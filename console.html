@@ -214,7 +214,10 @@
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="assessment">Đánh giá phương tiện định kỳ</a>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="plans">Kế hoạch bảo dưỡng/sửa chữa</a>
         <div class="mb-1 mt-4 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Danh mục &amp; cấu hình</div>
-        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="vehicleSystems">Hệ thống xe</a>
+        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="vehicleSystems">Hệ thống xe <span class="ml-auto text-[9px] text-sky-400">PWMS</span></a>
+        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="materials">Vật tư <span class="ml-auto text-[9px] text-sky-400">PWMS</span></a>
+        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="pwmsHistory">Lịch sử giá / NCC <span class="ml-auto text-[9px] text-sky-400">PWMS</span></a>
+        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="repairItems">Nội dung sửa chữa <span class="ml-auto text-[9px] text-sky-400">PWMS</span></a>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="serviceTypes">Loại dịch vụ</a>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="baremHours">Barem giờ công</a>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="catalog">Danh mục bảo dưỡng</a>
@@ -226,7 +229,7 @@
         <span class="nav-item disabled mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2 line-through">Vỏ lốp / ắc quy (retired)</span>
       </nav>
       <div class="border-t border-slate-800 px-4 py-3 text-[11px] text-slate-500">
-        Mẫu từ Excel khách: GLSPWMS + Dự toán SC HCM<br/>Bấm «Làm mới dữ liệu mẫu» để tải lại seed v15
+        Mẫu từ Excel khách: GLSPWMS + Dự toán SC HCM<br/>Bấm «Làm mới dữ liệu mẫu» để tải lại seed v21
       </div>
     </aside>
 
@@ -250,7 +253,7 @@
   <div id="toast" class="pointer-events-none fixed bottom-6 right-6 z-[60] hidden rounded-md bg-slate-900 px-4 py-2.5 text-sm text-white shadow-lg"></div>
 
 <script>
-const STORAGE_KEY = 'fleet-bdsc-proto-v18';
+const STORAGE_KEY = 'fleet-bdsc-proto-v21';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const money = (n) => (n == null ? '—' : Number(n).toLocaleString('vi-VN') + ' ₫');
@@ -2023,6 +2026,12 @@ const DEFAULT = {
     maintenanceRemindDaysBefore: 14,
     evalReminder: structuredClone(DEFAULT_EVAL_REMINDER),
   },
+  pwmsSync: {
+    materials: { lastSyncedAt: null, lastResult: null, status: 'IDLE' },
+    vehicleSystems: { lastSyncedAt: null, lastResult: null, status: 'IDLE' },
+    repairItems: { lastSyncedAt: null, lastResult: null, status: 'IDLE' },
+  },
+  pwmsValueHistory: [],
   repairItems: structuredClone(DEFAULT_REPAIR_ITEMS),
   materials: structuredClone(DEFAULT_MATERIALS),
   vehicleSystems: structuredClone(DEFAULT_VEHICLE_SYSTEMS),
@@ -5698,16 +5707,6 @@ const DEFAULT = {
   },
 };
 
-let DB = load();
-let view = {
-  name: 'history', histTab: 'vehicles', vehicleId: null, vehicleTab: 'plan',
-  plansTab: 'templates', templateId: null,
-  expandedPlanGroups: {},
-  orderId: null, catalogId: null, criteriaGroupId: null, from: null,
-  page: 1, pageSize: 10,
-  filters: defaultFilters(),
-};
-
 function defaultFilters() {
   return {
     search: '',
@@ -5769,8 +5768,151 @@ function contentLookupOptions() {
   DB.localLookups.contents.forEach(c => map.set(c.name.toLowerCase(), { id: c.id, name: c.name, system: c.system || 'Khác', source: 'local' }));
   return [...map.values()];
 }
+const PWMS_SUPPLIER_POOL = [
+  'Công ty TNHH Phụ tùng GLS',
+  'Hyundai Phú Lâm',
+  'Đại Dương Xanh',
+  'Thiên Mã Parts',
+  'Kho nội bộ GLS LSIP',
+];
+const PWMS_WAREHOUSE_POOL = ['Kho VT HCM', 'Kho VT BR-VT', 'Kho VT HP', 'Kho trung tâm'];
+
+function hashStr(s) {
+  let h = 0;
+  String(s || '').split('').forEach(c => { h = ((h << 5) - h) + c.charCodeAt(0); h |= 0; });
+  return Math.abs(h);
+}
+
+/** Gán giá tham chiếu / NCC / kho / tồn mẫu từ PWMS nếu thiếu (cache danh mục). */
+function enrichMaterialPwmsFields(m, force) {
+  if (!m || m.localOnly) return m;
+  const h = hashStr(m.code || m.id || m.name);
+  if (force || m.refPrice == null) m.refPrice = 80000 + (h % 180) * 25000;
+  if (force || !m.supplier) m.supplier = PWMS_SUPPLIER_POOL[h % PWMS_SUPPLIER_POOL.length];
+  if (force || !m.warehouse) m.warehouse = PWMS_WAREHOUSE_POOL[h % PWMS_WAREHOUSE_POOL.length];
+  if (force || m.stockQty == null) m.stockQty = (h % 40) + 1;
+  if (!m.uom) m.uom = 'Cái';
+  return m;
+}
+
+function enrichAllMaterials(force) {
+  (DB.materials || []).forEach(m => enrichMaterialPwmsFields(m, force));
+}
+
+function materialByCode(code) {
+  if (!code) return null;
+  return (DB.materials || []).find(m => String(m.code) === String(code));
+}
+function ensurePwmsValueHistory() {
+  if (!Array.isArray(DB.pwmsValueHistory)) DB.pwmsValueHistory = [];
+}
+function pushPwmsValueHistory(entry) {
+  ensurePwmsValueHistory();
+  DB.pwmsValueHistory.unshift({ id: uid('pvh'), at: nowStamp(), ...entry });
+  if (DB.pwmsValueHistory.length > 500) DB.pwmsValueHistory.length = 500;
+}
+function captureMaterialSnapshotFields(m) {
+  return {
+    code: m.code || null, name: m.name || '', uom: m.uom || 'Cái',
+    price: Number(m.price) || 0, supplier: m.supplier || null, warehouse: m.warehouse || null,
+    stockQty: m.stockQty != null ? m.stockQty : null,
+    priceKind: m.priceKind || (m.source === 'PWMS' ? 'REF' : 'MANUAL'),
+    issueLineRef: m.issueLineRef || null,
+  };
+}
+function stampMaterialSnapshot(m, o, reason) {
+  if (!m) return m;
+  const at = nowStamp();
+  const prev = m.snapshot || null;
+  const next = captureMaterialSnapshotFields(m);
+  m.snapshot = { ...next, at, reason: reason || 'FILL', frozen: !!m.snapshotFrozen };
+  m.snapshotAt = at;
+  if (!Array.isArray(m.lineHistory)) m.lineHistory = [];
+  const changed = !prev || prev.price !== next.price || prev.supplier !== next.supplier
+    || prev.warehouse !== next.warehouse || prev.name !== next.name;
+  if (changed || !prev) {
+    m.lineHistory.unshift({
+      at, reason: reason || 'FILL',
+      from: prev ? { price: prev.price, supplier: prev.supplier, warehouse: prev.warehouse, priceKind: prev.priceKind } : null,
+      to: { price: next.price, supplier: next.supplier, warehouse: next.warehouse, priceKind: next.priceKind },
+    });
+    if (m.lineHistory.length > 20) m.lineHistory.length = 20;
+    pushPwmsValueHistory({
+      kind: reason || 'FILL', orderId: o?.id || null, orderCode: o?.code || null, orderDate: o?.date || null,
+      materialCode: next.code, materialName: next.name, qty: m.qty, price: next.price,
+      supplier: next.supplier, warehouse: next.warehouse, priceKind: next.priceKind,
+      prevPrice: prev?.price ?? null, vehicleId: o?.vehicleId || null,
+    });
+  }
+  return m;
+}
+function freezeOrderMaterialSnapshots(o, reason) {
+  if (!o) return;
+  ensureOrderApproval(o);
+  (o.materials || []).forEach(m => {
+    stampMaterialSnapshot(m, o, reason || 'FREEZE');
+    m.snapshotFrozen = true;
+    if (m.snapshot) m.snapshot.frozen = true;
+  });
+  o.materialsSnapshotAt = nowStamp();
+  o.materialsSnapshotReason = reason || 'FREEZE';
+}
+function ensureMaterialSnapshotsOnOrder(o) {
+  if (!o) return;
+  ensureOrderApproval(o);
+  const frozen = o.status === 'COMPLETED' || o.purchaseSync?.status === 'SYNCED'
+    || o.approvalStatus === 'APPROVED' || o.approvalStatus === 'PENDING_APPROVAL';
+  (o.materials || []).forEach(m => {
+    if (m.snapshot && m.snapshotAt) {
+      if (frozen) { m.snapshotFrozen = true; if (m.snapshot) m.snapshot.frozen = true; }
+      return;
+    }
+    if (m.source === 'PWMS') {
+      const cat = materialByCode(m.code);
+      if (cat) {
+        enrichMaterialPwmsFields(cat, false);
+        if (m.supplier == null) m.supplier = cat.supplier;
+        if (m.warehouse == null) m.warehouse = cat.warehouse;
+        if (m.stockQty == null) m.stockQty = cat.stockQty;
+        if (!m.priceKind) m.priceKind = o.purchaseSync?.status === 'SYNCED' ? 'ISSUE' : 'REF';
+      }
+    }
+    const at = (o.date ? (o.date + ' 15:00') : nowStamp());
+    m.snapshot = { ...captureMaterialSnapshotFields(m), at, reason: 'SEED', frozen };
+    m.snapshotAt = at;
+    m.snapshotFrozen = frozen;
+    if (!Array.isArray(m.lineHistory)) {
+      m.lineHistory = [{ at, reason: 'SEED', from: null, to: { price: m.price, supplier: m.supplier, warehouse: m.warehouse, priceKind: m.priceKind } }];
+    }
+  });
+  if (frozen && !o.materialsSnapshotAt) {
+    o.materialsSnapshotAt = o.materials?.[0]?.snapshotAt || ((o.date || '') + ' 15:00');
+    o.materialsSnapshotReason = o.purchaseSync?.status === 'SYNCED' ? 'ISSUE_SYNC' : (o.status === 'COMPLETED' ? 'COMPLETE' : 'APPROVE');
+  }
+}
+function liveCatalogContrast(m) {
+  if (!m?.code || m.source !== 'PWMS') return null;
+  const cat = materialByCode(m.code);
+  if (!cat) return null;
+  enrichMaterialPwmsFields(cat, false);
+  if (Number(cat.refPrice) === Number(m.price) && cat.supplier === m.supplier) return null;
+  return { refPrice: cat.refPrice, supplier: cat.supplier, warehouse: cat.warehouse };
+}
+
+
 function materialMasterOptions() {
-  return (DB.materials || []).filter(m => !m.localOnly).map(m => ({ id: m.id, code: m.code, name: m.name, uom: m.uom || 'Cái', source: 'master' }));
+  enrichAllMaterials(false);
+  return (DB.materials || []).filter(m => !m.localOnly).map(m => ({
+    id: m.id,
+    code: m.code,
+    name: m.name,
+    uom: m.uom || 'Cái',
+    refPrice: m.refPrice,
+    supplier: m.supplier || '',
+    warehouse: m.warehouse || '',
+    stockQty: m.stockQty,
+    source: 'master',
+  }));
 }
 function materialLocalOptions() {
   ensureLocalLookups();
@@ -6232,6 +6374,12 @@ function load() {
             ...((parsed.settings && parsed.settings.evalReminder) || {}),
           },
         },
+        pwmsSync: {
+          materials: { lastSyncedAt: null, lastResult: null, status: 'IDLE', ...(parsed.pwmsSync?.materials || {}) },
+          vehicleSystems: { lastSyncedAt: null, lastResult: null, status: 'IDLE', ...(parsed.pwmsSync?.vehicleSystems || {}) },
+          repairItems: { lastSyncedAt: null, lastResult: null, status: 'IDLE', ...(parsed.pwmsSync?.repairItems || {}) },
+        },
+        pwmsValueHistory: Array.isArray(parsed.pwmsValueHistory) ? parsed.pwmsValueHistory : [],
         repairItems: parsed.repairItems?.length ? parsed.repairItems : structuredClone(DEFAULT_REPAIR_ITEMS),
         materials: parsed.materials?.length ? parsed.materials : structuredClone(DEFAULT_MATERIALS),
         vehicleSystems: parsed.vehicleSystems?.length ? parsed.vehicleSystems : structuredClone(DEFAULT_VEHICLE_SYSTEMS),
@@ -6247,15 +6395,27 @@ function load() {
       };
       (db.orders || []).forEach(ensureOrderApproval);
       (db.baremHours || []).forEach(normalizeBaremRow);
+      (db.materials || []).forEach(m => enrichMaterialPwmsFields(m, false));
       return db;
     }
   } catch {}
   const db = structuredClone(DEFAULT);
   (db.orders || []).forEach(ensureOrderApproval);
   (db.baremHours || []).forEach(normalizeBaremRow);
+  (db.materials || []).forEach(m => enrichMaterialPwmsFields(m, false));
   return db;
 }
 function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }
+
+let DB = load();
+let view = {
+  name: 'history', histTab: 'vehicles', vehicleId: null, vehicleTab: 'plan',
+  plansTab: 'templates', templateId: null,
+  expandedPlanGroups: {},
+  orderId: null, catalogId: null, criteriaGroupId: null, from: null,
+  page: 1, pageSize: 10,
+  filters: defaultFilters(),
+};
 
 function toast(msg) {
   const el = $('#toast');
@@ -6462,8 +6622,9 @@ function recalcOrderCost(o) {
   return o.cost;
 }
 function materialCatalogOptionsHtml(selectedCode) {
-  return (DB.materials || []).slice(0, 80).map(m =>
-    `<option value="${esc(m.code)}" data-name="${esc(m.name)}" data-uom="${esc(m.uom || 'Cái')}" ${selectedCode === m.code ? 'selected' : ''}>${esc(m.code)} · ${esc(m.name)}</option>`
+  enrichAllMaterials(false);
+  return (DB.materials || []).filter(m => !m.localOnly).slice(0, 80).map(m =>
+    `<option value="${esc(m.code)}" data-name="${esc(m.name)}" data-uom="${esc(m.uom || 'Cái')}" data-price="${m.refPrice ?? 0}" data-supplier="${esc(m.supplier || '')}" data-warehouse="${esc(m.warehouse || '')}" data-stock="${m.stockQty ?? ''}" ${selectedCode === m.code ? 'selected' : ''}>${esc(m.code)} · ${esc(m.name)} · ${money(m.refPrice)}</option>`
   ).join('');
 }
 function materialsSummary(list) {
@@ -6747,6 +6908,9 @@ function summary() {
 function render() {
   (DB.catalog || []).forEach(normalizeCatalog);
   (DB.baremHours || []).forEach(normalizeBaremRow);
+  enrichAllMaterials(false);
+  ensurePwmsValueHistory();
+  (DB.orders || []).forEach(o => { ensureOrderApproval(o); ensureMaterialSnapshotsOnOrder(o); });
   (DB.vehicleSystems || []).forEach(s => {
     if (!s?.name) return;
     const next = slugifyVi(s.name);
@@ -6772,6 +6936,9 @@ function render() {
   else if (view.name === 'reminder') main.innerHTML = pageReminder();
   else if (view.name === 'assessment') main.innerHTML = pageAssessment();
   else if (view.name === 'vehicleSystems') main.innerHTML = pageVehicleSystemsMaster();
+  else if (view.name === 'materials') main.innerHTML = pageMaterialsMaster();
+  else if (view.name === 'pwmsHistory') main.innerHTML = pagePwmsValueHistory();
+  else if (view.name === 'repairItems') main.innerHTML = pageRepairItemsMaster();
   else if (view.name === 'serviceTypes') main.innerHTML = pageServiceTypesMaster();
   else if (view.name === 'baremHours') main.innerHTML = pageBaremHoursMaster();
   else if (view.name === 'catalog') main.innerHTML = pageCatalogMaster();
@@ -6796,6 +6963,7 @@ function updateNav() {
     catHistory: 'Lịch sử theo danh mục bảo dưỡng', vehicleHistory: 'Lịch sử bảo dưỡng / sửa chữa theo xe',
     plans: 'Kế hoạch bảo dưỡng/sửa chữa', planTemplate: 'Mẫu kế hoạch', reminder: 'Nhắc bảo dưỡng',
     assessment: 'Đánh giá phương tiện định kỳ', vehicleSystems: 'Hệ thống xe',
+    materials: 'Vật tư (PWMS)', pwmsHistory: 'Lịch sử giá / NCC (PWMS)', repairItems: 'Nội dung sửa chữa (PWMS)',
     catalog: 'Danh mục bảo dưỡng', catalogDetail: 'Chi tiết danh mục bảo dưỡng',
     criteria: 'Tiêu chí đánh giá', criteriaDetail: 'Chi tiết nhóm tiêu chí',
     settings: 'Cài đặt nhắc đánh giá phương tiện',
@@ -7649,18 +7817,37 @@ function pageOrder() {
             <div class="font-semibold text-sm">Vật tư (kho mua hàng + kỹ thuật viên ghi)</div>
             <div class="flex flex-wrap gap-2">
               ${canEditOrderDetail(o) ? `<button type="button" data-add-material="${o.id}" class="btn btn-primary btn-sm">+ Thêm vật tư</button>` : ''}
+              ${hasPwms && canEditOrderDetail(o)
+                ? `<button type="button" data-refresh-pwms-lines="${o.id}" class="btn btn-outline btn-sm !border-sky-400 !bg-sky-50 text-sky-900">Đồng bộ giá / NCC vào phiếu</button>`
+                : ''}
               ${hasPwms && canSyncPurchase(o) && ps.status !== 'SYNCING'
-                ? `<button data-sync-purchase="${o.id}" class="btn btn-outline btn-sm !border-sky-400 !bg-sky-50 text-sky-900">${ps.status === 'SYNCED' ? 'Đồng bộ lại' : 'Đồng bộ mua hàng'}</button>`
+                ? `<button data-sync-purchase="${o.id}" class="btn btn-outline btn-sm !border-sky-400 !bg-sky-50 text-sky-900">${ps.status === 'SYNCED' ? 'Đồng bộ lại xuất kho' : 'Đồng bộ mua hàng (xuất kho)'}</button>`
                 : ps.status === 'SYNCING' ? `<span class="text-xs font-medium text-sky-700">Đang đồng bộ…</span>` : ''}
             </div>
           </div>
-          <div class="space-y-3 px-5 py-3">${syncBanner}</div>
+          <div class="space-y-3 px-5 py-3">${syncBanner}
+            ${hasPwms && canEditOrderDetail(o) ? `<div class="rounded-md border border-sky-200 bg-sky-50/80 px-3 py-2 text-xs text-sky-950 leading-relaxed">
+              <strong>Hai bước đồng bộ:</strong>
+              (1) Khi lập phiếu — «Đồng bộ giá / NCC vào phiếu» lấy <em>giá tham chiếu · nhà cung cấp · kho · tồn</em> từ danh mục PWMS để điền dòng vật tư.
+              (2) Sau duyệt / thực hiện — «Đồng bộ mua hàng» lấy <em>giá xuất thực · phiếu xuất</em> từ kho.
+              Mỗi lần điền đều <strong>lưu kèm phiếu</strong> (snapshot) để báo cáo và xem phiếu quá khứ.
+            </div>` : ''}
+            ${hasPwms && !canEditOrderDetail(o) ? `<div class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-950 leading-relaxed">
+              <strong>Thông tin lưu kèm phiếu</strong> — giá / NCC / kho là bản tại
+              <strong>${esc(o.materialsSnapshotAt || (o.materials || []).find(x => x.snapshotAt)?.snapshotAt || '—')}</strong>
+              (${esc(o.materialsSnapshotReason || 'SNAPSHOT')}). Không đổi khi PWMS cập nhật sau.
+              <button type="button" class="ml-1 text-sky-800 underline" data-nav="pwmsHistory">Xem lịch sử giá / NCC</button>
+            </div>` : ''}
+          </div>
           <div class="overflow-x-auto border-t border-slate-100">
             <table class="min-w-full text-sm">
               <thead class="bg-slate-50 text-slate-600"><tr>
                 <th class="th text-left">Nguồn vật tư</th><th class="th text-left">Mã</th><th class="th text-left">Tên</th>
                 <th class="th text-right">SL</th><th class="th text-left">ĐVT</th>
-                <th class="th text-right">Đơn giá</th>
+                <th class="th text-right">Đơn giá (lưu kèm)</th>
+                <th class="th text-left">Nhà cung cấp</th>
+                <th class="th text-left">Kho</th>
+                <th class="th text-left">Snapshot</th>
                 <th class="th text-left">Trạng thái giá</th>
                 ${canEditOrderDetail(o) ? '<th class="th text-center">Thao tác</th>' : ''}
               </tr></thead>
@@ -7685,13 +7872,20 @@ function pageOrder() {
                   <td class="td text-right">${m.qty}</td>
                   <td class="td">${m.uom || '—'}</td>
                   <td class="td text-right tabular-nums font-medium">${money(m.price)}</td>
-                  <td class="td text-xs">${priceState}</td>
+                  <td class="td text-xs">${esc(m.supplier || '—')}</td>
+                  <td class="td text-xs">${esc(m.warehouse || '—')}</td>
+                  <td class="td text-xs">${(m.snapshotFrozen
+                    ? `<span class="chip bg-emerald-100 text-emerald-800">Đã khóa</span>`
+                    : `<span class="chip bg-amber-100 text-amber-800">Chưa khóa</span>`)
+                    + `<div class="text-[10px] text-slate-500 mt-0.5">${esc(m.snapshotAt || m.snapshot?.at || '—')}</div>`}</td>
+                  <td class="td text-xs">${priceState}${(!canEditOrderDetail(o) && isPwms && liveCatalogContrast(m))
+                    ? `<div class="text-[10px] text-slate-400 mt-0.5">PWMS hiện tại: ${money(liveCatalogContrast(m).refPrice)}</div>` : ''}</td>
                   ${canEditOrderDetail(o) ? `<td class="td text-center whitespace-nowrap">
                     <button type="button" data-edit-material="${o.id}:${idx}" class="btn btn-outline btn-xs mr-1">Sửa</button>
                     <button type="button" data-del-material="${o.id}:${idx}" class="btn btn-outline btn-xs text-rose-700 !border-rose-300">Xóa</button>
                   </td>` : ''}
                 </tr>`;
-              }).join('') || `<tr><td colspan="${canEditOrderDetail(o) ? 8 : 7}" class="px-5 py-8 text-center text-slate-400">${canEditOrderDetail(o) ? 'Chưa có vật tư — bấm «Thêm vật tư»' : 'Chưa có vật tư'}</td></tr>`}</tbody>
+              }).join('') || `<tr><td colspan="${canEditOrderDetail(o) ? 11 : 10}" class="px-5 py-8 text-center text-slate-400">${canEditOrderDetail(o) ? 'Chưa có vật tư — bấm «Thêm vật tư»' : 'Chưa có vật tư'}</td></tr>`}</tbody>
             </table>
           </div>
         </div>
@@ -8556,11 +8750,112 @@ function pageCatalogMaster() {
   );
 }
 
+
+/* ========== PWMS catalog sync (on-demand) ========== */
+const PWMS_SYNC_LABELS = {
+  materials: 'Vật tư / Product',
+  vehicleSystems: 'Hệ thống xe / Repair_Category',
+  repairItems: 'Nội dung sửa chữa',
+};
+
+function ensurePwmsSyncMeta() {
+  if (!DB.pwmsSync) DB.pwmsSync = structuredClone(DEFAULT.pwmsSync);
+  ['materials', 'vehicleSystems', 'repairItems'].forEach(k => {
+    DB.pwmsSync[k] = { lastSyncedAt: null, lastResult: null, status: 'IDLE', ...(DB.pwmsSync[k] || {}) };
+  });
+}
+
+function pwmsSyncMeta(key) {
+  ensurePwmsSyncMeta();
+  return DB.pwmsSync[key] || { lastSyncedAt: null, lastResult: null, status: 'IDLE' };
+}
+
+function pwmsSyncActions(key) {
+  const m = pwmsSyncMeta(key);
+  const syncing = m.status === 'SYNCING';
+  const last = m.lastSyncedAt
+    ? `Lần đồng bộ: <strong>${esc(m.lastSyncedAt)}</strong>${m.lastResult ? ' · ' + esc(m.lastResult) : ''}`
+    : 'Chưa đồng bộ từ PWMS trong phiên này';
+  return `
+    <button type="button" data-pwms-sync="${esc(key)}" class="btn btn-outline !border-sky-400 !bg-sky-50 text-sky-900" ${syncing ? 'disabled' : ''}>
+      ${syncing ? 'Đang đồng bộ…' : (m.lastSyncedAt ? 'Đồng bộ lại từ PWMS' : 'Đồng bộ từ PWMS')}
+    </button>
+    <span class="text-[11px] text-slate-500 self-center max-w-[280px] leading-snug">${last}</span>`;
+}
+
+function pwmsSourceBanner(text) {
+  return `<div class="mb-4 rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-950 leading-relaxed">
+    <strong>Nguồn PWMS</strong> — ${text}
+    Bấm <strong>«Đồng bộ từ PWMS»</strong> để kéo cập nhật tăng dần (mô phỏng on-demand; thực tế còn cron theo giờ).
+  </div>`;
+}
+
+function runPwmsCatalogSync(key) {
+  ensurePwmsSyncMeta();
+  const meta = DB.pwmsSync[key];
+  if (!meta || meta.status === 'SYNCING') return;
+  meta.status = 'SYNCING';
+  toast('Đang đồng bộ ' + (PWMS_SYNC_LABELS[key] || key) + ' từ PWMS…');
+  render();
+  setTimeout(() => {
+    let upserted = 0;
+    let deactivated = 0;
+    if (key === 'materials') {
+      upserted = Math.min(8, (DB.materials || []).length);
+      (DB.materials || []).slice(0, upserted).forEach(m => {
+        const prevPrice = m.refPrice;
+        enrichMaterialPwmsFields(m, true);
+        m.refPrice = Math.round((m.refPrice || 100000) * (1 + ((hashStr(nowStamp() + m.code) % 7) - 3) / 100));
+        m.stockQty = Math.max(0, (m.stockQty || 0) + ((hashStr(m.code + nowStamp()) % 5) - 2));
+        m.lastPwmsSyncAt = nowStamp();
+        pushPwmsValueHistory({
+          kind: 'CATALOG_SYNC', materialCode: m.code, materialName: m.name,
+          price: m.refPrice, supplier: m.supplier, warehouse: m.warehouse, priceKind: 'REF', prevPrice: prevPrice ?? null,
+        });
+      });
+      if (!(DB.materials || []).some(m => m.code === 'VTU-SYNC-DEMO')) {
+        const demo = {
+          id: uid('m'),
+          code: 'VTU-SYNC-DEMO',
+          name: 'Vật tư mới từ PWMS (mẫu đồng bộ)',
+          uom: 'Cái',
+          lastPwmsSyncAt: nowStamp(),
+        };
+        enrichMaterialPwmsFields(demo, true);
+        DB.materials.unshift(demo);
+        upserted += 1;
+      }
+    } else if (key === 'vehicleSystems') {
+      upserted = (DB.vehicleSystems || []).filter(s => s.pwmsCategoryId).length;
+      (DB.vehicleSystems || []).forEach(s => {
+        if (s.pwmsCategoryId) s.lastPwmsSyncAt = nowStamp();
+      });
+    } else if (key === 'repairItems') {
+      upserted = Math.min(8, (DB.repairItems || []).length);
+      (DB.repairItems || []).slice(0, upserted).forEach(r => { r.lastPwmsSyncAt = nowStamp(); });
+      if (!(DB.repairItems || []).some(r => r.id === 'ri-sync-demo')) {
+        DB.repairItems.unshift({
+          id: 'ri-sync-demo',
+          name: 'Nội dung SC mới từ PWMS (mẫu đồng bộ)',
+          system: 'Hệ Thống Máy Xe',
+          lastPwmsSyncAt: nowStamp(),
+        });
+        upserted += 1;
+      }
+    }
+    meta.status = 'IDLE';
+    meta.lastSyncedAt = nowStamp();
+    meta.lastResult = `+${upserted} cập nhật` + (deactivated ? ` · ${deactivated} ngưng` : '');
+    toast('Đã đồng bộ ' + (PWMS_SYNC_LABELS[key] || key) + ' · ' + meta.lastResult);
+    render();
+  }, 1100);
+}
+
 function pageVehicleSystemsMaster() {
   const f = F();
   const list = (DB.vehicleSystems || []).slice().sort((a, b) => (a.sort || 0) - (b.sort || 0));
   const filtered = list.filter(s => {
-    if (!matchSearch([s.code, s.name, s.description].join(' '), f.search)) return false;
+    if (!matchSearch([s.code, s.name, s.description, s.pwmsCategoryId].join(' '), f.search)) return false;
     if (f.active === 'ACTIVE' && s.active === false) return false;
     if (f.active === 'INACTIVE' && s.active !== false) return false;
     return true;
@@ -8570,9 +8865,10 @@ function pageVehicleSystemsMaster() {
   (DB.catalog || []).forEach(c => { if (c.systemId) used[c.systemId] = (used[c.systemId] || 0) + 1; });
   return pageShell(
     'Hệ thống xe',
-    'Danh mục hệ thống kỹ thuật trên xe (ví dụ hệ thống phanh, hệ thống dầu động cơ). Danh mục bảo dưỡng gắn vào hệ thống này — vật tư chọn khi lập phiếu.',
-    `<button id="btnAddVehicleSystem" class="btn btn-primary">+ Hệ thống</button>`,
+    'Ánh xạ từ nhóm sửa chữa PWMS (Repair_Category). Danh mục bảo dưỡng gắn vào hệ thống — vật tư chọn khi lập phiếu.',
+    `${pwmsSyncActions('vehicleSystems')}<button id="btnAddVehicleSystem" class="btn btn-primary">+ Hệ thống</button>`,
     `
+    ${pwmsSourceBanner('Danh mục hệ thống kỹ thuật lấy từ nhóm / hệ thống trên PWMS. Có thể bổ sung tay trên TMS khi cần.')}
     ${filterBarShell([
       filterSearch('flt-search', 'Mã, tên hệ thống…', f.search),
       filterSelect('flt-active', 'Trạng thái', f.active, [['ALL','Tất cả'], ['ACTIVE','Đang dùng'], ['INACTIVE','Ngưng']]),
@@ -8581,6 +8877,7 @@ function pageVehicleSystemsMaster() {
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-slate-600"><tr>
           <th class="th text-left">Mã</th>
+          <th class="th text-left">Mã PWMS</th>
           <th class="th text-left">Tên hệ thống</th>
           <th class="th text-left">Mô tả</th>
           <th class="th text-right">Danh mục BD</th>
@@ -8590,6 +8887,7 @@ function pageVehicleSystemsMaster() {
         <tbody>
           ${pg.items.map(s => `<tr class="row-h">
             <td class="td font-mono text-xs">${esc(s.code)}</td>
+            <td class="td font-mono text-xs text-sky-700">${esc(s.pwmsCategoryId || '—')}</td>
             <td class="td font-medium text-slate-900">${esc(s.name)}</td>
             <td class="td text-xs text-slate-600 max-w-[280px]">${esc(s.description || '—')}</td>
             <td class="td text-right tabular-nums">${used[s.id] || 0}</td>
@@ -8598,7 +8896,172 @@ function pageVehicleSystemsMaster() {
               <button data-edit-vehicle-system="${esc(s.id)}" class="btn btn-outline btn-sm">Sửa</button>
               <button data-toggle-vehicle-system="${esc(s.id)}" class="btn btn-outline btn-sm">${s.active === false ? 'Bật' : 'Ngưng'}</button>
             </td>
-          </tr>`).join('') || `<tr><td colspan="6" class="px-5 py-12 text-center text-slate-500">Chưa có hệ thống</td></tr>`}
+          </tr>`).join('') || `<tr><td colspan="7" class="px-5 py-12 text-center text-slate-500">Chưa có hệ thống</td></tr>`}
+        </tbody>
+      </table>
+      ${paginationBar(pg)}
+    </div>`
+  );
+}
+
+function pageMaterialsMaster() {
+  const f = F();
+  const list = (DB.materials || []).filter(m => !m.localOnly);
+  const filtered = list.filter(m => matchSearch([m.code, m.name, m.uom, m.supplier, m.warehouse].join(' '), f.search));
+  const pg = paginate(filtered);
+  return pageShell(
+    'Vật tư',
+    'Bộ nhớ đệm danh mục Product từ PWMS — dùng tra cứu khi lập phiếu / kế hoạch. Số seri không lưu master tại đây (chỉ tra cứu khi gắn hạng mục).',
+    pwmsSyncActions('materials'),
+    `
+    ${pwmsSourceBanner('Product là nguồn sự thật trên PWMS. TMS chỉ cache để lookup; dòng KTV nhập tay nằm riêng và không ghi đè danh mục này.')}
+    ${filterBarShell([
+      filterSearch('flt-search', 'Mã, tên vật tư…', f.search),
+    ].join(''), `${filtered.length} / ${list.length} vật tư`)}
+    <div class="card overflow-hidden">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600"><tr>
+          <th class="th text-left">Mã</th>
+          <th class="th text-left">Tên vật tư</th>
+          <th class="th text-left">ĐVT</th>
+          <th class="th text-right">Giá tham chiếu</th>
+          <th class="th text-left">Nhà cung cấp</th>
+          <th class="th text-left">Kho</th>
+          <th class="th text-right">Tồn</th>
+          <th class="th text-left">Đồng bộ gần nhất</th>
+        </tr></thead>
+        <tbody>
+          ${pg.items.map(m => { enrichMaterialPwmsFields(m, false); return `<tr class="row-h">
+            <td class="td font-mono text-xs text-sky-700">${esc(m.code || '—')}</td>
+            <td class="td font-medium">${esc(m.name)}</td>
+            <td class="td">${esc(m.uom || 'Cái')}</td>
+            <td class="td text-right tabular-nums">${money(m.refPrice)}</td>
+            <td class="td text-xs">${esc(m.supplier || '—')}</td>
+            <td class="td text-xs">${esc(m.warehouse || '—')}</td>
+            <td class="td text-right tabular-nums">${m.stockQty ?? '—'}</td>
+            <td class="td text-xs text-slate-500 tabular-nums">${esc(m.lastPwmsSyncAt || pwmsSyncMeta('materials').lastSyncedAt || '—')}</td>
+          </tr>`; }).join('') || `<tr><td colspan="8" class="px-5 py-12 text-center text-slate-500">Chưa có vật tư · bấm Đồng bộ từ PWMS</td></tr>`}
+        </tbody>
+      </table>
+      ${paginationBar(pg)}
+    </div>`
+  );
+}
+
+function pagePwmsValueHistory() {
+  ensurePwmsValueHistory();
+  enrichAllMaterials(false);
+  const f = F();
+  const fromOrders = [];
+  (DB.orders || []).forEach(o => {
+    ensureMaterialSnapshotsOnOrder(o);
+    (o.materials || []).forEach(m => {
+      fromOrders.push({
+        id: 'ord-' + o.id + '-' + (m.id || m.code),
+        at: m.snapshotAt || o.materialsSnapshotAt || o.date,
+        kind: m.snapshotFrozen ? 'ORDER_SNAPSHOT' : 'ORDER_OPEN',
+        orderId: o.id, orderCode: o.code, orderDate: o.date,
+        materialCode: m.code, materialName: m.name, qty: m.qty,
+        price: m.price, supplier: m.supplier, warehouse: m.warehouse,
+        priceKind: m.priceKind, prevPrice: m.priceBeforeSync ?? null,
+        vehicleId: o.vehicleId, frozen: !!m.snapshotFrozen,
+      });
+    });
+  });
+  const seen = new Set();
+  const merged = [];
+  [...(DB.pwmsValueHistory || []), ...fromOrders].forEach(e => {
+    const key = e.id || [e.orderCode, e.materialCode, e.at, e.kind, e.price].join('|');
+    if (seen.has(key)) return;
+    seen.add(key); merged.push(e);
+  });
+  merged.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+  const filtered = merged.filter(e => {
+    if (!matchSearch([e.orderCode, e.materialCode, e.materialName, e.supplier, e.warehouse, e.kind].join(' '), f.search)) return false;
+    if (f.active === 'FROZEN' && !(e.frozen || e.kind === 'ORDER_SNAPSHOT' || e.kind === 'ISSUE_SYNC' || e.kind === 'COMPLETE' || e.kind === 'SUBMIT')) return false;
+    if (f.active === 'LIVE' && (e.frozen || e.kind === 'ORDER_SNAPSHOT')) return false;
+    return true;
+  });
+  const pg = paginate(filtered);
+  const kindLabel = (k) => ({
+    FILL: 'Điền form', REFRESH: 'Đồng bộ giá/NCC vào phiếu', ISSUE_SYNC: 'Đồng bộ xuất kho',
+    SUBMIT: 'Khóa khi nộp duyệt', COMPLETE: 'Khóa khi hoàn thành', FREEZE: 'Khóa snapshot',
+    SEED: 'Dữ liệu mẫu', CATALOG_SYNC: 'Đồng bộ danh mục', ORDER_SNAPSHOT: 'Snapshot phiếu', ORDER_OPEN: 'Phiếu đang mở',
+  }[k] || k || '—');
+  return pageShell(
+    'Lịch sử giá / NCC (PWMS)',
+    'Nhật ký báo cáo & đối chiếu. Phiếu quá khứ luôn hiển thị giá/NCC lưu kèm phiếu — không lấy giá danh mục hiện tại.',
+    `<button type="button" data-nav="materials" class="btn btn-outline">← Danh mục vật tư</button>`,
+    `
+    <div class="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700 leading-relaxed">
+      <strong>Quy tắc:</strong> chọn VT / đồng bộ giá / xuất kho / nộp duyệt / hoàn thành → snapshot trên dòng phiếu + nhật ký tại đây.
+      Báo cáo chi phí BD/SC đọc từ <em>snapshot phiếu</em>.
+    </div>
+    ${filterBarShell([
+      filterSearch('flt-search', 'Mã phiếu, VT, NCC…', f.search),
+      filterSelect('flt-active', 'Loại', f.active, [['ALL','Tất cả'], ['FROZEN','Đã khóa snapshot'], ['LIVE','Chưa khóa / danh mục']]),
+    ].join(''), `${filtered.length} bản ghi`)}
+    <div class="card overflow-hidden"><div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600"><tr>
+          <th class="th text-left">Thời điểm</th><th class="th text-left">Sự kiện</th><th class="th text-left">Phiếu</th>
+          <th class="th text-left">Vật tư</th><th class="th text-right">Đơn giá</th><th class="th text-left">NCC</th>
+          <th class="th text-left">Kho</th><th class="th text-center">Xem phiếu</th>
+        </tr></thead>
+        <tbody>
+          ${pg.items.map(e => {
+            const v = e.vehicleId ? vehicleById(e.vehicleId) : null;
+            return `<tr class="row-h">
+              <td class="td text-xs tabular-nums whitespace-nowrap">${esc(e.at || '—')}</td>
+              <td class="td text-xs"><span class="chip bg-sky-50 text-sky-900">${esc(kindLabel(e.kind))}</span>
+                ${e.prevPrice != null && e.prevPrice !== e.price ? `<div class="text-[10px] text-slate-500 mt-0.5">${money(e.prevPrice)} → ${money(e.price)}</div>` : ''}</td>
+              <td class="td text-xs">${e.orderCode ? `<div class="font-medium">${esc(e.orderCode)}</div><div class="text-slate-500">${esc(e.orderDate || '')}${v ? ' · ' + esc(v.plate) : ''}</div>` : '—'}</td>
+              <td class="td"><div class="font-mono text-[11px] text-sky-700">${esc(e.materialCode || '—')}</div><div class="text-xs">${esc(e.materialName || '')}${e.qty != null ? ' ×' + e.qty : ''}</div></td>
+              <td class="td text-right tabular-nums font-medium">${money(e.price)}</td>
+              <td class="td text-xs">${esc(e.supplier || '—')}</td>
+              <td class="td text-xs">${esc(e.warehouse || '—')}</td>
+              <td class="td text-center">${e.orderId ? `<button type="button" data-open-order="${esc(e.orderId)}" class="btn btn-outline btn-xs">Mở</button>` : '—'}</td>
+            </tr>`;
+          }).join('') || `<tr><td colspan="8" class="px-5 py-12 text-center text-slate-500">Chưa có lịch sử</td></tr>`}
+        </tbody>
+      </table>
+    </div>${paginationBar(pg)}</div>`
+  );
+}
+
+function pageRepairItemsMaster() {
+  const f = F();
+  const list = (DB.repairItems || []).slice();
+  const filtered = list.filter(r => {
+    if (!matchSearch([r.name, r.system].join(' '), f.search)) return false;
+    if (f.system !== 'ALL' && r.system !== f.system && r.system !== systemNameById(f.system)) return false;
+    return true;
+  });
+  const pg = paginate(filtered);
+  const sysOpts = [['ALL', 'Tất cả'], ...[...new Set(list.map(r => r.system).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi')).map(n => [n, n])];
+  return pageShell(
+    'Nội dung sửa chữa',
+    'Danh mục nội dung / hạng mục sửa chữa lấy từ PWMS (bản mẫu khách) — dùng gợi ý khi lập phiếu và gắn danh mục bảo dưỡng.',
+    pwmsSyncActions('repairItems'),
+    `
+    ${pwmsSourceBanner('Nội dung sửa chữa đồng bộ từ Sheet / AppSheet PWMS. Có thể bổ sung nội bộ khi lập phiếu (không đẩy ngược PWMS).')}
+    ${filterBarShell([
+      filterSearch('flt-search', 'Tên nội dung, hệ thống…', f.search),
+      filterSelect('flt-system', 'Hệ thống', f.system, sysOpts),
+    ].join(''), `${filtered.length} / ${list.length} nội dung`)}
+    <div class="card overflow-hidden">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600"><tr>
+          <th class="th text-left">Nội dung thực hiện</th>
+          <th class="th text-left">Hệ thống</th>
+          <th class="th text-left">Đồng bộ gần nhất</th>
+        </tr></thead>
+        <tbody>
+          ${pg.items.map(r => `<tr class="row-h">
+            <td class="td font-medium">${esc(r.name)}</td>
+            <td class="td">${esc(r.system || '—')}</td>
+            <td class="td text-xs text-slate-500 tabular-nums">${esc(r.lastPwmsSyncAt || pwmsSyncMeta('repairItems').lastSyncedAt || '—')}</td>
+          </tr>`).join('') || `<tr><td colspan="3" class="px-5 py-12 text-center text-slate-500">Chưa có nội dung · bấm Đồng bộ từ PWMS</td></tr>`}
         </tbody>
       </table>
       ${paginationBar(pg)}
@@ -10461,7 +10924,8 @@ function completeOrder(id) {
     o.cost = (o.materials || []).reduce((a, m) => a + (m.price || 0) * (m.qty || 1), 0) || 1500000;
   }
   if (!o.approvalLog) o.approvalLog = [];
-  o.approvalLog.push({ at: nowStamp(), action: 'COMPLETE', by: 'Nguyễn Văn Kỹ thuật', note: 'Hoàn thành thực tế · chi phí ' + money(o.cost) });
+  freezeOrderMaterialSnapshots(o, 'COMPLETE');
+  o.approvalLog.push({ at: nowStamp(), action: 'COMPLETE', by: 'Nguyễn Văn Kỹ thuật', note: 'Hoàn thành thực tế · chi phí ' + money(o.cost) + ' · khóa snapshot VT' });
   if (o.type === 'PERIODIC' && o.catalogId) {
     const st = getCatState(o.vehicleId, o.catalogId);
     const c = catById(o.catalogId);
@@ -10491,9 +10955,10 @@ function submitOrderForApproval(id, isResubmit) {
     o.pendingChanges = [];
   } else {
     o.revision = Math.max(1, o.revision || 0);
-    o.approvalLog.push({ at: nowStamp(), action: 'SUBMIT', by: 'Nguyễn Văn Kỹ thuật', note: 'Nộp duyệt lần 1' });
+    o.approvalLog.push({ at: nowStamp(), action: 'SUBMIT', by: 'Nguyễn Văn Kỹ thuật', note: 'Nộp duyệt lần 1 · khóa snapshot VT' });
     o.lastSubmitted = orderSnapshot(o);
   }
+  freezeOrderMaterialSnapshots(o, 'SUBMIT');
   o.approvalStatus = 'PENDING_APPROVAL';
   toast(isResubmit ? 'Đã nộp lại · chờ duyệt' : 'Đã nộp duyệt');
   render();
@@ -10980,9 +11445,13 @@ function openMaterialModal(orderId, idx) {
       </label>
       <div class="grid gap-3 sm:grid-cols-2">
         <label class="block text-sm font-medium text-slate-700">Số lượng<input name="qty" type="number" step="0.01" min="0" value="${m?.qty ?? 1}" required /></label>
-        <label class="block text-sm font-medium text-slate-700">Đơn giá (tạm)<input name="price" type="number" min="0" value="${m?.price ?? 0}" /></label>
+        <label class="block text-sm font-medium text-slate-700">Đơn giá (tham chiếu PWMS)<input name="price" id="matPrice" type="number" min="0" value="${m?.price ?? 0}" /></label>
       </div>
-      <p class="text-xs text-slate-500">Giá kho mua hàng sẽ được cập nhật khi đồng bộ mua hàng (sau khi duyệt / thực hiện). Vật tư tạo mới chỉ lưu nội bộ TMS.</p>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <label class="block text-sm font-medium text-slate-700">Nhà cung cấp<input name="supplier" id="matSupplier" type="text" value="${esc(m?.supplier || '')}" placeholder="Điền từ PWMS khi chọn VT" /></label>
+        <label class="block text-sm font-medium text-slate-700">Kho<input name="warehouse" id="matWarehouse" type="text" value="${esc(m?.warehouse || '')}" placeholder="Kho xuất / tồn" /></label>
+      </div>
+      <p id="matPwmsHint" class="text-xs text-slate-500">Chọn vật tư kho → tự điền mã · tên · ĐVT · <strong>giá tham chiếu</strong> · <strong>NCC</strong> · kho. Sau duyệt: «Đồng bộ mua hàng» lấy giá xuất thực.</p>
       <div class="flex justify-end gap-2 pt-1">
         <button type="button" data-close class="btn btn-outline">Hủy</button>
         <button class="btn btn-primary">${isNew ? 'Thêm vật tư' : 'Lưu vật tư'}</button>
@@ -10990,14 +11459,33 @@ function openMaterialModal(orderId, idx) {
     </form>`, 'max-w-lg');
   $('[data-close]').onclick = closeModal;
   let matLocalOnly = !!m?.localOnly;
+  const applyPwmsFill = (data) => {
+    if (!data) return;
+    if (data.code != null) $('#matCode').value = data.code;
+    if (data.name != null) $('#matName').value = data.name;
+    if (data.uom != null) $('#matUom').value = data.uom || 'Cái';
+    if (data.price != null && data.price !== '') $('#matPrice').value = data.price;
+    if (data.supplier != null) $('#matSupplier').value = data.supplier;
+    if (data.warehouse != null) $('#matWarehouse').value = data.warehouse;
+    const hint = $('#matPwmsHint');
+    if (hint && data.stockQty != null) {
+      hint.innerHTML = `Đã điền từ PWMS · tồn <strong>${esc(String(data.stockQty))}</strong> tại <strong>${esc(data.warehouse || '—')}</strong> · giá tham chiếu <strong>${money(Number(data.price) || 0)}</strong>. Sau duyệt dùng «Đồng bộ mua hàng» để lấy giá xuất thực.`;
+    }
+    matLocalOnly = false;
+  };
   const fillFromCatalog = () => {
     const sel = $('#matCatalog');
     const opt = sel?.selectedOptions?.[0];
     if (!opt || !opt.value) return;
-    $('#matCode').value = opt.value;
-    $('#matName').value = opt.dataset.name || '';
-    $('#matUom').value = opt.dataset.uom || 'Cái';
-    matLocalOnly = false;
+    applyPwmsFill({
+      code: opt.value,
+      name: opt.dataset.name || '',
+      uom: opt.dataset.uom || 'Cái',
+      price: opt.dataset.price || 0,
+      supplier: opt.dataset.supplier || '',
+      warehouse: opt.dataset.warehouse || '',
+      stockQty: opt.dataset.stock,
+    });
   };
   $('#matCatalog')?.addEventListener('change', fillFromCatalog);
   bindCreatableAc($('#matName'), $('#matNameDd'), {
@@ -11005,13 +11493,28 @@ function openMaterialModal(orderId, idx) {
       ? [...materialLocalOptions(), ...materialMasterOptions()]
       : materialMasterOptions()),
     allowCreate: () => $('#matSource')?.value === 'TECHNICIAN',
-    format: x => x.code ? `${esc(x.code)} · ${esc(x.name)}` : esc(x.name),
+    format: x => x.code
+      ? `${esc(x.code)} · ${esc(x.name)} · ${money(x.refPrice)}`
+      : esc(x.name),
     onPick: x => {
-      $('#matName').value = x.name;
-      if (x.code) $('#matCode').value = x.code;
-      if (x.uom) $('#matUom').value = x.uom;
-      matLocalOnly = x.source === 'local';
-      if (x.source === 'local') $('#matSource').value = 'TECHNICIAN';
+      if (x.source === 'local') {
+        $('#matName').value = x.name;
+        if (x.code) $('#matCode').value = x.code;
+        if (x.uom) $('#matUom').value = x.uom;
+        matLocalOnly = true;
+        $('#matSource').value = 'TECHNICIAN';
+        return;
+      }
+      applyPwmsFill({
+        code: x.code || '',
+        name: x.name,
+        uom: x.uom || 'Cái',
+        price: x.refPrice ?? 0,
+        supplier: x.supplier || '',
+        warehouse: x.warehouse || '',
+        stockQty: x.stockQty,
+      });
+      $('#matSource').value = 'PWMS';
     },
     onCreate: name => {
       const item = persistLocalMaterial(name);
@@ -11048,11 +11551,16 @@ function openMaterialModal(orderId, idx) {
       qty: Number(fd.get('qty') || 0),
       uom: String(fd.get('uom') || 'Cái'),
       price: Number(fd.get('price') || 0),
+      supplier: String(fd.get('supplier') || '').trim() || null,
+      warehouse: String(fd.get('warehouse') || '').trim() || null,
+      priceKind: source === 'PWMS' ? 'REF' : 'MANUAL',
       localOnly: source === 'TECHNICIAN' ? matLocalOnly || undefined : false,
     };
     if (!item.name) { toast('Nhập tên vật tư'); return; }
     if (isNew) o.materials.push(item);
-    else o.materials[idx] = { ...m, ...item };
+    else o.materials[idx] = { ...m, ...item, snapshotFrozen: false };
+    const saved = isNew ? o.materials[o.materials.length - 1] : o.materials[idx];
+    stampMaterialSnapshot(saved, o, 'FILL');
     recalcOrderCost(o);
     if (o.purchaseSync && item.source === 'PWMS' && o.purchaseSync.status === 'SYNCED') {
       o.purchaseSync.status = 'NONE';
@@ -11149,6 +11657,40 @@ function startOrder(id) {
   render();
 }
 
+/** Làm mới giá tham chiếu / NCC / kho từ danh mục PWMS vào dòng phiếu (lúc lập form). */
+function refreshPwmsLinesIntoOrder(id) {
+  const o = DB.orders.find(x => x.id === id);
+  if (!o || !canEditOrderDetail(o)) return;
+  ensureOrderApproval(o);
+  enrichAllMaterials(false);
+  const before = orderSnapshot(o);
+  let n = 0;
+  const changes = [];
+  (o.materials || []).forEach(m => {
+    if (m.source !== 'PWMS') return;
+    const cat = materialByCode(m.code) || (DB.materials || []).find(x => x.name === m.name);
+    if (!cat) return;
+    enrichMaterialPwmsFields(cat, false);
+    const beforePrice = m.price;
+    m.uom = cat.uom || m.uom || 'Cái';
+    m.price = cat.refPrice ?? m.price;
+    m.supplier = cat.supplier || m.supplier;
+    m.warehouse = cat.warehouse || m.warehouse;
+    m.stockQty = cat.stockQty;
+    m.priceKind = 'REF';
+    m.pwmsFilledAt = nowStamp();
+    stampMaterialSnapshot(m, o, 'REFRESH');
+    n += 1;
+    if (beforePrice !== m.price) changes.push(`${m.code || m.name}: ${money(beforePrice)} → ${money(m.price)}`);
+    else changes.push(`${m.code || m.name}: NCC ${m.supplier || '—'}`);
+  });
+  if (!n) { toast('Không có dòng kho mua hàng để điền từ PWMS'); return; }
+  recalcOrderCost(o);
+  logOrderEdit(o, before, 'Đồng bộ giá / NCC từ PWMS vào phiếu');
+  toast(`Đã điền ${n} dòng · giá tham chiếu + NCC + kho` + (changes.length ? '' : ''));
+  render();
+}
+
 function syncPurchaseOrder(id) {
   const o = DB.orders.find(x => x.id === id);
   if (!o) return;
@@ -11161,42 +11703,42 @@ function syncPurchaseOrder(id) {
   if (o.purchaseSync.status === 'SYNCING') return;
 
   o.purchaseSync.status = 'SYNCING';
-  o.purchaseSync.note = 'Đang gọi mua hàng để lấy giá và phiếu xuất…';
+  o.purchaseSync.note = 'Đang gọi mua hàng để lấy giá xuất thực, NCC và phiếu xuất…';
   toast('Đang đồng bộ mua hàng…');
   render();
 
   setTimeout(() => {
-    const priceMap = {
-      'P-BAT-120': 3250000,
-      'P-OT-15W40': 182000,
-      'P-FLT-OIL': 295000,
-      'P-FLT-AIR': 335000,
-      'P-TIRE-385': 4550000,
-      'P-TIRE-315': 4250000,
-      'P-BRK-PAD': 880000,
-    };
     const changes = [];
     (o.materials || []).forEach(m => {
       if (m.source !== 'PWMS') return;
+      const cat = materialByCode(m.code);
+      if (cat) enrichMaterialPwmsFields(cat, false);
       const before = m.price;
       m.priceBeforeSync = before;
-      const next = priceMap[m.code] != null ? priceMap[m.code] : Math.round((before || 100000) * 1.05);
-      if (next !== before) {
-        changes.push(`${m.code || m.name}: ${money(before)} → ${money(next)}`);
-        m.price = next;
-      } else {
-        changes.push(`${m.code || m.name}: giữ ${money(before)}`);
-      }
+      // giá xuất thực ≈ giá tham chiếu × 1.02–1.08 (mô phỏng)
+      const base = cat?.refPrice != null ? cat.refPrice : (before || 100000);
+      const next = Math.round(base * (1.02 + (hashStr(o.code + m.code) % 6) / 100));
+      m.price = next;
+      m.priceKind = 'ISSUE';
+      m.supplier = cat?.supplier || m.supplier || PWMS_SUPPLIER_POOL[hashStr(m.code) % PWMS_SUPPLIER_POOL.length];
+      m.warehouse = cat?.warehouse || m.warehouse || PWMS_WAREHOUSE_POOL[0];
+      m.issueLineRef = 'XK-LINE-' + hashStr(m.code + o.id).toString(36).slice(0, 6).toUpperCase();
+      stampMaterialSnapshot(m, o, 'ISSUE_SYNC');
+      m.snapshotFrozen = true;
+      if (m.snapshot) m.snapshot.frozen = true;
+      if (next !== before) changes.push(`${m.code || m.name}: ${money(before)} → ${money(next)} · ${m.supplier}`);
+      else changes.push(`${m.code || m.name}: giữ ${money(before)} · ${m.supplier}`);
     });
     const issueDoc = 'XK-' + String(o.code || '').replace(/^RO-/, '');
     const at = nowStamp();
+    o.materialsSnapshotAt = at;
+    o.materialsSnapshotReason = 'ISSUE_SYNC';
     o.purchaseSync = {
       status: 'SYNCED',
       lastSyncedAt: at,
       issueDocCode: issueDoc,
-      note: 'Đã cập nhật đơn giá dòng kho mua hàng · dòng KTV ghi giữ nguyên',
+      note: 'Đã cập nhật giá xuất thực · NCC · kho · đã lưu kèm phiếu · dòng KTV giữ nguyên',
     };
-    // Chi phí chuẩn ưu tiên tổng dòng kho mua hàng
     const pwmsCost = (o.materials || [])
       .filter(m => m.source === 'PWMS')
       .reduce((a, m) => a + (m.price || 0) * (m.qty || 1), 0);
@@ -11207,7 +11749,7 @@ function syncPurchaseOrder(id) {
       by: 'Nguyễn Văn Kỹ thuật',
       note: `Đồng bộ mua hàng · phiếu xuất ${issueDoc}` + (changes.length ? ' · ' + changes.join('; ') : ''),
     });
-    toast('Đã đồng bộ mua hàng · ' + issueDoc);
+    toast('Đã đồng bộ mua hàng · ' + issueDoc + ' · giá xuất + NCC');
     render();
   }, 1400);
 }
@@ -11651,6 +12193,8 @@ function bind() {
     toast('Đã lưu gợi ý sửa chữa · ' + cat.repairItemIds.length + ' hạng mục');
     render();
   });
+  $$('[data-pwms-sync]').forEach(b => b.onclick = () => runPwmsCatalogSync(b.dataset.pwmsSync));
+  $$('[data-refresh-pwms-lines]').forEach(b => b.onclick = () => refreshPwmsLinesIntoOrder(b.dataset.refreshPwmsLines));
   $('#btnAddVehicleSystem')?.addEventListener('click', () => openVehicleSystemModal(null));
   $$('[data-edit-vehicle-system]').forEach(b => b.onclick = () => openVehicleSystemModal(b.dataset.editVehicleSystem));
   $$('[data-toggle-vehicle-system]').forEach(b => b.onclick = () => {
@@ -11705,6 +12249,10 @@ function bind() {
     c.rules.splice(Number(idx), 1);
     c.rules.forEach((r, i) => r.seq = i + 1);
     toast('Đã xóa chu kỳ'); render();
+  });
+  $$('button[data-nav]').forEach(b => b.onclick = () => {
+    view = { name: b.getAttribute('data-nav'), histTab: 'vehicles', vehicleId: null, vehicleTab: 'plan', plansTab: 'templates', templateId: null, orderId: null, catalogId: null, criteriaGroupId: null, from: null, filters: defaultFilters(), page: 1, pageSize: view.pageSize || 10 };
+    render();
   });
   $$('[data-nav-settings-eval]').forEach(b => b.onclick = () => {
     view = { ...view, name: 'settings', filters: defaultFilters(), page: 1 };

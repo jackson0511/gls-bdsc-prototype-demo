@@ -199,7 +199,11 @@
           </select>
         </label>
         <div class="rounded-md border border-emerald-200 bg-emerald-50/50 p-3 mb-3 space-y-2">
-          <div class="text-xs font-semibold text-emerald-800">Vật tư từ kho (master) — chọn từ danh mục</div>
+          <div class="flex items-start justify-between gap-2">
+            <div class="text-xs font-semibold text-emerald-800">Vật tư từ kho (PWMS) — chọn từ danh mục</div>
+            <button type="button" id="btnSyncPwmsMat" class="btn btn-outline btn-sm shrink-0 !border-sky-400 !bg-sky-50 text-sky-900">Đồng bộ</button>
+          </div>
+          <div class="text-[11px] text-slate-500" id="pwmsMatSyncHint">Nguồn PWMS · bấm Đồng bộ để làm mới danh mục</div>
           <div class="ac-wrap">
             <input id="cPwmsMat" type="search" autocomplete="off" class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm" placeholder="Tìm mã / tên vật tư kho…" />
             <div class="ac-dropdown hidden" id="cPwmsMatDd"></div>
@@ -484,7 +488,7 @@ function renderOrder(){
           (o.workItems&&o.workItems.length?o.workItems:[{content:o.content,system:o.system}]).map((w,i)=>`<article class="card10 p-3">
           <div class="flex justify-between"><p class="text-[15px] font-bold m-0">#${i+1} · ${esc(w.system||o.system||'—')}</p>${i===0?`<p class="text-sm font-semibold text-emerald-700 m-0">${money(o.cost)}</p>`:''}</div>
           <p class="text-sm text-slate-600 mt-1 m-0">${esc(w.content)}</p>
-          ${i===0?(o.mats||[]).map(m=>`<div class="text-xs text-slate-500 mt-1">${esc(m.name)} ×${m.qty} · ${money(m.price)} (${m.tag})</div>`).join(''):''}
+          ${i===0?(o.mats||[]).map(m=>`<div class="text-xs text-slate-500 mt-1">${esc(m.name)} ×${m.qty} · ${money(m.price)}${m.supplier?' · '+esc(m.supplier):''}${m.warehouse?' · '+esc(m.warehouse):''} (${m.tag||'—'}${m.snapshotAt?' · lưu kèm '+esc(m.snapshotAt):''}${m.snapshotFrozen?' · đã khóa':''})</div>`).join(''):''}
         </article>`).join('')
         }</div>
       </section>
@@ -498,8 +502,21 @@ function renderOrder(){
     setTimeout(()=>{o.base={status:'SYNCED',code:o.base.code||('BASE-'+o.code.replace(/^RO-/,'')),baseStatus:'APPROVED'};o.log.push({at:'Vừa xong',text:'Đồng bộ BASE · '+o.base.code});toast('Đã đồng bộ · '+o.base.code);renderOrder()},900);
   });
   $('#btnSyncMh')?.addEventListener('click',()=>{
-    o.mh='SYNCING';renderOrder();toast('Đang đồng bộ mua hàng…');
-    setTimeout(()=>{o.mh='SYNCED';o.mats=(o.mats||[]).map(m=>({...m,price:Math.round(m.price*1.05),tag:'Đã ĐB MH'}));o.cost=(o.mats||[]).reduce((a,m)=>a+m.price*m.qty,0);o.log.push({at:'Vừa xong',text:'Đồng bộ mua hàng'});toast('Đã đồng bộ mua hàng');renderOrder()},1000);
+    o.mh='SYNCING';renderOrder();toast('Đang đồng bộ mua hàng (giá xuất + NCC)…');
+    setTimeout(()=>{
+      o.mh='SYNCED';
+      const at=new Date().toLocaleString('vi-VN');
+      o.mats=(o.mats||[]).map(m=>{
+        const cat=MATERIALS.find(x=>x.code===m.code||x.name===m.name);
+        if(cat)enrichMat(cat,false);
+        const next=Math.round((cat?.refPrice||m.price||100000)*1.05);
+        return{...m,price:next,supplier:cat?.supplier||m.supplier||PWMS_SUPPLIERS[0],warehouse:cat?.warehouse||m.warehouse||PWMS_WH[0],tag:'Đã ĐB MH · giá xuất',snapshotAt:at,snapshotFrozen:true};
+      });
+      o.cost=(o.mats||[]).reduce((a,m)=>a+(m.price||0)*(m.qty||1),0);
+      o.log.push({at:'Vừa xong',text:'Đồng bộ mua hàng · giá xuất + NCC · đã lưu kèm phiếu'});
+      toast('Đã đồng bộ mua hàng · lưu kèm phiếu');
+      renderOrder();
+    },1000);
   });
 }
 
@@ -728,8 +745,20 @@ function garageOptions(){
   (LOCAL.garages||[]).forEach(g=>set.add(typeof g==='string'?g:g.name));
   return [...set].filter(Boolean).sort((a,b)=>a.localeCompare(b,'vi'));
 }
+const PWMS_SUPPLIERS=['Công ty TNHH Phụ tùng GLS','Hyundai Phú Lâm','Đại Dương Xanh','Thiên Mã Parts','Kho nội bộ GLS LSIP'];
+const PWMS_WH=['Kho VT HCM','Kho VT BR-VT','Kho VT HP','Kho trung tâm'];
+function hashStr(s){let h=0;String(s||'').split('').forEach(c=>{h=((h<<5)-h)+c.charCodeAt(0);h|=0});return Math.abs(h)}
+function enrichMat(m,force){
+  if(!m)return m;
+  const h=hashStr(m.code||m.id||m.name);
+  if(force||m.refPrice==null)m.refPrice=80000+(h%180)*25000;
+  if(force||!m.supplier)m.supplier=PWMS_SUPPLIERS[h%PWMS_SUPPLIERS.length];
+  if(force||!m.warehouse)m.warehouse=PWMS_WH[h%PWMS_WH.length];
+  if(force||m.stockQty==null)m.stockQty=(h%40)+1;
+  return m;
+}
 function materialMasterOptions(){
-  return MATERIALS.map(m=>({id:m.id,code:m.code,name:m.name,source:'master'}));
+  return MATERIALS.map(m=>{enrichMat(m,false);return{id:m.id,code:m.code,name:m.name,refPrice:m.refPrice,supplier:m.supplier,warehouse:m.warehouse,stockQty:m.stockQty,source:'master'}});
 }
 function materialLocalOptions(){
   return (LOCAL.materials||[]).map(m=>({id:m.id,code:m.code||'',name:m.name,source:'local'}));
@@ -777,7 +806,7 @@ function renderCreateWorkItems(){
 function renderCreateMatChips(){
   const pwms=$('#cPwmsChips'),ktv=$('#cKtvChips');
   if(pwms){
-    pwms.innerHTML=(S.createPwmsMats||[]).map((m,i)=>`<span class="chip">${esc(m.code?m.code+' · ':'')}${esc(m.name)} <button type="button" data-rm-pwms="${i}" aria-label="Xóa">×</button></span>`).join('');
+    pwms.innerHTML=(S.createPwmsMats||[]).map((m,i)=>`<span class="chip">${esc(m.code?m.code+' · ':'')}${esc(m.name)} · ${money(m.price||0)}${m.supplier?' · '+esc(m.supplier):''} <button type="button" data-rm-pwms="${i}" aria-label="Xóa">×</button></span>`).join('');
     pwms.querySelectorAll('[data-rm-pwms]').forEach(b=>b.onclick=()=>{S.createPwmsMats.splice(+b.dataset.rmPwms,1);renderCreateMatChips()});
   }
   if(ktv){
@@ -862,11 +891,16 @@ function initCreateAutocomplete(){
   bindCreatableAc($('#cPwmsMat'),$('#cPwmsMatDd'),{
     getOptions:materialMasterOptions,
     allowCreate:false,
-    format:o=>`${esc(o.code)} · ${esc(o.name)}`,
+    format:o=>`${esc(o.code)} · ${esc(o.name)} · ${money(o.refPrice)}`,
     onPick:o=>{
-      if(!S.createPwmsMats.some(x=>x.id===o.id))S.createPwmsMats.push({id:o.id,code:o.code,name:o.name,qty:1,price:0,tag:'Kho MH'});
+      if(!S.createPwmsMats.some(x=>x.id===o.id))S.createPwmsMats.push({
+        id:o.id,code:o.code,name:o.name,qty:1,
+        price:o.refPrice||0,supplier:o.supplier||'',warehouse:o.warehouse||'',
+        stockQty:o.stockQty,tag:'Kho MH · giá tham chiếu'
+      });
       $('#cPwmsMat').value='';
       renderCreateMatChips();
+      toast('Đã điền giá / NCC từ PWMS');
     },
     onCreate:()=>null
   });
@@ -930,6 +964,33 @@ function syncCreateType(){
 $('#cType')?.addEventListener('change',syncCreateType);
 $('#cCatalog')?.addEventListener('change',syncCreateType);
 
+$('#btnSyncPwmsMat')?.addEventListener('click',()=>{
+  const btn=$('#btnSyncPwmsMat');
+  const hint=$('#pwmsMatSyncHint');
+  if(btn?.disabled)return;
+  if(btn){btn.disabled=true;btn.textContent='Đang đồng bộ…'}
+  toast('Đang đồng bộ vật tư / giá / NCC từ PWMS…');
+  setTimeout(()=>{
+    if(!MATERIALS.some(m=>m.code==='VTU-SYNC-DEMO')){
+      MATERIALS.unshift({id:'m-sync',code:'VTU-SYNC-DEMO',name:'Vật tư mới từ PWMS (mẫu đồng bộ)'});
+    }
+    MATERIALS.forEach(m=>enrichMat(m,true));
+    // làm mới các dòng đã chọn trên form
+    (S.createPwmsMats||[]).forEach(row=>{
+      const cat=MATERIALS.find(x=>x.id===row.id||x.code===row.code);
+      if(!cat)return;
+      enrichMat(cat,false);
+      row.price=cat.refPrice;row.supplier=cat.supplier;row.warehouse=cat.warehouse;row.stockQty=cat.stockQty;
+      row.tag='Kho MH · giá tham chiếu';
+    });
+    renderCreateMatChips();
+    const at=new Date().toLocaleString('vi-VN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'});
+    if(hint)hint.textContent='Đã đồng bộ lúc '+at+' · giá + NCC + tồn · '+MATERIALS.length+' VT';
+    if(btn){btn.disabled=false;btn.textContent='Đồng bộ lại'}
+    toast('Đã đồng bộ danh mục + điền giá/NCC vào form');
+  },900);
+});
+
 $('#btnCreateSave')?.addEventListener('click',()=>{
   const v=veh(S.vehicleId);
   const type=$('#cType').value;
@@ -954,8 +1015,8 @@ $('#btnCreateSave')?.addEventListener('click',()=>{
     saveLocalLookups(LOCAL);
   }
   const mats=[
-    ...(S.createPwmsMats||[]).map(m=>({name:m.name,code:m.code,qty:m.qty||1,price:m.price||0,tag:'Kho MH'})),
-    ...(S.createKtvMats||[]).map(m=>({name:m.name,code:m.code||'',qty:m.qty||1,price:m.price||0,tag:'KTV/ngoài kho'})),
+    ...(S.createPwmsMats||[]).map(m=>({name:m.name,code:m.code,qty:m.qty||1,price:m.price||0,supplier:m.supplier||'',warehouse:m.warehouse||'',tag:m.tag||'Kho MH',snapshotAt:new Date().toLocaleString('vi-VN'),snapshotFrozen:false})),
+    ...(S.createKtvMats||[]).map(m=>({name:m.name,code:m.code||'',qty:m.qty||1,price:m.price||0,tag:'KTV/ngoài kho',snapshotAt:new Date().toLocaleString('vi-VN'),snapshotFrozen:false})),
   ];
   const id='o'+Date.now().toString(36);
   const workItems=S.createWorkItems.map(w=>({content:w.content,system:w.system||'—',local:!!w.local}));
