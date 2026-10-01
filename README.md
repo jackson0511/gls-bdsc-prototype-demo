@@ -7,7 +7,9 @@ Static HTML demo for customer review:
 | `index.html` | Trang chọn demo |
 | `console.html` | Prototype console web |
 | `mobile.html` | Prototype mobile kỹ thuật viên |
-| `diagrams.html` | Sơ đồ nghiệp vụ (QL xe/KTV) + sơ đồ dữ liệu (IT) |
+| `diagram-ops.html` | Sơ đồ quy trình nghiệp vụ (QL xe / KTV) |
+| `diagram-it.html` | Sơ đồ dữ liệu & tích hợp (đội IT) |
+| `diagrams.html` | Trang chọn 2 loại sơ đồ |
 
 Không cần build. Cần internet để tải Tailwind CDN.
 

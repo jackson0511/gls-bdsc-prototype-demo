@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GLS · IT · tích hợp dữ liệu BD/SC</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --ink: #0f172a; --muted: #475569; --line: #e2e8f0;
+      --brand: #0b6e4f; --brand-dark: #0f513f; --sky: #0369a1;
+      --surface: #fff; --bg: #f1f5f9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: "Segoe UI", system-ui, sans-serif; color: var(--ink);
+      background:
+        radial-gradient(900px 420px at 8% -8%, #cfeee3 0%, transparent 55%),
+        radial-gradient(700px 360px at 100% 0%, #dbeafe 0%, transparent 45%),
+        var(--bg);
+      line-height: 1.55;
+    }
+    a { color: var(--brand); }
+    .top {
+      position: sticky; top: 0; z-index: 20;
+      backdrop-filter: blur(10px); background: rgba(255,255,255,.9);
+      border-bottom: 1px solid var(--line);
+    }
+    .top-inner {
+      max-width: 1120px; margin: 0 auto; padding: 12px 20px;
+      display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+    }
+    .top .brand {
+      font-size: 12px; font-weight: 700; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--brand); margin-right: auto;
+    }
+    .top nav { display: flex; flex-wrap: wrap; gap: 6px; }
+    .top a.nav {
+      text-decoration: none; font-size: 12px; font-weight: 600;
+      padding: 5px 9px; border-radius: 8px; color: var(--ink);
+      border: 1px solid transparent;
+    }
+    .top a.nav:hover { background: #f8fafc; border-color: var(--line); }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 20px 72px; }
+    h1 { margin: 0 0 8px; font-size: clamp(1.5rem, 3.2vw, 1.95rem); line-height: 1.2; }
+    .lead { margin: 0 0 20px; color: var(--muted); max-width: 78ch; font-size: 15px; }
+    .phases {
+      display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      margin-bottom: 28px;
+    }
+    .phases a {
+      text-decoration: none; color: inherit; background: #fff;
+      border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+      font-size: 12px;
+    }
+    .phases a:hover { border-color: var(--brand); }
+    .phases strong { display: block; font-size: 13px; margin-bottom: 2px; }
+    .phases span { color: var(--muted); }
+    .toc { display: grid; gap: 12px; margin-bottom: 32px; }
+    @media (min-width: 720px) { .toc { grid-template-columns: 1fr 1fr; } }
+    .toc > a {
+      display: block; text-decoration: none; color: inherit;
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: 12px; padding: 16px 18px;
+    }
+    .toc > a:hover { border-color: var(--brand); }
+    .tag {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      letter-spacing: .03em; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 999px; margin-bottom: 8px;
+    }
+    .tag.ops { background: #ecfdf5; color: var(--brand-dark); }
+    .tag.it { background: #eff6ff; color: var(--sky); }
+    .toc strong { display: block; margin-bottom: 4px; }
+    .toc span { font-size: 14px; color: var(--muted); }
+    section.panel {
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: 16px; padding: 22px 20px 28px; margin-bottom: 28px;
+    }
+    section.panel h2 {
+      margin: 0 0 6px; font-size: 1.2rem;
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    }
+    section.panel .sub { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+    h3.block {
+      margin: 22px 0 10px; font-size: 15px; color: var(--brand-dark);
+      padding-bottom: 6px; border-bottom: 1px solid var(--line);
+    }
+    h3.block:first-of-type { margin-top: 4px; }
+    .diagram {
+      overflow-x: auto; background: #f8fafc; border: 1px solid var(--line);
+      border-radius: 12px; padding: 14px 10px; margin-bottom: 14px;
+    }
+    .mermaid { display: flex; justify-content: center; }
+    .explain p, .explain li { font-size: 14px; color: #334155; }
+    .explain ul, .explain ol { margin: 6px 0 0; padding-left: 1.2rem; }
+    .explain li { margin: 4px 0; }
+    .grid-2, .grid-3 { display: grid; gap: 12px; margin-top: 12px; }
+    @media (min-width: 800px) {
+      .grid-2 { grid-template-columns: 1fr 1fr; }
+      .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    }
+    .box {
+      border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+      background: #f8fafc; font-size: 13px;
+    }
+    .box.amber { border-color: #fcd34d; background: #fffbeb; }
+    .box.sky { border-color: #7dd3fc; background: #f0f9ff; }
+    .box.green { border-color: #6ee7b7; background: #ecfdf5; }
+    .box.violet { border-color: #c4b5fd; background: #f5f3ff; }
+    .box.slate { border-color: #cbd5e1; background: #f8fafc; }
+    .box strong { display: block; margin-bottom: 4px; }
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 10px 16px;
+      font-size: 12px; color: var(--muted); margin: 0 0 10px;
+    }
+    .legend i {
+      display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+      margin-right: 6px; vertical-align: middle;
+    }
+    footer {
+      margin-top: 8px; font-size: 12px; color: var(--muted);
+      display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between;
+    }
+    code {
+      font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+      background: #e2e8f0; padding: 1px 5px; border-radius: 4px;
+    }
+    .note-call {
+      margin: 12px 0 0; padding: 12px 14px; border-radius: 10px;
+      border-left: 4px solid var(--brand); background: #f0fdf4; font-size: 13px;
+    }
+  
+    .top a.nav.active { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+    .top.it-theme a.nav.active { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+    .switch {
+      display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 22px;
+    }
+    .switch a {
+      text-decoration: none; font-size: 13px; font-weight: 600;
+      padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line);
+      background: #fff; color: var(--ink);
+    }
+    .switch a.on-ops { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
+    .switch a.on-it { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
+</style>
+</head>
+<body>
+  <div class="top it-theme">
+    <div class="top-inner">
+      <div class="brand">GLS · BD/SC prototype</div>
+      <nav>
+        <a class="nav" href="index.html">← Demo</a>
+        <a class="nav" href="console.html">Console</a>
+        <a class="nav " href="diagram-ops.html">Quy trình nghiệp vụ</a>
+        <a class="nav active" href="diagram-it.html">IT · tích hợp</a>
+      </nav>
+    </div>
+  </div>
+
+  <div class="wrap">
+        <div class="switch">
+      <a href="diagram-ops.html">← Quy trình nghiệp vụ</a>
+      <a class="on-it" href="diagram-it.html">Đang xem: IT · tích hợp dữ liệu</a>
+    </div>
+    <h1>Sơ đồ dữ liệu &amp; tích hợp</h1>
+    <p class="lead">
+      Dành cho <strong>đội IT / tích hợp</strong>: phân lớp SoT, quan hệ entity, luồng Plan/Order/PWMS/BASE.
+      Luồng thao tác người dùng nằm ở trang nghiệp vụ.
+    </p>
+
+    <!-- ===================== IT ===================== -->
+    <section class="panel" id="it">
+      <h2><span class="tag it">IT / tích hợp</span> Kiến trúc dữ liệu end-to-end</h2>
+      <p class="sub">SoT theo miền: master kho/serial = PWMS; vận hành kỹ thuật &amp; phiếu = Quản lý xe; duyệt BASE = BASE TMS.</p>
+
+      <h3 class="block">Kiến trúc phân lớp</h3>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TB
+  subgraph MASTER_QLX["Master QLX"]
+    Cat[Catalog + rules + catState]
+    Crit[EvalCriteria]
+    Barem[BaremHours + ServiceType]
+    VSys[VehicleSystem]
+  end
+
+  subgraph MASTER_PWMS["Master PWMS"]
+    Product[Product / Stock / Price]
+    Serial[Product_SERI]
+    PObj[Vehicle Object ID]
+  end
+
+  subgraph BRIDGE["Cầu nối"]
+    VMap[pwmsVehicleMaps]
+    SyncMeta[pwmsSyncMeta / valueHistory]
+  end
+
+  subgraph PLAN_L["Lớp kế hoạch"]
+    Tpl[PlanTemplate + items]
+    Plan[MaintenancePlan]
+  end
+
+  subgraph EXEC["Lớp thực tế"]
+    Ord[MaintenanceOrder]
+    WI[WorkItems]
+    MatP[materials dự kiến]
+    MatB[purchaseMaterials]
+    TL[timeline 4 mốc]
+  end
+
+  subgraph EXT["Hệ thống ngoài"]
+    BASE[BASE sync]
+    MH[PWMS issue / external buy]
+  end
+
+  Cat --> Tpl
+  Cat --> Plan
+  Crit --> Asm[PeriodicAssessment]
+  Asm --> Plan
+  Asm --> Ord
+  Tpl --> Plan
+  Plan --> Ord
+  Product --> MatP
+  Product --> Plan
+  VMap --> Ord
+  PObj --> VMap
+  Ord --> WI
+  Ord --> MatP
+  Ord --> MatB
+  Ord --> TL
+  Ord --> BASE
+  Ord --> MH
+  MH --> MatB
+        </pre>
+      </div>
+
+      <h3 class="block">Quan hệ entity (rút gọn)</h3>
+      <div class="diagram">
+        <pre class="mermaid">
+erDiagram
+  VEHICLE ||--o{ CAT_STATE : tracks
+  CATALOG ||--o{ CAT_STATE : defines
+  CATALOG ||--o{ PLAN_TEMPLATE_ITEM : used_in
+  PLAN_TEMPLATE ||--o{ PLAN_TEMPLATE_ITEM : has
+  PLAN_TEMPLATE ||--o{ MAINTENANCE_PLAN : generates
+  CATALOG ||--o{ MAINTENANCE_PLAN : optional
+  MAINTENANCE_PLAN ||--o| MAINTENANCE_ORDER : realizes
+  VEHICLE ||--o{ MAINTENANCE_ORDER : has
+  VEHICLE ||--o| PWMS_VEHICLE_MAP : maps
+  MAINTENANCE_ORDER ||--o{ WORK_ITEM : has
+  MAINTENANCE_ORDER ||--o{ MATERIAL_PLANNED : planned
+  MAINTENANCE_ORDER ||--o{ MATERIAL_PURCHASE : from_MH
+  EVAL_CRITERIA ||--o{ PERIODIC_ASSESSMENT : checklist
+  PERIODIC_ASSESSMENT ||--o{ MAINTENANCE_PLAN : may_create
+  PERIODIC_ASSESSMENT ||--o{ MAINTENANCE_ORDER : may_create
+
+  CATALOG {
+    int id
+    string code
+    json rules "km|month OR repeat"
+  }
+  MAINTENANCE_PLAN {
+    string id
+    string period
+    int vehicleId
+    int catalogId
+    string source "PLAN|ASSESSMENT|..."
+  }
+  MAINTENANCE_ORDER {
+    string code
+    string type "PERIODIC|INCIDENTAL"
+    string approvalStatus
+    datetime startedAt
+    datetime materialRequestedAt
+    datetime materialReadyAt
+    datetime repairCompletedAt
+  }
+  MATERIAL_PLANNED {
+    string source "PWMS|EXTERNAL|TECHNICIAN"
+    number price
+  }
+  MATERIAL_PURCHASE {
+    string purchaseOrderRef
+    string purchaseDocCode
+    datetime issuedAt
+  }
+        </pre>
+      </div>
+
+      <div class="explain grid-2">
+        <div class="box green">
+          <strong>Luồng dữ liệu kế hoạch</strong>
+          <code>Catalog.rules</code> + <code>catState</code> → nhắc / gợi ý.
+          <code>PlanTemplate</code> (scope xe) → generate <code>MaintenancePlan[]</code>.
+          Đánh giá FAIL → plan/order với <code>source=PERIODIC_ASSESSMENT</code>.
+        </div>
+        <div class="box sky">
+          <strong>Luồng dữ liệu thực tế</strong>
+          Order giữ 2 cụm VT. Gửi MH theo <code>code</code> + <code>pwmsObjectId</code>.
+          Sync MH → <code>purchaseMaterials</code> (snapshot). BASE sync độc lập SoT duyệt.
+        </div>
+      </div>
+
+      <h3 class="block">API / tích hợp (hướng triển khai)</h3>
+      <ul>
+        <li><strong>PWMS đọc:</strong> Product search, tồn, giá tham chiếu, serial, Object danh sách xe.</li>
+        <li><strong>PWMS ghi (qua tích hợp):</strong> yêu cầu xuất / nhận phiếu BD/SC theo mã; QLX không ghi đè master Product.</li>
+        <li><strong>BASE:</strong> push/pull trạng thái duyệt phiếu SC.</li>
+        <li><strong>Nội bộ QLX:</strong> CRUD master kỹ thuật, template, plan, order, assessment, reminder engine.</li>
+      </ul>
+
+      <div class="box violet" style="margin-top:14px">
+        <strong>Prototype để đối chiếu</strong>
+        Console menu: Danh mục · Tiêu chí · Barem · Vật tư PWMS · Ánh xạ xe · Nhắc · Đánh giá · Kế hoạch (mẫu/danh sách) · Phiếu.
+        Demo phiếu đủ 2 cụm: <code>DEMO-VT-MIX-01</code>.
+      </div>
+    </section>
+    <footer>
+      <span>GLS · IT · tích hợp · GitHub Pages</span>
+      <span><a href="index.html">Trang demo</a> · <a href="console.html">Console</a></span>
+    </footer>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      securityLevel: 'loose',
+      flowchart: { curve: 'basis', htmlLabels: true, nodeSpacing: 28, rankSpacing: 36 },
+      themeVariables: {
+        fontFamily: 'Segoe UI, system-ui, sans-serif',
+        fontSize: '13px',
+        primaryColor: '#ecfdf5',
+        primaryTextColor: '#0f172a',
+        primaryBorderColor: '#059669',
+        lineColor: '#64748b',
+        secondaryColor: '#eff6ff',
+        tertiaryColor: '#f8fafc',
+      },
+    });
+  </script>
+</body>
+</html>
