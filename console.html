@@ -223,9 +223,10 @@
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="criteria">Tiêu chí đánh giá</a>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="settings">Cài đặt nhắc đánh giá</a>
         <div class="mb-1 mt-4 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Khác</div>
+        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="ktvCalendar">Lịch kỹ thuật viên</a>
         <span class="nav-item disabled mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2">Kế hoạch xe - tài xế hàng ngày</span>
         <span class="nav-item disabled mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2">Đánh giá phương tiện trước chuyến</span>
-        <span class="nav-item disabled mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2 line-through">Vỏ lốp / ắc quy (retired)</span>
+        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="tireBattery">Vỏ lốp / ắc quy <span class="ml-auto text-[9px] text-sky-400">PWMS</span></a>
       </nav>
       <div class="border-t border-slate-800 px-4 py-3 text-[11px] text-slate-500">
         Mẫu từ Excel khách: GLSPWMS + Dự toán SC HCM<br/>Bấm «Làm mới dữ liệu mẫu» để tải lại seed v25
@@ -6526,6 +6527,9 @@ function defaultFilters() {
     mapStatus: 'ALL',
     dateFrom: '',
     dateTo: '',
+    ktvMonth: '',
+    ktvTech: 'ALL',
+    tbKind: 'ALL',
   };
 }
 function F() { return view.filters; }
@@ -6586,10 +6590,20 @@ function enrichMaterialPwmsFields(m, force) {
   if (!m || m.localOnly) return m;
   const h = hashStr(m.code || m.id || m.name);
   if (force || m.refPrice == null) m.refPrice = 80000 + (h % 180) * 25000;
+  if (force || m.vat == null) m.vat = 8;
   if (force || !m.supplier) m.supplier = PWMS_SUPPLIER_POOL[h % PWMS_SUPPLIER_POOL.length];
   if (force || !m.warehouse) m.warehouse = PWMS_WAREHOUSE_POOL[h % PWMS_WAREHOUSE_POOL.length];
   if (force || m.stockQty == null) m.stockQty = (h % 40) + 1;
   if (!m.uom) m.uom = 'Cái';
+  // Mẫu định mức kép cho lốp/ắc (hiển thị màn Vỏ lốp / ắc quy)
+  const blob = `${m.name || ''} ${m.code || ''}`.toLowerCase();
+  if (/lốp|lop|tire|ắc|acquy|battery/.test(blob)) {
+    if (force || m.maxKm == null) m.maxKm = /ắc|acquy|battery/.test(blob) ? 200000 : 80000;
+    if (force || m.maxMonth == null) m.maxMonth = /ắc|acquy|battery/.test(blob) ? 24 : 18;
+    if (force || m.usedKm == null) m.usedKm = Math.round(m.maxKm * (0.25 + (h % 50) / 100));
+    if (force || m.usedMonth == null) m.usedMonth = 4 + (h % 16);
+    if (force || !m.serial) m.serial = `SR-${(h % 900000) + 100000}`;
+  }
   return m;
 }
 
@@ -7701,7 +7715,7 @@ function ensurePurchaseMaterialsCluster(o) {
 function materialCatalogOptionsHtml(selectedCode) {
   enrichAllMaterials(false);
   return (DB.materials || []).filter(m => !m.localOnly).slice(0, 80).map(m =>
-    `<option value="${esc(m.code)}" data-name="${esc(m.name)}" data-uom="${esc(m.uom || 'Cái')}" data-price="${m.refPrice ?? 0}" data-supplier="${esc(m.supplier || '')}" data-warehouse="${esc(m.warehouse || '')}" data-stock="${m.stockQty ?? ''}" ${selectedCode === m.code ? 'selected' : ''}>${esc(m.code)} · ${esc(m.name)} · tồn ${m.stockQty ?? '—'} · ${money(m.refPrice)}</option>`
+    `<option value="${esc(m.code)}" data-name="${esc(m.name)}" data-uom="${esc(m.uom || 'Cái')}" data-price="${m.refPrice ?? 0}" data-vat="${m.vat ?? 8}" data-supplier="${esc(m.supplier || '')}" data-warehouse="${esc(m.warehouse || '')}" data-stock="${m.stockQty ?? ''}" ${selectedCode === m.code ? 'selected' : ''}>${esc(m.code)} · ${esc(m.name)} · tồn ${m.stockQty ?? '—'} · ${money(m.refPrice)}</option>`
   ).join('');
 }
 /**
@@ -8153,6 +8167,8 @@ function render() {
   else if (view.name === 'criteria') main.innerHTML = pageCriteriaMaster();
   else if (view.name === 'criteriaDetail') main.innerHTML = pageCriteriaDetail();
   else if (view.name === 'settings') main.innerHTML = pageSettings();
+  else if (view.name === 'ktvCalendar') main.innerHTML = pageKtvCalendar();
+  else if (view.name === 'tireBattery') main.innerHTML = pageTireBattery();
   else main.innerHTML = pageHistory();
   bind();
   if (focusId) {
@@ -8834,12 +8850,11 @@ function pageOrder() {
   }
 
   const bs = o.baseSync || { status: 'NONE' };
-  if ((o.content || '').trim()) {
-    if (bs.status === 'SYNCING') {
-      actionBtns.push(`<button class="btn btn-outline" disabled>Đang đồng bộ BASE…</button>`);
-    } else {
-      actionBtns.push(`<button data-sync-base="${o.id}" class="btn btn-outline">${bs.status === 'SYNCED' ? 'Đồng bộ lại BASE' : 'Đồng bộ BASE'}</button>`);
-    }
+  // Nút Đồng bộ BASE luôn hiện (duyệt lãnh đạo)
+  if (bs.status === 'SYNCING') {
+    actionBtns.push(`<button class="btn btn-outline" disabled>Đang đồng bộ BASE…</button>`);
+  } else {
+    actionBtns.push(`<button data-sync-base="${o.id}" class="btn btn-outline">${bs.status === 'SYNCED' ? 'Đồng bộ lại BASE' : 'Đồng bộ BASE'}</button>`);
   }
 
   const cycleHint = {
@@ -9915,6 +9930,146 @@ function openPickVehiclesModal(tpl) {
   };
 }
 
+/* ----- LỊCH KTV ----- */
+function pageKtvCalendar() {
+  const f = F();
+  const month = f.ktvMonth || (new Date().toISOString().slice(0, 7));
+  const techs = [...new Set((DB.orders || []).flatMap(o => {
+    const names = [o.technician || ''].concat((o.workItems || []).map(w => w.assignee || ''));
+    return names.filter(Boolean);
+  }))];
+  if (!techs.length) techs.push('KTV A', 'KTV B');
+  const tech = f.ktvTech || 'ALL';
+  const daysInMonth = (() => { const [y, m] = month.split('-').map(Number); return new Date(y, m, 0).getDate(); })();
+  const cells = [];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const day = `${month}-${String(d).padStart(2, '0')}`;
+    const items = (DB.orders || []).filter(o => {
+      const od = (o.date || '').slice(0, 10);
+      if (od !== day && !(o.startedAt || '').startsWith(day) && !(o.completedAt || '').startsWith(day)) return false;
+      if (tech !== 'ALL') {
+        const names = [o.technician || ''].concat((o.workItems || []).map(w => w.assignee || ''));
+        if (!names.some(n => n === tech)) return false;
+      }
+      return true;
+    });
+    cells.push({ day, d, items });
+  }
+  const color = (o) => o.status === 'COMPLETED' ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
+    : o.status === 'IN_PROGRESS' ? 'bg-amber-100 border-amber-300 text-amber-950'
+    : 'bg-slate-100 border-slate-300 text-slate-700';
+  const label = (o) => o.status === 'COMPLETED' ? 'HT' : o.status === 'IN_PROGRESS' ? 'Đang' : 'Chưa';
+  return pageShell(
+    'Lịch kỹ thuật viên',
+    'Theo tháng · màu trạng thái phiếu (chưa làm / đang làm / hoàn thành) · giống phân hệ Quản lý xe',
+    '',
+    `
+    <div class="mb-4 flex flex-wrap items-end gap-3">
+      <label class="text-sm">Tháng<input type="month" id="flt-ktvMonth" value="${esc(month)}" class="ml-2 rounded border px-2 py-1" /></label>
+      <label class="text-sm">KTV
+        <select id="flt-ktvTech" class="ml-2 rounded border px-2 py-1">
+          <option value="ALL">Tất cả</option>
+          ${techs.map(x => `<option value="${esc(x)}" ${tech === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}
+        </select>
+      </label>
+      <div class="flex flex-wrap gap-2 text-xs">
+        <span class="rounded border border-slate-300 bg-slate-100 px-2 py-0.5">Chưa làm</span>
+        <span class="rounded border border-amber-300 bg-amber-100 px-2 py-0.5">Đang làm</span>
+        <span class="rounded border border-emerald-300 bg-emerald-100 px-2 py-0.5">Hoàn thành</span>
+      </div>
+    </div>
+    <div class="card p-4 grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-7">
+      ${cells.map(c => `
+        <div class="min-h-[88px] rounded-md border border-slate-200 bg-white p-2">
+          <div class="mb-1 text-xs font-semibold text-slate-500">${c.d}</div>
+          <div class="space-y-1">
+            ${c.items.slice(0, 4).map(o => `
+              <button data-open-order="${o.id}" class="block w-full truncate rounded border px-1.5 py-0.5 text-left text-[10px] ${color(o)}" title="${esc(o.code)} · ${esc(o.content || '')}">
+                ${label(o)} · ${esc(o.code)} · Lần ${o.occurrence || 1}
+              </button>`).join('') || '<span class="text-[10px] text-slate-300">—</span>'}
+            ${c.items.length > 4 ? `<div class="text-[10px] text-slate-400">+${c.items.length - 4}</div>` : ''}
+          </div>
+        </div>`).join('')}
+    </div>`
+  );
+}
+
+/* ----- VỎ LỐP / ẮC QUY (hiển thị từ bản đồng bộ PWMS) ----- */
+function pageTireBattery() {
+  const f = F();
+  const mats = (DB.materials || []).filter(m => {
+    const blob = `${m.name || ''} ${m.code || ''} ${m.system || ''} ${m.group || ''}`.toLowerCase();
+    return /lốp|lop|ắc|ac quy|acquy|battery|tire/.test(blob);
+  });
+  const kind = f.tbKind || 'ALL';
+  const filtered = mats.filter(m => {
+    const blob = `${m.name || ''} ${m.code || ''}`.toLowerCase();
+    const isTire = /lốp|lop|tire/.test(blob);
+    const isBat = /ắc|ac quy|acquy|battery/.test(blob);
+    if (kind === 'TIRE' && !isTire) return false;
+    if (kind === 'BATTERY' && !isBat) return false;
+    if (!matchSearch([m.code, m.name, m.serial, m.supplier].join(' '), f.search)) return false;
+    return true;
+  });
+  const due = filtered.filter(m => {
+    const maxKm = Number(m.maxKm || m.lifeKm || 80000);
+    const maxMonth = Number(m.maxMonth || m.lifeMonth || 24);
+    const usedKm = Number(m.usedKm || 0);
+    const usedMonth = Number(m.usedMonth || 0);
+    return usedKm >= maxKm * 0.9 || usedMonth >= maxMonth * 0.9;
+  });
+  return pageShell(
+    'Vỏ lốp / ắc quy',
+    'Chỉ hiển thị từ dữ liệu đã đồng bộ PWMS → TMS · định mức kép km+tháng · cảnh báo đẩy dự toán · không sổ ghi ngược',
+    `<button type="button" id="btnSyncTireBattery" class="btn btn-outline btn-sm">Đồng bộ từ PWMS</button>
+     <button type="button" id="btnPushTirePlan" class="btn btn-primary btn-sm">Đẩy dòng đến hạn → dự toán</button>
+     <button type="button" id="btnSyncLifecycleMh" class="btn btn-outline btn-sm !border-pink-400 !bg-pink-50 text-pink-900">Đồng bộ vòng đời → mua hàng</button>`,
+    `
+    <div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div class="card p-3"><p class="text-xs text-slate-500">Tổng dòng</p><p class="text-xl font-bold">${filtered.length}</p></div>
+      <div class="card p-3"><p class="text-xs text-slate-500">Sắp / đến hạn</p><p class="text-xl font-bold text-amber-700">${due.length}</p></div>
+      <div class="card p-3 col-span-2 text-xs text-slate-600 leading-relaxed">Nguồn nội bộ TMS = bản copy từ PWMS. Khi ĐG/SC thay lốp–ắc: «Đồng bộ vòng đời → mua hàng» (API #6) để MH cập nhật sổ.</div>
+    </div>
+    ${filterBarShell([
+      filterSearch('flt-search', 'Mã, tên, seri, NCC…', f.search),
+      filterSelect('flt-tbKind', 'Loại', kind, [['ALL', 'Tất cả'], ['TIRE', 'Vỏ lốp'], ['BATTERY', 'Ắc quy']]),
+    ].join(''), `${filtered.length} dòng`)}
+    <div class="card overflow-hidden">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600"><tr>
+          <th class="th"><input type="checkbox" id="tbCheckAll" /></th>
+          <th class="th text-left">Mã / Seri</th><th class="th text-left">Tên</th>
+          <th class="th text-right">Giá</th><th class="th text-right">VAT</th><th class="th text-left">ĐVT</th><th class="th text-left">NCC</th>
+          <th class="th text-right">Định mức km</th><th class="th text-right">Định mức tháng</th>
+          <th class="th text-right">Đã dùng</th><th class="th text-center">TT</th>
+        </tr></thead>
+        <tbody>
+          ${filtered.map(m => {
+            const maxKm = Number(m.maxKm || m.lifeKm || 80000);
+            const maxMonth = Number(m.maxMonth || m.lifeMonth || 24);
+            const usedKm = Number(m.usedKm || Math.round(maxKm * 0.3));
+            const usedMonth = Number(m.usedMonth || 6);
+            const warn = usedKm >= maxKm * 0.9 || usedMonth >= maxMonth * 0.9;
+            return `<tr class="row-h ${warn ? 'bg-amber-50/60' : ''}">
+              <td class="td text-center"><input type="checkbox" class="tb-row" data-code="${esc(m.code || '')}" ${warn ? 'checked' : ''} /></td>
+              <td class="td font-mono text-xs">${esc(m.code || '—')}<div class="text-[10px] text-slate-500">${esc(m.serial || m.seri || '—')}</div></td>
+              <td class="td">${esc(m.name || '—')}</td>
+              <td class="td text-right tabular-nums">${money(m.refPrice || m.price || 0)}</td>
+              <td class="td text-right">${m.vat ?? 8}%</td>
+              <td class="td">${esc(m.uom || 'Cái')}</td>
+              <td class="td">${esc(m.supplier || '—')}</td>
+              <td class="td text-right">${kmFmt(maxKm)}</td>
+              <td class="td text-right">${maxMonth}</td>
+              <td class="td text-right text-xs">${kmFmt(usedKm)} · ${usedMonth} th</td>
+              <td class="td text-center">${warn ? evalBadge('soon') : evalBadge('ok')}</td>
+            </tr>`;
+          }).join('') || `<tr><td colspan="11" class="px-5 py-10 text-center text-slate-500">Chưa có dòng lốp/ắc trong danh mục vật tư — bấm Đồng bộ từ PWMS</td></tr>`}
+        </tbody>
+      </table>
+    </div>`
+  );
+}
+
 /* ----- REMINDER ----- */
 function pageReminder() {
   const f = F();
@@ -9952,9 +10107,10 @@ function pageReminder() {
   };
   return pageShell(
     'Nhắc bảo dưỡng',
-    'Theo dõi chu kỳ BD theo danh mục · km GPS / ngày · chỉnh mốc kỳ',
-    '',
+    'Định mức + lịch sử + km GPS → tích chọn → đẩy dự toán (có thể sửa kỳ) · kế hoạch không duyệt LĐ',
+    `<button type="button" id="btnPushRemindPlan" class="btn btn-primary btn-sm">Đẩy dòng đã chọn → dự toán</button>`,
     `
+    <div class="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950">Luồng họp: hệ thống liệt kê đến hạn từ <strong>định mức hạng mục</strong> · <strong>lịch sử thay</strong> · <strong>km GPS</strong> → user tích chọn → đẩy vào dự toán tháng.</div>
     <div class="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
       ${[
         ['Tổng xe', kpis.total, 'bg-blue-50 text-blue-600'],
@@ -9976,6 +10132,7 @@ function pageReminder() {
     <div class="card overflow-hidden">
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-slate-600"><tr>
+          <th class="th"><input type="checkbox" id="remCheckAll" /></th>
           <th class="th text-left">Xe / mooc</th><th class="th text-right">Odo</th>
           <th class="th text-left">Danh mục ưu tiên</th><th class="th text-left">Mốc tiếp</th>
           <th class="th text-right">Còn (km)</th><th class="th text-center">TT</th><th class="th text-center">Thao tác</th>
@@ -9983,6 +10140,7 @@ function pageReminder() {
         <tbody>
           ${(pgRem = paginate(filtered)).items.map(({ v, worst }) => `
             <tr class="row-h">
+              <td class="td text-center"><input type="checkbox" class="rem-row" data-vid="${v.id}" data-cid="${worst?.cat?.id||''}" ${worst?.status==='overdue'||worst?.status==='dueSoon'?'checked':''} /></td>
               <td class="td"><button data-open-vehicle="${v.id}" class="font-medium text-blue-600 hover:underline">${v.plate}</button> ${vehicleChip(v)}</td>
               <td class="td text-right tabular-nums">${kmFmt(v.km)}</td>
               <td class="td">${worst ? worst.cat.name : '—'}</td>
@@ -9992,7 +10150,7 @@ function pageReminder() {
               <td class="td text-center">
                 <button data-open-vehicle-catalog="${v.id}" class="btn btn-outline btn-sm">Sửa kỳ / danh mục</button>
               </td>
-            </tr>`).join('') || `<tr><td colspan="7" class="px-5 py-12 text-center text-slate-500">Không có xe khớp bộ lọc</td></tr>`}
+            </tr>`).join('') || `<tr><td colspan="8" class="px-5 py-12 text-center text-slate-500">Không có xe khớp bộ lọc</td></tr>`}
         </tbody>
       </table>
       ${paginationBar(pgRem)}
@@ -13406,11 +13564,16 @@ function openMaterialModal(orderId, idx) {
         <label class="block text-sm font-medium text-slate-700">Số lượng<input name="qty" type="number" step="0.01" min="0" value="${m?.qty ?? 1}" required /></label>
         <label class="block text-sm font-medium text-slate-700">Đơn giá (tham chiếu PWMS)<input name="price" id="matPrice" type="number" min="0" value="${m?.price ?? 0}" /></label>
       </div>
-      <div class="grid gap-3 sm:grid-cols-2">
+      <div class="grid gap-3 sm:grid-cols-3">
+        <label class="block text-sm font-medium text-slate-700">VAT (%)<input name="vat" id="matVat" type="number" min="0" step="0.1" value="${m?.vat ?? 8}" /></label>
         <label class="block text-sm font-medium text-slate-700">Nhà cung cấp<input name="supplier" id="matSupplier" type="text" value="${esc(m?.supplier || '')}" placeholder="Điền từ PWMS khi chọn VT" /></label>
         <label class="block text-sm font-medium text-slate-700">Kho<input name="warehouse" id="matWarehouse" type="text" value="${esc(m?.warehouse || '')}" placeholder="Kho xuất / tồn" /></label>
       </div>
-      <p id="matPwmsHint" class="text-xs text-slate-500">Chọn vật tư kho → tự điền mã · tên · ĐVT · <strong>giá tham chiếu</strong> · <strong>NCC</strong> · kho. Sau duyệt: «Đồng bộ mua hàng» lấy giá xuất thực.</p>
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" id="btnSyncPwmsMats" class="btn btn-outline btn-sm">Đồng bộ danh mục PWMS</button>
+        <span class="text-[11px] text-slate-500">Làm mới giá · VAT · ĐVT · NCC từ bản đã đồng bộ</span>
+      </div>
+      <p id="matPwmsHint" class="text-xs text-slate-500">Chọn vật tư kho → tự điền mã · tên · ĐVT · <strong>giá</strong> · <strong>VAT</strong> · <strong>NCC</strong> · kho (giống form phân hệ). Sau duyệt: «Đồng bộ mua hàng» lấy giá xuất thực.</p>
       <div class="flex justify-end gap-2 pt-1">
         <button type="button" data-close class="btn btn-outline">Hủy</button>
         <button class="btn btn-primary">${isNew ? 'Thêm vật tư' : 'Lưu vật tư'}</button>
@@ -13424,6 +13587,7 @@ function openMaterialModal(orderId, idx) {
     if (data.name != null) $('#matName').value = data.name;
     if (data.uom != null) $('#matUom').value = data.uom || 'Cái';
     if (data.price != null && data.price !== '') $('#matPrice').value = data.price;
+    if (data.vat != null && $('#matVat')) $('#matVat').value = data.vat;
     if (data.supplier != null) $('#matSupplier').value = data.supplier;
     if (data.warehouse != null) $('#matWarehouse').value = data.warehouse;
     const hint = $('#matPwmsHint');
@@ -13447,6 +13611,7 @@ function openMaterialModal(orderId, idx) {
       name: opt.dataset.name || '',
       uom: opt.dataset.uom || 'Cái',
       price: opt.dataset.price || 0,
+      vat: opt.dataset.vat || 8,
       supplier: opt.dataset.supplier || '',
       warehouse: opt.dataset.warehouse || '',
       stockQty: opt.dataset.stock,
@@ -13475,6 +13640,7 @@ function openMaterialModal(orderId, idx) {
         name: x.name,
         uom: x.uom || 'Cái',
         price: x.refPrice ?? 0,
+        vat: x.vat ?? 8,
         supplier: x.supplier || '',
         warehouse: x.warehouse || '',
         stockQty: x.stockQty,
@@ -13521,6 +13687,7 @@ function openMaterialModal(orderId, idx) {
       qty,
       uom: String(fd.get('uom') || 'Cái'),
       price: Number(fd.get('price') || 0),
+      vat: Number(fd.get('vat') ?? 8),
       supplier: String(fd.get('supplier') || '').trim() || null,
       warehouse: ful.source === 'EXTERNAL' ? null : (String(fd.get('warehouse') || '').trim() || null),
       priceKind: ful.source === 'TECHNICIAN' ? 'MANUAL' : 'REF',
@@ -13862,6 +14029,9 @@ function bindFilters() {
     'flt-mapStatus': 'mapStatus',
     'flt-dateFrom': 'dateFrom',
     'flt-dateTo': 'dateTo',
+    'flt-ktvMonth': 'ktvMonth',
+    'flt-ktvTech': 'ktvTech',
+    'flt-tbKind': 'tbKind',
   };
   Object.entries(map).forEach(([id, key]) => {
     const el = document.getElementById(id);
@@ -14432,5 +14602,80 @@ $('#btnReset').onclick = () => {
 
 render();
 </script>
+<script>
+(function () {
+  function setFilter(key, val) {
+    window.view = window.view || {};
+    window.view.filters = window.view.filters || {};
+    window.view.filters[key] = val;
+  }
+  document.addEventListener('change', (e) => {
+    const t = e.target;
+    if (!t) return;
+    if (t.id === 'flt-ktvMonth') { setFilter('ktvMonth', t.value); if (typeof render === 'function') render(); }
+    if (t.id === 'flt-ktvTech') { setFilter('ktvTech', t.value); if (typeof render === 'function') render(); }
+    if (t.id === 'flt-tbKind') { setFilter('tbKind', t.value); if (typeof render === 'function') render(); }
+    if (t.id === 'remCheckAll') document.querySelectorAll('.rem-row').forEach((c) => { c.checked = t.checked; });
+    if (t.id === 'tbCheckAll') document.querySelectorAll('.tb-row').forEach((c) => { c.checked = t.checked; });
+  });
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (!t || !t.id) return;
+    if (t.id === 'btnPushRemindPlan') {
+      const rows = [...document.querySelectorAll('.rem-row:checked')];
+      if (!rows.length) { toast('Chọn ít nhất một dòng đến hạn'); return; }
+      const period = new Date().toISOString().slice(0, 7);
+      let n = 0;
+      rows.forEach((r) => {
+        const vid = Number(r.dataset.vid);
+        const cid = Number(r.dataset.cid);
+        const v = DB.vehicles.find((x) => x.id === vid);
+        const c = DB.catalog.find((x) => x.id === cid);
+        if (!v || !c) return;
+        const id = Math.max(0, ...DB.plans.map((p) => p.id || 0)) + 1 + n;
+        DB.plans.push({
+          id, code: 'KH-AUTO-' + String(id).padStart(4, '0'), vehicleId: vid, catalogId: cid, period,
+          qty: 1, uom: 'Lần', unitPrice: c.refPrice || 0, vat: 8, vendor: c.supplier || '',
+          system: c.system || '', status: 'PLANNED', source: 'REMINDER', service: c.name,
+          note: 'Từ nhắc hạn (tích chọn)',
+        });
+        n++;
+      });
+      save(); toast('Đã đẩy ' + n + ' dòng vào dự toán ' + period); view.name = 'plans'; render();
+    }
+    if (t.id === 'btnSyncTireBattery') {
+      if (typeof enrichAllMaterials === 'function') enrichAllMaterials(true);
+      toast('Đã đồng bộ danh mục lốp/ắc từ PWMS (mẫu)'); render();
+    }
+    if (t.id === 'btnPushTirePlan') {
+      const rows = [...document.querySelectorAll('.tb-row:checked')];
+      if (!rows.length) { toast('Chọn dòng lốp/ắc đến hạn'); return; }
+      const period = new Date().toISOString().slice(0, 7);
+      const v0 = DB.vehicles[0];
+      rows.forEach((r, i) => {
+        const code = r.dataset.code;
+        const m = (DB.materials || []).find((x) => x.code === code);
+        const id = Math.max(0, ...DB.plans.map((p) => p.id || 0)) + 1 + i;
+        DB.plans.push({
+          id, code: 'KH-LOP-' + String(id).padStart(4, '0'), vehicleId: v0?.id, period,
+          qty: 1, uom: m?.uom || 'Cái', unitPrice: m?.refPrice || m?.price || 0, vat: m?.vat ?? 8,
+          vendor: m?.supplier || '', system: /ắc|ac/i.test(m?.name || '') ? 'Ắc Quy' : 'Vỏ Lốp',
+          status: 'PLANNED', source: 'TIRE_BATTERY', service: m?.name || code,
+          note: 'Từ cảnh báo lốp/ắc · seri ' + (m?.serial || m?.seri || ''),
+        });
+      });
+      save(); toast('Đã đẩy ' + rows.length + ' dòng lốp/ắc vào dự toán'); view.name = 'plans'; render();
+    }
+    if (t.id === 'btnSyncLifecycleMh') {
+      toast('Đã gửi cập nhật vòng đời lốp/ắc sang mua hàng (API #6 · mẫu)');
+    }
+    if (t.id === 'btnSyncPwmsMats') {
+      if (typeof enrichAllMaterials === 'function') enrichAllMaterials(true);
+      toast('Đã làm mới danh mục VT PWMS');
+    }
+  });
+})();
+</script>
+
 </body>
 </html>

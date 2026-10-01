@@ -87,16 +87,17 @@
         theo khoảng thời gian cập nhật, và lọc đang áp dụng (<code>ap_dung</code>) — không mô tả ánh xạ xe.
       </p>
       <div class="kpis">
-        <div class="kpi"><b>5</b><span>API đề xuất</span></div>
+        <div class="kpi"><b>6</b><span>API đề xuất</span></div>
         <div class="kpi"><b>6</b><span>bảng master (API #1)</span></div>
         <div class="kpi"><b>4</b><span>chế độ sync (all / chỉ định / khoảng TG / active)</span></div>
-        <div class="kpi"><b>1</b><span>chiều gửi phiếu BD/SC sang PWMS</span></div>
+        <div class="kpi"><b>2</b><span>chiều TMS ↔ PWMS (gửi phiếu + vòng đời lốp/ắc)</span></div>
       </div>
       <div class="topbar">
-        <a href="index.html">← Demo</a>
-        <a href="diagram-ops.html">Quy trình nghiệp vụ</a>
-        <a class="on" href="diagram-it.html">IT · API PWMS</a>
-        <a href="console.html">Console prototype</a>
+        <a href="index.html">← Trang demo</a>
+        <a href="diagrams.html">Chọn đối tượng</a>
+        <a href="diagram-ops.html">Nghiệp vụ</a>
+        <a class="on" href="diagram-it.html">IT · API</a>
+        <a href="https://jackson0511.github.io/gls-bdsc-prototype-demo/diagram-it.html" target="_blank" rel="noopener">Pages</a>
       </div>
     </div>
   </header>
@@ -110,7 +111,8 @@
       <a href="#api-send-order">5. API Gửi phiếu</a>
       <a href="#api-storage">6. API Storage</a>
       <a href="#api-fuel">7. API Fuel</a>
-      <a href="#luong">8. Luồng gọi</a>
+      <a href="#api-lifecycle">8. API Vòng đời lốp/ắc</a>
+      <a href="#luong">9. Luồng gọi</a>
     </div>
   </nav>
 
@@ -161,6 +163,13 @@
               <td>PWMS → TMS</td>
               <td><code>Fuel_Card</code></td>
               <td>Thông tin dầu nội bộ</td>
+            </tr>
+            <tr>
+              <td>6</td>
+              <td><b>Tire / battery lifecycle</b></td>
+              <td>TMS → PWMS</td>
+              <td>Cập nhật vòng đời / hao mòn lốp · ắc (seri, xe, vị trí, km/ngày, mức mòn, phiếu ĐG/SC)</td>
+              <td>Đẩy ngược sau ĐG hoặc phiếu SC có thay / cập nhật lốp–ắc</td>
             </tr>
           </tbody>
         </table>
@@ -637,8 +646,73 @@
 }</pre>
     </section>
 
+    <!-- ========== API 6 ========== -->
+    <section id="api-lifecycle">
+      <h2>8. API #6 — Cập nhật vòng đời / hao mòn vỏ lốp &amp; ắc quy (TMS → PWMS)</h2>
+      <p class="lead">
+        Sau khi kỹ thuật viên ghi nhận thay thế, đổi vị trí, hoặc cập nhật độ mòn trên phiếu đánh giá / phiếu BD-SC,
+        TMS gọi API này để <strong>mua hàng cập nhật sổ seri</strong>. TMS chỉ giữ bản đã đồng bộ để hiển thị — không phải sổ nguồn.
+      </p>
+      <div class="card">
+        <div><span class="method post">POST</span><span class="ep">/api/v1/tire-battery/lifecycle</span></div>
+        <p class="lead" style="margin:8px 0 0">Nút trên UI: «Đồng bộ vòng đời → mua hàng» (sau ĐG / hoàn thành phiếu có lốp–ắc).</p>
+      </div>
+
+      <h3>Request sample</h3>
+      <pre class="payload">{
+  "request_id": "tb-life-20261002-001",
+  "source": "TMS",
+  "trigger": "REPAIR_ORDER_COMPLETED",
+  "order_code": "RO-2026-1042",
+  "assessment_id": null,
+  "vehicle_plate": "50E-65517",
+  "events": [
+    {
+      "item_type": "TIRE",
+      "serial": "LOP-SR-998821",
+      "product_code": "VTU-LOP-29580",
+      "action": "REPLACE",
+      "position": "TRUOC_TRAI",
+      "odometer_km": 412500,
+      "wear_percent": 85,
+      "installed_at": "2026-10-02T09:30:00+07:00",
+      "removed_serial": "LOP-SR-771102",
+      "note": "Thay theo đánh giá tuần · mòn vượt ngưỡng"
+    },
+    {
+      "item_type": "BATTERY",
+      "serial": "AQ-SR-120045",
+      "product_code": "VTU-AQ-12V",
+      "action": "INSPECT",
+      "position": "CABIN",
+      "odometer_km": 412500,
+      "wear_percent": 40,
+      "installed_at": null,
+      "removed_serial": null,
+      "note": "Kiểm tra định kỳ — chưa thay"
+    }
+  ]
+}</pre>
+
+      <h3>Response sample</h3>
+      <pre class="payload">{
+  "request_id": "tb-life-20261002-001",
+  "accepted": true,
+  "pwms_ref": "LIFE-UPD-77821",
+  "updated": 2,
+  "errors": []
+}</pre>
+      <div class="call ok">
+        <b>Khi nào gọi</b>
+        (1) Hoàn thành phiếu BD/SC có dòng lốp/ắc thay hoặc cập nhật ·
+        (2) Nộp phiếu đánh giá có hạng mục thay/kiểm tra lốp–ắc kèm seri ·
+        (3) User bấm «Đồng bộ vòng đời → mua hàng» khi trạng thái chờ đẩy.
+        Master sync (API #1) / Storage (API #4) vẫn dùng để <em>kéo</em> danh mục + seri về TMS trước khi chọn.
+      </div>
+    </section>
+
     <section id="luong">
-      <h2>8. Luồng gọi đề xuất</h2>
+      <h2>9. Luồng gọi đề xuất</h2>
       <p class="lead">Không mô tả ánh xạ — chỉ thứ tự query / đồng bộ và gửi phiếu.</p>
       <div class="card"><div class="diagram" id="flow"></div></div>
       <div class="grid2" style="margin-top:12px">
@@ -668,7 +742,7 @@
 
     <footer>
       <span>GLS · Đề xuất API PWMS · nguồn cột từ GLSPWMS (Bản Mẫu).xlsx</span>
-      <span><a href="diagram-ops.html">Quy trình nghiệp vụ</a> · <a href="index.html">Demo</a></span>
+      <span><a href="diagram-ops.html">Quy trình nghiệp vụ</a> · <a href="index.html">Hub</a></span>
     </footer>
   </main>
 
@@ -697,12 +771,16 @@
   G --> H["POST /purchase/sync<br/>BY_KEY mã phiếu<br/>hoặc RANGE"]
   H --> I["TMS · cụm mua hàng / giá / giờ cấp"]
   C --> I
+  J["ĐG hoặc phiếu có thay<br/>lốp / ắc"] --> K["POST /tire-battery/lifecycle<br/>TMS → PWMS"]
+  K --> L["PWMS cập nhật sổ seri<br/>vòng đời / hao mòn"]
   classDef a fill:#d1fae5,stroke:#0b6e4f
   classDef b fill:#cffafe,stroke:#0e7490
   classDef c fill:#fef3c7,stroke:#b45309
-  class A,E a
+  classDef d fill:#fce7f3,stroke:#db2777
+  class A,E,J a
   class B,C,D,H b
-  class F,G,I c`;
+  class F,G,I c
+  class K,L d`;
       const { svg } = await mermaid.render('flow_svg_' + Date.now(), src);
       document.getElementById('flow').innerHTML = svg;
     })();

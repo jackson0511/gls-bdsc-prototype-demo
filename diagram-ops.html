@@ -201,6 +201,8 @@
       <a href="#b3"><strong>3.</strong> Lập kế hoạch</a>
       <a href="#b4"><strong>4.</strong> Làm phiếu</a>
       <a href="#b5"><strong>5.</strong> Đối chiếu</a>
+      <a href="#b6"><strong>6.</strong> Vỏ lốp / ắc quy</a>
+      <a href="#b7"><strong>7.</strong> Lịch KTV</a>
     </nav>
 
     <section class="panel">
@@ -215,15 +217,20 @@
         <pre class="mermaid">
 flowchart TD
   A[1. Khai báo danh mục<br/>và quy tắc bảo dưỡng] --> B[2. Hệ thống nhắc việc<br/>và hỗ trợ đánh giá xe]
-  B --> C[3. Lập kế hoạch<br/>tháng / theo xe]
+  B --> C[3. Lập kế hoạch / dự toán<br/>từ nhắc · mẫu · đánh giá]
   C --> D[4. Tạo phiếu làm thật<br/>bảo dưỡng hoặc sửa chữa]
   D --> E[5. So sánh kế hoạch<br/>với thực tế · xem lịch sử]
+  B --> F[6. Vỏ lốp / ắc quy<br/>đồng bộ PWMS · cảnh báo]
+  F --> C
+  D --> G[7. Lịch KTV<br/>theo màu trạng thái]
 
   style A fill:#fef3c7,stroke:#d97706
   style B fill:#dbeafe,stroke:#0284c8
   style C fill:#d1fae5,stroke:#059669
   style D fill:#d1fae5,stroke:#059669
   style E fill:#e2e8f0,stroke:#64748b
+  style F fill:#fce7f3,stroke:#db2777
+  style G fill:#e0e7ff,stroke:#4f46e5
         </pre>
       </div>
     </section>
@@ -289,31 +296,36 @@ flowchart TD
       <div class="diagram">
         <pre class="mermaid">
 flowchart TD
-  A[Tạo mẫu kế hoạch<br/>theo loại xe · hãng · đời] --> B[Chọn hạng mục bảo dưỡng<br/>số lượng · giá dự toán]
-  B --> C[Áp mẫu cho nhiều xe<br/>cùng loại]
-  D[Hoặc lấy từ danh sách<br/>xe đến hạn nhắc] --> F[Kế hoạch tháng]
-  E[Hoặc từ đánh giá xe<br/>không đạt] --> F
-  C --> F
-  F --> G[Kỹ thuật xem lại · chỉnh]
-  G --> H[Sẵn sàng tạo phiếu làm thật]
+  A[Định mức hạng mục<br/>km / tháng] --> D[Hệ thống tính đến hạn]
+  B[Lịch sử thay gần nhất<br/>trên xe] --> D
+  C[Số km GPS cập nhật] --> D
+  D --> E[Danh sách đến hạn<br/>sắp hạn / quá hạn]
+  E --> F[Người dùng tích chọn<br/>xe + hạng mục]
+  F --> G[Đẩy vào dự toán tháng<br/>giữ / đổi kỳ được]
+  H[Tạo mẫu kế hoạch<br/>theo loại xe] --> I[Áp mẫu nhiều xe]
+  J[Đánh giá xe không đạt] --> G
+  I --> G
+  G --> K[Dòng dự toán có giá · VAT<br/>ĐVT · NCC từ PWMS]
+  K --> L[Tạo phiếu làm thật<br/>không duyệt LĐ trên kế hoạch]
         </pre>
       </div>
       <div class="cards three">
         <div class="box g">
           <strong>Cách 1 — Theo mẫu</strong>
-          Làm một mẫu cho nhóm xe giống nhau, rồi áp sang nhiều xe trong kỳ (tháng).
+          Làm một mẫu cho nhóm xe giống nhau, rồi áp sang nhiều xe trong kỳ (tháng). Không cần duyệt Ban lãnh đạo trên kế hoạch.
         </div>
         <div class="box y">
-          <strong>Cách 2 — Theo nhắc việc</strong>
-          Hệ thống liệt kê xe / hạng mục đến hạn → đưa vào kế hoạch hoặc làm phiếu luôn.
+          <strong>Cách 2 — Theo nhắc việc (tự động hóa)</strong>
+          Hệ thống ghép định mức + lịch sử + km GPS → danh sách đến hạn → <em>tích chọn</em> → đẩy vào dự toán (có thể sửa kỳ).
         </div>
         <div class="box p">
           <strong>Cách 3 — Theo đánh giá</strong>
-          Xe đánh giá không đạt → thêm vào kế hoạch hoặc tạo phiếu sửa chữa.
+          Xe đánh giá không đạt → thêm vào dự toán hoặc tạo phiếu sửa chữa ngay.
         </div>
       </div>
       <div class="tip">
-        Giá trên kế hoạch thường là <strong>giá tham khảo</strong> từ kho. Chi phí thật sẽ lấy sau khi mua hàng xử lý và đồng bộ lại phiếu.
+        Giá trên kế hoạch: <strong>đơn giá · VAT · ĐVT · nhà cung cấp</strong> lấy từ dữ liệu PWMS đã đồng bộ về TMS (nút Đồng bộ khi chọn VT).
+        Chi phí thật lấy sau khi mua hàng xử lý và đồng bộ lại phiếu. Duyệt lãnh đạo của <em>phiếu</em> BD/SC qua <strong>BASE</strong> — không áp dụng duyệt LĐ lên kế hoạch.
       </div>
     </section>
 
@@ -325,12 +337,15 @@ flowchart TD
 flowchart TD
   A[Tạo phiếu] --> B[Kỹ thuật ghi phần dự kiến<br/>hạng mục + vật tư]
   B --> C[Nộp duyệt · quản lý duyệt]
-  C --> D[Gửi sang hệ thống duyệt BASE<br/>và / hoặc gửi mua hàng]
-  D --> E[Bắt đầu làm việc trên xưởng]
-  E --> F[Mua hàng xuất kho<br/>hoặc mua ngoài theo mã phiếu]
-  F --> G[Đồng bộ lại từ mua hàng<br/>thành phần dữ liệu thật]
-  G --> H[Hoàn thành từng hạng mục<br/>so giờ thực tế với barem]
-  H --> I[Đủ hạng mục → phiếu tự<br/>chuyển Hoàn thành]
+  C --> D[Nút Đồng bộ BASE luôn hiện<br/>đẩy duyệt lãnh đạo]
+  C --> E[Gửi / đồng bộ mua hàng]
+  D --> F[Bắt đầu làm việc trên xưởng]
+  E --> F
+  F --> G[Mua hàng xuất kho<br/>hoặc mua ngoài theo mã phiếu]
+  G --> H[Đồng bộ lại từ mua hàng<br/>thành phần dữ liệu thật]
+  H --> I[Hoàn thành từng hạng mục<br/>so giờ thực tế với barem]
+  I --> J[Đủ hạng mục → phiếu tự<br/>chuyển Hoàn thành]
+  J --> K[Nếu có thay lốp / ắc<br/>đồng bộ vòng đời → mua hàng]
         </pre>
       </div>
       <div class="cards two">
@@ -372,6 +387,57 @@ flowchart TD
         Sau khi hoàn thành phiếu bảo dưỡng định kỳ, hệ thống cập nhật “lần gần nhất” trên xe
         và tính “lần tới” theo quy tắc danh mục (ví dụ cứ thêm 10.000 km, hoặc đủ 3 tháng — lấy mốc nào đến sớm hơn).
       </p>
+    </section>
+
+    <section class="panel" id="b6">
+      <h3 class="step">Bước 6 — Vỏ lốp / ắc quy (hiển thị từ PWMS · cảnh báo · đẩy dự toán)</h3>
+      <p class="sub">TMS không giữ sổ riêng ghi ngược. Dữ liệu đồng bộ PWMS → TMS làm nguồn nội bộ; chỗ chọn VT có nút Đồng bộ khi cần.</p>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+  A[PWMS / mua hàng<br/>danh mục · seri · giá] -->|API đồng bộ| B[Bản nội bộ trên TMS<br/>màn Vỏ lốp / ắc quy]
+  B --> C[Định mức kép<br/>km tối đa + số tháng]
+  C --> D{Chạm ngưỡng<br/>hoặc độ mòn?}
+  D -->|Có| E[Danh sách cảnh báo<br/>tích chọn]
+  E --> F[Đẩy vào dự toán thay]
+  F --> G[Tạo phiếu thay lốp / ắc]
+  G --> H[KTV ghi thay / vị trí / mòn]
+  H -->|API vòng đời| I[Cập nhật lại sổ mua hàng]
+  D -->|Chưa| B
+        </pre>
+      </div>
+      <div class="cards two">
+        <div class="box b">
+          <strong>Đồng bộ PWMS → TMS (khi nào)</strong>
+          Lần đầu / định kỳ / khi bấm «Đồng bộ» ở màn lốp–ắc hoặc form chọn VT.
+          Chỉ <em>hiển thị</em> seri, xe gắn, vị trí, km/tháng — không nhập sổ lệch PWMS.
+        </div>
+        <div class="box y">
+          <strong>Đồng bộ ngược TMS → mua hàng (khi nào)</strong>
+          Sau khi phiếu đánh giá hoặc phiếu SC có thay / cập nhật hao mòn / đổi vị trí lốp–ắc:
+          bấm «Đồng bộ vòng đời → mua hàng» (hoặc tự đẩy khi hoàn thành phiếu — chốt kỹ thuật với MH).
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="b7">
+      <h3 class="step">Bước 7 — Lịch kỹ thuật viên (theo màu trạng thái)</h3>
+      <p class="sub">Giống phân hệ Quản lý xe hiện tại: xem tiến độ công việc theo tháng / người.</p>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart LR
+  A[Phiếu / hạng mục<br/>đã gán KTV] --> B[Lịch tháng KTV]
+  B --> C[Màu: chưa làm]
+  B --> D[Màu: đang làm]
+  B --> E[Màu: hoàn thành]
+  C --> F[Theo dõi tải việc<br/>và giờ vs barem]
+  D --> F
+  E --> F
+        </pre>
+      </div>
+      <div class="tip">
+        Lịch KTV nằm trên bản mẫu console để đủ luồng phân công — báo cáo giờ công (#95) dùng cùng nguồn bắt đầu / hoàn thành hạng mục.
+      </div>
     </section>
 
     <footer>
