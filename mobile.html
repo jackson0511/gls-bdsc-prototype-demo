@@ -156,9 +156,27 @@
       <div class="shell-hdr">
         <button type="button" class="text-sm font-semibold text-blue-600 bg-transparent border-0 p-0 mb-1" data-go="vehicle">← Hủy</button>
         <div class="text-base font-bold">Tạo phiếu · <span id="createPlate">—</span></div>
-        <p class="text-xs text-slate-500 m-0 mt-0.5">Giống web: loại · danh mục · hệ thống xe · vật tư chọn lúc lập phiếu</p>
+        <p class="text-xs text-slate-500 m-0 mt-0.5">Ngày · nơi thực hiện trước · rồi loại / danh mục / hạng mục / vật tư</p>
       </div>
       <div class="scroll px-4 py-4 space-y-1">
+        <div class="grid grid-cols-2 gap-2">
+          <label class="field"><span>Ngày</span><input id="cDate" type="date" value="2026-09-30" /></label>
+          <label class="field"><span>Odo (km)</span><input id="cKm" type="number" /></label>
+        </div>
+        <label class="field"><span>Nơi thực hiện <span class="hint">autocomplete · nhập mới chỉ lưu nội bộ</span></span>
+          <div class="ac-wrap">
+            <input id="cGarage" type="search" autocomplete="off" placeholder="Tìm xưởng / garage…" value="" />
+            <div class="ac-dropdown hidden" id="cGarageDd"></div>
+          </div>
+        </label>
+        <label class="field"><span>Nguồn tạo</span>
+          <select id="cSource">
+            <option value="KTV tạo">KTV tạo</option>
+            <option value="Dự toán">Dự toán / kế hoạch</option>
+            <option value="Sự cố">Sự cố</option>
+            <option value="Đánh giá định kỳ">Đánh giá định kỳ</option>
+          </select>
+        </label>
         <label class="field"><span>Loại phiếu</span>
           <select id="cType"><option value="PERIODIC">Bảo dưỡng định kỳ</option><option value="INCIDENTAL" selected>Sửa chữa phát sinh</option></select>
         </label>
@@ -187,24 +205,6 @@
           </div>
           <div id="cWiList" class="space-y-1.5"></div>
         </div>
-        <div class="grid grid-cols-2 gap-2">
-          <label class="field"><span>Ngày</span><input id="cDate" type="date" value="2026-09-30" /></label>
-          <label class="field"><span>Odo (km)</span><input id="cKm" type="number" /></label>
-        </div>
-        <label class="field"><span>Nơi thực hiện <span class="hint">autocomplete · nhập mới chỉ lưu nội bộ</span></span>
-          <div class="ac-wrap">
-            <input id="cGarage" type="search" autocomplete="off" placeholder="Tìm xưởng / garage…" value="" />
-            <div class="ac-dropdown hidden" id="cGarageDd"></div>
-          </div>
-        </label>
-        <label class="field"><span>Nguồn tạo</span>
-          <select id="cSource">
-            <option value="KTV tạo">KTV tạo</option>
-            <option value="Dự toán">Dự toán / kế hoạch</option>
-            <option value="Sự cố">Sự cố</option>
-            <option value="Đánh giá định kỳ">Đánh giá định kỳ</option>
-          </select>
-        </label>
         <div class="rounded-md border border-emerald-200 bg-emerald-50/50 p-3 mb-3 space-y-2">
           <div class="flex items-start justify-between gap-2">
             <div class="text-xs font-semibold text-emerald-800">Vật tư từ kho (PWMS) — chọn từ danh mục</div>
