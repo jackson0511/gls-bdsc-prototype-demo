@@ -7406,6 +7406,106 @@ function getEvalChecklist() {
     .filter(g => g.items.length);
 }
 function ordersOf(vid) { return DB.orders.filter(o => o.vehicleId === Number(vid)); }
+/**
+ * Lịch sử BD & SC cùng xe/mooc — giống fleet HistoryTable (listMaintenanceHistory).
+ * Lấy hạng mục từ các phiếu COMPLETED trước đó (loại trừ phiếu hiện tại).
+ * Có vật tư → 1 dòng / vật tư (gắn hệ thống·loại DV từ hạng mục); không có → 1 dòng / hạng mục.
+ */
+function listMaintenanceHistoryRows(order) {
+  if (!order?.vehicleId) return [];
+  const prior = ordersOf(order.vehicleId)
+    .filter(x => x.id !== order.id && x.status === 'COMPLETED')
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.code).localeCompare(String(a.code)));
+  const rows = [];
+  for (const ord of prior) {
+    const wis = ord.workItems || [];
+    const mats = (ord.materials || []).filter(Boolean);
+    if (mats.length) {
+      mats.forEach((m, i) => {
+        const w = wis[i] || wis[0] || {};
+        rows.push({
+          system: w.system || ord.system || null,
+          service: w.service || null,
+          material: m.name || null,
+          qty: m.qty != null ? m.qty : null,
+          uom: m.uom || null,
+          supplier: m.supplier || null,
+          date: ord.date,
+          orderId: ord.id,
+          orderCode: ord.code,
+        });
+      });
+    } else if (wis.length) {
+      wis.forEach(w => {
+        rows.push({
+          system: w.system || ord.system || null,
+          service: w.service || null,
+          material: null,
+          qty: null,
+          uom: null,
+          supplier: null,
+          date: ord.date,
+          orderId: ord.id,
+          orderCode: ord.code,
+        });
+      });
+    } else {
+      rows.push({
+        system: ord.system || null,
+        service: null,
+        material: ord.content || null,
+        qty: null,
+        uom: null,
+        supplier: null,
+        date: ord.date,
+        orderId: ord.id,
+        orderCode: ord.code,
+      });
+    }
+  }
+  return rows;
+}
+function renderMaintenanceHistorySection(order) {
+  const rows = listMaintenanceHistoryRows(order);
+  const cell = (v) => esc(v == null || v === '' ? '—' : String(v));
+  const qtyCell = (r) => (r.qty == null || r.qty === '' ? '—' : String(r.qty));
+  return `
+        <div class="card overflow-hidden">
+          <div class="border-b border-slate-200 px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div class="font-semibold text-sm">Lịch sử BD &amp; sửa chữa</div>
+              <p class="text-[11px] text-slate-500">Phiếu hoàn thành trước trên cùng xe/mooc · giống Fleet · chỉ đọc</p>
+            </div>
+            <span class="chip bg-slate-100 text-slate-700">${rows.length} dòng</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+              <thead class="bg-slate-50 text-slate-600"><tr>
+                <th class="th text-left">Hệ thống</th>
+                <th class="th text-left">Loại DV</th>
+                <th class="th text-left">Vật tư</th>
+                <th class="th text-right">SL</th>
+                <th class="th text-left">ĐVT</th>
+                <th class="th text-left">NCC</th>
+                <th class="th text-right">Ngày BD</th>
+                <th class="th text-left">Phiếu</th>
+              </tr></thead>
+              <tbody>
+                ${rows.length ? rows.map(r => `<tr class="row-h">
+                  <td class="td">${cell(r.system)}</td>
+                  <td class="td">${cell(r.service)}</td>
+                  <td class="td">${cell(r.material)}</td>
+                  <td class="td text-right tabular-nums">${qtyCell(r)}</td>
+                  <td class="td">${cell(r.uom)}</td>
+                  <td class="td">${cell(r.supplier)}</td>
+                  <td class="td text-right tabular-nums whitespace-nowrap">${cell(r.date)}</td>
+                  <td class="td"><button type="button" data-open-order="${esc(r.orderId)}" class="text-blue-600 hover:underline font-medium">${esc(r.orderCode)}</button></td>
+                </tr>`).join('') : `<tr><td colspan="8" class="px-5 py-8 text-center text-slate-400">Chưa có lịch sử BD/SC hoàn thành trên xe này</td></tr>`}
+              </tbody>
+            </table>
+          </div>
+        </div>`;
+}
 function catalogHistory(vid, cid) {
   return ordersOf(vid)
     .filter(o => o.catalogId === Number(cid) && o.type === 'PERIODIC')
@@ -7502,12 +7602,28 @@ function canEditOrderDetail(o) {
 }
 function ensureWorkItemFields(w) {
   if (!w) return w;
+  if (w.startedAt === undefined) w.startedAt = null;
   if (w.completedAt) w.status = 'DONE';
+  else if (w.startedAt) w.status = 'IN_PROGRESS';
   else {
     if (w.completedAt === undefined) w.completedAt = null;
     w.status = 'PENDING';
   }
   return w;
+}
+function parseStampMs(s) {
+  if (!s) return NaN;
+  const d = new Date(String(s).replace(' ', 'T') + (String(s).length <= 16 ? ':00' : ''));
+  return d.getTime();
+}
+/** Giờ công thực tế = khoảng từ bắt đầu → hoàn thành hạng mục (làm tròn 0.1h, tối thiểu 0.1). */
+function actualHoursFromRange(startedAt, completedAt) {
+  const a = parseStampMs(startedAt);
+  const b = parseStampMs(completedAt);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b < a) return null;
+  const hours = (b - a) / 3600000;
+  if (hours <= 0) return 0.1;
+  return Math.round(hours * 10) / 10;
 }
 function allWorkItemsDone(o) {
   ensureOrderApproval(o);
@@ -7747,6 +7863,8 @@ function approvalActionLabel(a) {
     REJECT: 'Từ chối',
     EDIT: 'Sửa phiếu',
     COMPLETE: 'Hoàn thành thực tế',
+    WI_START: 'Bắt đầu hạng mục',
+    WI_COMPLETE: 'Hoàn thành hạng mục',
     START: 'Bắt đầu thực hiện',
     SYNC: 'Đồng bộ mua hàng',
     SYNC_FAIL: 'Đồng bộ mua hàng thất bại',
@@ -7764,6 +7882,8 @@ function approvalActionColor(a) {
     REJECT: 'text-rose-700',
     EDIT: 'text-amber-800',
     COMPLETE: 'text-emerald-700',
+    WI_START: 'text-sky-700',
+    WI_COMPLETE: 'text-emerald-700',
     START: 'text-amber-700',
     SYNC: 'text-sky-700',
     SYNC_FAIL: 'text-rose-700',
@@ -8954,20 +9074,29 @@ function pageOrder() {
                 <tbody>${(o.workItems||[]).map((w, idx) => {
                   ensureWorkItemFields(w);
                   const wiDone = !!w.completedAt;
+                  const wiStarted = !!w.startedAt && !wiDone;
                   const wiStatus = wiDone
                     ? '<span class="badge bg-emerald-50 text-emerald-800">Đã HT</span>'
-                    : '<span class="badge bg-slate-100 text-slate-600">Chưa HT</span>';
+                    : wiStarted
+                      ? '<span class="badge bg-sky-50 text-sky-800">Đang làm</span>'
+                      : '<span class="badge bg-slate-100 text-slate-600">Chưa bắt đầu</span>';
                   const hoursCell = wiDone && w.hours != null
                     ? `<span class="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800">TT ${Number(w.hours).toFixed(1)} / barem ${w.standardHours != null ? Number(w.standardHours).toFixed(1) : '—'}</span>`
-                    : (w.hours != null ? Number(w.hours).toFixed(1) : '—');
+                    : wiStarted
+                      ? `<span class="text-[11px] text-sky-700">Từ ${fmtStampVi(w.startedAt)}</span>`
+                      : (w.hours != null ? Number(w.hours).toFixed(1) : '—');
                   let wiActions = '';
                   if (canEditOrderDetail(o)) {
                     wiActions = `<button type="button" data-edit-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs mr-1">Sửa</button>
                     <button type="button" data-del-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs text-rose-700 !border-rose-300">Xóa</button>`;
                   } else if (canCompleteWi) {
-                    wiActions = wiDone
-                      ? `<span class="text-emerald-600 font-semibold">✓</span> <span class="text-[10px] text-slate-500">${fmtStampVi(w.completedAt)}</span>`
-                      : `<button type="button" data-complete-work-item="${o.id}:${idx}" class="btn btn-emerald btn-xs">Hoàn thành</button>`;
+                    if (wiDone) {
+                      wiActions = `<span class="text-emerald-600 font-semibold">✓</span> <span class="text-[10px] text-slate-500">${fmtStampVi(w.completedAt)}</span>`;
+                    } else if (!w.startedAt) {
+                      wiActions = `<button type="button" data-start-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs !border-sky-400 !bg-sky-50 text-sky-900">Bắt đầu</button>`;
+                    } else {
+                      wiActions = `<button type="button" data-complete-work-item="${o.id}:${idx}" class="btn btn-emerald btn-xs">Hoàn thành</button>`;
+                    }
                   }
                   return `<tr class="row-h">
                   <td class="td">${esc(w.system)}</td>
@@ -9071,6 +9200,8 @@ function pageOrder() {
             <span>Đối chiếu dự kiến: <strong class="tabular-nums">${money(sumMaterialLines(plannedMaterials(o)))}</strong></span>
           </div>` : ''}
         </div>
+
+        ${renderMaintenanceHistorySection(o)}
       </div>
       <aside class="card p-4">
         <h3 class="mb-1 text-sm font-semibold">Tiến trình phiếu</h3>
@@ -12622,17 +12753,42 @@ function completeOrder(id) {
   return true;
 }
 
-function completeWorkItem(orderId, idx, hours) {
+function startWorkItem(orderId, idx) {
+  const o = DB.orders.find(x => x.id === orderId);
+  if (!o || !canCompleteWorkItems(o)) return;
+  ensureOrderApproval(o);
+  const w = o.workItems[idx];
+  if (!w || w.completedAt || w.startedAt) return;
+  const at = nowStamp();
+  w.startedAt = at;
+  w.status = 'IN_PROGRESS';
+  if (o.status === 'NOT_STARTED') {
+    o.status = 'IN_PROGRESS';
+    if (!o.startedAt) {
+      o.startedAt = at;
+      o.approvalLog.push({ at, action: 'START', by: 'Nguyễn Văn Kỹ thuật', note: 'Bắt đầu thực hiện (tự động khi bắt đầu hạng mục đầu) · ' + fmtStampVi(at) });
+    }
+  }
+  o.approvalLog.push({
+    at, action: 'WI_START', by: 'Nguyễn Văn Kỹ thuật',
+    note: `Bắt đầu hạng mục: ${w.content} · ${fmtStampVi(at)}`,
+  });
+  toast('Đã bắt đầu hạng mục · ' + fmtStampVi(at));
+  render();
+}
+
+function completeWorkItem(orderId, idx) {
   const o = DB.orders.find(x => x.id === orderId);
   if (!o || !canCompleteWorkItems(o)) return;
   ensureOrderApproval(o);
   const w = o.workItems[idx];
   if (!w || w.completedAt) return;
+  if (!w.startedAt) { toast('Cần bấm «Bắt đầu» hạng mục trước'); return; }
   const barem = w.standardHours != null ? w.standardHours
     : (w.systemId && w.content ? resolveBaremHours(w.systemId, w.content) : null);
-  const act = hours != null && hours !== '' ? Number(hours) : barem;
-  if (act == null || Number.isNaN(act)) { toast('Nhập giờ thực tế'); return; }
   const at = nowStamp();
+  const act = actualHoursFromRange(w.startedAt, at);
+  if (act == null || Number.isNaN(act)) { toast('Không tính được giờ thực tế'); return; }
   w.standardHours = barem;
   w.hours = act;
   w.completedAt = at;
@@ -12641,17 +12797,17 @@ function completeWorkItem(orderId, idx, hours) {
   if (o.status === 'NOT_STARTED') {
     o.status = 'IN_PROGRESS';
     if (!o.startedAt) {
-      o.startedAt = at;
-      o.approvalLog.push({ at, action: 'START', by: 'Nguyễn Văn Kỹ thuật', note: 'Bắt đầu thực hiện (tự động khi hoàn thành hạng mục đầu) · ' + fmtStampVi(at) });
+      o.startedAt = w.startedAt || at;
+      o.approvalLog.push({ at, action: 'START', by: 'Nguyễn Văn Kỹ thuật', note: 'Bắt đầu thực hiện (tự động) · ' + fmtStampVi(o.startedAt) });
     }
   }
   o.approvalLog.push({
     at, action: 'WI_COMPLETE', by: 'Nguyễn Văn Kỹ thuật',
-    note: `HT hạng mục: ${w.content} · TT ${act.toFixed(1)}h · barem ${barem != null ? barem.toFixed(1) : '—'}h · ${delta}`,
+    note: `HT hạng mục: ${w.content} · từ ${fmtStampVi(w.startedAt)} → ${fmtStampVi(at)} · TT ${act.toFixed(1)}h · barem ${barem != null ? barem.toFixed(1) : '—'}h · ${delta}`,
   });
   closeModal();
   if (!finalizeOrderIfAllWorkItemsDone(orderId)) {
-    toast(`Đã hoàn thành hạng mục · ${delta}`);
+    toast(`Đã hoàn thành hạng mục · TT ${act.toFixed(1)}h · ${delta}`);
     render();
   }
 }
@@ -12662,41 +12818,35 @@ function openCompleteWorkItemModal(orderId, idx) {
   ensureOrderApproval(o);
   const w = o.workItems[idx];
   if (!w || w.completedAt) return;
+  if (!w.startedAt) { toast('Cần bấm «Bắt đầu» hạng mục trước'); return; }
   const barem = w.standardHours != null ? w.standardHours
     : (w.systemId && w.content ? resolveBaremHours(w.systemId, w.content) : null);
-  const defaultAct = w.hours != null ? w.hours : barem;
+  const endAt = nowStamp();
+  const act = actualHoursFromRange(w.startedAt, endAt);
   openModal(`
     <div class="border-b border-slate-200 px-5 py-4">
-      <h2 class="text-lg font-bold">Hoàn thành hạng mục</h2>
+      <h2 class="text-lg font-bold">Xác nhận hoàn thành hạng mục</h2>
       <p class="text-sm text-slate-500">${esc(o.code)} · ${esc(w.content)}</p>
     </div>
-    <form id="completeWiForm" class="space-y-3 px-5 py-4">
-      <label class="block text-sm font-medium text-slate-700">Giờ barem (định mức)
-        <input type="text" readonly class="!bg-slate-50 text-slate-700" value="${barem != null ? Number(barem).toFixed(1) + ' h' : '—'}" />
-      </label>
-      <label class="block text-sm font-medium text-slate-700">Giờ thực tế
-        <input name="hours" id="wiCompleteHours" type="number" step="0.1" min="0" value="${defaultAct != null ? defaultAct : ''}" required />
-      </label>
+    <div class="space-y-3 px-5 py-4">
+      <dl class="grid gap-2 text-sm sm:grid-cols-2">
+        <div><dt class="text-xs text-slate-500">Bắt đầu hạng mục</dt><dd class="font-medium tabular-nums">${fmtStampVi(w.startedAt)}</dd></div>
+        <div><dt class="text-xs text-slate-500">Hoàn thành (hiện tại)</dt><dd class="font-medium tabular-nums">${fmtStampVi(endAt)}</dd></div>
+        <div><dt class="text-xs text-slate-500">Giờ barem</dt><dd class="font-medium">${barem != null ? Number(barem).toFixed(1) + ' h' : '—'}</dd></div>
+        <div><dt class="text-xs text-slate-500">Giờ thực tế (tự tính)</dt><dd class="font-medium text-emerald-800">${act != null ? act.toFixed(1) + ' h' : '—'}</dd></div>
+      </dl>
       <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
         <span class="text-slate-500">So với barem:</span>
-        <strong id="wiCompleteDelta" class="ml-1 text-slate-900">${baremDeltaText(defaultAct, barem)}</strong>
+        <strong class="ml-1 text-slate-900">${baremDeltaText(act, barem)}</strong>
+        <p class="mt-1 text-[11px] text-slate-500 m-0">Giờ TT = thời điểm bắt đầu → hoàn thành hạng mục. KTV không nhập tay.</p>
       </div>
       <div class="flex justify-end gap-2 pt-1">
         <button type="button" data-close class="btn btn-outline">Hủy</button>
-        <button class="btn btn-emerald">Xác nhận hoàn thành</button>
+        <button type="button" id="wiCompleteConfirm" class="btn btn-emerald">Xác nhận hoàn thành</button>
       </div>
-    </form>`, 'max-w-md');
+    </div>`, 'max-w-md');
   $('[data-close]').onclick = closeModal;
-  const syncDelta = () => {
-    const el = $('#wiCompleteDelta');
-    if (el) el.textContent = baremDeltaText($('#wiCompleteHours')?.value, barem);
-  };
-  $('#wiCompleteHours')?.addEventListener('input', syncDelta);
-  $('#completeWiForm').onsubmit = (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    completeWorkItem(orderId, idx, fd.get('hours'));
-  };
+  $('#wiCompleteConfirm').onclick = () => completeWorkItem(orderId, idx);
 }
 
 function submitOrderForApproval(id, isResubmit) {
@@ -12883,7 +13033,7 @@ function openWorkItemModal(orderId, idx) {
   const initBarem = resolveBaremHours(initSysId, initContent);
   const initStd = w?.standardHours != null ? w.standardHours : initBarem;
 
-  const renderForm = (sysId, serviceTypeId, content, standardHours, actualHours, performer) => {
+  const renderForm = (sysId, serviceTypeId, content, standardHours, performer) => {
     const barems = baremRowsForSystem(sysId);
     const svcOpts = serviceTypesForSystem(sysId);
     const std = content ? (resolveBaremHours(sysId, content) ?? standardHours) : null;
@@ -12910,14 +13060,10 @@ function openWorkItemModal(orderId, idx) {
         </select>
         ${!barems.length && sysId ? '<span class="mt-1 block text-[11px] text-amber-700">Hệ thống này chưa có barem đang áp dụng hôm nay — thêm / mở kỳ tại «Barem giờ công».</span>' : ''}
       </label>
-      <div class="grid gap-3 sm:grid-cols-2">
-        <label class="block text-sm font-medium text-slate-700">Giờ barem (định mức)
-          <input name="standardHours" id="wiStdHours" type="number" step="0.1" value="${std != null ? std : ''}" readonly class="!bg-slate-50 text-slate-700" />
-        </label>
-        <label class="block text-sm font-medium text-slate-700">Giờ thực tế
-          <input name="hours" id="wiActHours" type="number" step="0.1" min="0" value="${actualHours != null && actualHours !== '' ? actualHours : (std != null ? std : '')}" placeholder="Mặc định = giờ barem" />
-        </label>
-      </div>
+      <label class="block text-sm font-medium text-slate-700">Giờ barem (định mức)
+        <input name="standardHours" id="wiStdHours" type="number" step="0.1" value="${std != null ? std : ''}" readonly class="!bg-slate-50 text-slate-700" />
+        <span class="mt-1 block text-[11px] text-slate-500">Giờ thực tế tự tính khi bấm Bắt đầu → Hoàn thành hạng mục.</span>
+      </label>
       <label class="block text-sm font-medium text-slate-700">Người thực hiện
         <input name="performer" type="text" value="${esc(performer || 'Nguyễn Văn Kỹ thuật')}" />
       </label>
@@ -12931,9 +13077,9 @@ function openWorkItemModal(orderId, idx) {
   openModal(`
     <div class="border-b border-slate-200 px-5 py-4">
       <h2 class="text-lg font-bold">${isNew ? 'Thêm hạng mục công việc' : 'Sửa hạng mục công việc'}</h2>
-      <p class="text-sm text-slate-500">${esc(o.code)} · chọn hệ thống để xem lịch sử cùng hạng mục trên xe · rồi chọn loại DV / nội dung / giờ</p>
+      <p class="text-sm text-slate-500">${esc(o.code)} · chọn hệ thống để xem lịch sử cùng hạng mục trên xe · rồi chọn loại DV / nội dung</p>
     </div>
-    <div id="wiFormWrap" class="max-h-[75vh] overflow-y-auto">${renderForm(initSysId, w?.serviceTypeId || '', initContent, initStd, w?.hours, w?.performer)}</div>
+    <div id="wiFormWrap" class="max-h-[75vh] overflow-y-auto">${renderForm(initSysId, w?.serviceTypeId || '', initContent, initStd, w?.performer)}</div>
   `, 'max-w-2xl');
 
   const bindWi = () => {
@@ -12949,7 +13095,7 @@ function openWorkItemModal(orderId, idx) {
       const sid = $('#wiSystem')?.value || '';
       const wrap = $('#wiFormWrap');
       if (!wrap) return;
-      wrap.innerHTML = renderForm(sid, '', '', null, null, $('[name=performer]')?.value || 'Nguyễn Văn Kỹ thuật');
+      wrap.innerHTML = renderForm(sid, '', '', null, $('[name=performer]')?.value || 'Nguyễn Văn Kỹ thuật');
       bindWi();
     };
     const syncFromContent = () => {
@@ -12957,11 +13103,10 @@ function openWorkItemModal(orderId, idx) {
       const content = $('#wiContent')?.value || '';
       const serviceTypeId = $('#wiService')?.value || '';
       const performer = $('[name=performer]')?.value || 'Nguyễn Văn Kỹ thuật';
-      const act = $('#wiActHours')?.value;
       const h = content ? resolveBaremHours(sid, content) : null;
       const wrap = $('#wiFormWrap');
       if (!wrap) return;
-      wrap.innerHTML = renderForm(sid, serviceTypeId, content, h, act !== '' && act != null ? act : h, performer);
+      wrap.innerHTML = renderForm(sid, serviceTypeId, content, h, performer);
       bindWi();
     };
     $('#wiSystem')?.addEventListener('change', syncFromSystem);
@@ -12977,7 +13122,6 @@ function openWorkItemModal(orderId, idx) {
       const standardHours = fd.get('standardHours') === '' || fd.get('standardHours') == null
         ? resolveBaremHours(systemId, content)
         : Number(fd.get('standardHours'));
-      const hours = fd.get('hours') === '' || fd.get('hours') == null ? standardHours : Number(fd.get('hours'));
       if (!systemId || !sys) { toast('Chọn hệ thống'); return; }
       if (!serviceTypeId || !st) { toast('Chọn loại dịch vụ'); return; }
       if (!content) { toast('Chọn nội dung công việc từ master'); return; }
@@ -12990,7 +13134,9 @@ function openWorkItemModal(orderId, idx) {
         service: st.name,
         content,
         standardHours,
-        hours,
+        hours: null,
+        startedAt: w?.startedAt || null,
+        completedAt: w?.completedAt || null,
         performer: String(fd.get('performer') || '—'),
       };
       if (isNew) o.workItems.push(item);
@@ -13783,6 +13929,11 @@ function bind() {
   $$('[data-goto-plan-vehicle]').forEach(b => b.onclick = () => {
     view = { ...view, name: 'vehicle', vehicleId: Number(b.dataset.gotoPlanVehicle), vehicleTab: 'plan', from: 'assessment', filters: defaultFilters(), page: 1 };
     render();
+  });
+  $$('[data-start-work-item]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    const [oid, idx] = b.dataset.startWorkItem.split(':');
+    startWorkItem(oid, Number(idx));
   });
   $$('[data-complete-work-item]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();
