@@ -97,6 +97,15 @@
     .tl::after{content:'';position:absolute;left:8px;top:18px;bottom:0;width:2px;background:#e2e8f0}
     .tl:last-child::after{display:none}
     .sec-h{padding:12px 16px;border-bottom:1px solid #e2e8f0;font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .sheet-bg{position:absolute;inset:0;z-index:60;background:rgba(15,23,42,.45);display:none;align-items:flex-end;justify-content:center}
+    .sheet-bg.on{display:flex}
+    .sheet{width:100%;max-height:88%;overflow:auto;background:#fff;border-radius:16px 16px 0 0;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(15,23,42,.2)}
+    .sheet h2{margin:0 0 4px;font-size:17px;font-weight:700}
+    .sheet .sub{margin:0 0 12px;font-size:12px;color:#64748b}
+    .mat-row{display:flex;gap:8px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f1f5f9}
+    .mat-row:last-child{border-bottom:0}
+    .mat-row .grow{flex:1;min-width:0}
+    .mat-row .qty{width:64px;min-height:36px;border:1px solid #cbd5e1;border-radius:.375rem;padding:4px 8px;font-size:14px}
   </style>
 </head>
 <body>
@@ -234,8 +243,11 @@
       <div class="scroll px-4 py-3" id="evalBody"></div>
       <div class="shell-ftr" id="evalFooter"></div>
     </section>
+  <div class="sheet-bg" id="orderSheetBg" aria-hidden="true">
+    <div class="sheet" id="orderSheet" role="dialog" aria-modal="true"></div>
   </div>
   <div class="toast" id="toast"></div>
+  </div>
 
 <script>
 const $=(s,el=document)=>el.querySelector(s);
@@ -438,25 +450,123 @@ function orderCard(o){
   </article>`;
 }
 
+function systems(){
+  const s=new Set(['Hệ Thống Máy Xe','Hệ Thống Điện','Nhân Công Sửa Chữa','Hệ Thống Máy Lạnh','Dầu Nhớt','Mỡ','Khác','Phí Phát Sinh Khác']);
+  REPAIRS.forEach(r=>{if(r.system)s.add(r.system)});
+  MOBILE_CATALOG.forEach(c=>{if(c.system)s.add(c.system)});
+  ORDERS.forEach(o=>{if(o.system)s.add(o.system)});
+  return [...s].sort((a,b)=>a.localeCompare(b,'vi'));
+}
+function canEditOrderDetail(o){return o.approval==='DRAFT'||o.approval==='REJECTED'}
+function ensureOrderWorkItems(o){
+  if(!Array.isArray(o.workItems)||!o.workItems.length){
+    o.workItems=[{content:o.content||'—',system:o.system||'—'}];
+  }
+  if(!Array.isArray(o.mats))o.mats=[];
+  return o;
+}
+function syncOrderContentFromItems(o){
+  ensureOrderWorkItems(o);
+  o.content=o.workItems.map(w=>w.content).filter(Boolean).join(' · ')||o.content;
+  if(o.workItems[0]?.system)o.system=o.workItems[0].system;
+}
+function recalcOrderCostMobile(o){
+  o.cost=Math.round((o.mats||[]).reduce((a,m)=>a+(Number(m.price)||0)*(Number(m.qty)||1),0));
+  return o.cost;
+}
+function closeOrderSheet(){
+  const bg=$('#orderSheetBg');
+  if(!bg)return;
+  bg.classList.remove('on');
+  bg.setAttribute('aria-hidden','true');
+  $('#orderSheet').innerHTML='';
+}
+function openOrderSheet(html){
+  const bg=$('#orderSheetBg');
+  $('#orderSheet').innerHTML=html;
+  bg.classList.add('on');
+  bg.setAttribute('aria-hidden','false');
+}
+
 function renderOrder(){
   const o=ORDERS.find(x=>x.id===S.orderId); if(!o) return;
   if(!o.base)o.base={status:'NONE',code:null,baseStatus:null};
+  ensureOrderWorkItems(o);
   $$('#orderTabs [data-otab]').forEach(b=>b.classList.toggle('on',b.dataset.otab===S.orderTab));
 
   if(S.orderTab==='system'){
-    $('#orderPanel').innerHTML=`<div class="m-3 surface overflow-hidden"><div class="sec-h">Thông tin hệ thống</div><div class="p-4">${(o.log||[]).map(e=>`<div class="tl"><div class="text-sm font-medium">${e.text}</div><div class="text-xs text-slate-500">${e.at}</div></div>`).join('')||'<p class="text-sm text-slate-500">Chưa có sự kiện</p>'}</div></div>`;
+    $('#orderPanel').innerHTML=`<div class="m-3 surface overflow-hidden"><div class="sec-h">Thông tin hệ thống</div><div class="p-4">${(o.log||[]).map(e=>`<div class="tl"><div class="text-sm font-medium">${esc(e.text||e.note||e.action||'')}</div><div class="text-xs text-slate-500">${esc(e.at||'')}</div></div>`).join('')||'<p class="text-sm text-slate-500">Chưa có sự kiện</p>'}</div></div>`;
     return;
   }
 
+  const editable=canEditOrderDetail(o);
   const acts=[];
+  if(editable){
+    acts.push(`<button type="button" class="btn btn-outline btn-touch" id="btnEditOrder">Sửa thông tin chung</button>`);
+    if(o.approval==='DRAFT')acts.push(`<button type="button" class="btn btn-primary btn-touch" id="btnSubmitOrder">Nộp duyệt</button>`);
+    if(o.approval==='REJECTED')acts.push(`<button type="button" class="btn btn-primary btn-touch" id="btnSubmitOrder">Nộp lại</button>`);
+  }
   if(o.status==='NOT_STARTED'&&o.approval==='APPROVED')acts.push(`<button type="button" class="btn btn-primary btn-touch" id="btnStart">Bắt đầu thực hiện</button>`);
-  if(o.status==='IN_PROGRESS')acts.push(`<button type="button" class="btn btn-emerald btn-touch" id="btnComplete">Hoàn thành</button>`);
-  acts.push(o.base.status==='SYNCING'?`<button class="btn btn-outline btn-touch" disabled>Đang đồng bộ…</button>`:`<button type="button" class="btn btn-outline btn-touch" id="btnSyncBase">Đồng bộ</button>`);
-  if(o.mh==='NONE'||o.mh==='SYNCING')acts.push(`<button type="button" class="btn btn-sky btn-touch" id="btnSyncMh" ${o.mh==='SYNCING'?'disabled':''}>${o.mh==='SYNCING'?'Đang ĐB mua hàng…':'Đồng bộ mua hàng'}</button>`);
+  if(o.status==='IN_PROGRESS'&&o.approval==='APPROVED')acts.push(`<button type="button" class="btn btn-emerald btn-touch" id="btnComplete">Hoàn thành</button>`);
+  if(o.approval==='APPROVED'){
+    acts.push(o.base.status==='SYNCING'?`<button class="btn btn-outline btn-touch" disabled>Đang đồng bộ…</button>`:`<button type="button" class="btn btn-outline btn-touch" id="btnSyncBase">Đồng bộ BASE</button>`);
+    if(o.mh==='NONE'||o.mh==='SYNCING')acts.push(`<button type="button" class="btn btn-sky btn-touch" id="btnSyncMh" ${o.mh==='SYNCING'?'disabled':''}>${o.mh==='SYNCING'?'Đang ĐB mua hàng…':'Đồng bộ mua hàng'}</button>`);
+  }
 
   const baseLine=o.base.code
     ?`<p class="mt-1 text-sm text-slate-600 m-0">Mã BASE: ${esc(o.base.code)}</p>`
     :`<p class="mt-1 text-sm text-slate-500 m-0">Chưa đồng bộ BASE</p>`;
+
+  const editHint=editable
+    ?`<div class="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">Phiếu ${o.approval==='REJECTED'?'bị từ chối':'nháp'} — có thể sửa thông tin chung, hạng mục và chọn vật tư bên dưới.</div>`
+    :`<div class="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">Chỉ sửa khi phiếu <strong>Nháp</strong> hoặc <strong>Từ chối</strong> (giống web).</div>`;
+
+  const wiHtml=(o.workItems||[]).map((w,i)=>`<article class="card10 p-3">
+    <div class="flex justify-between gap-2 items-start">
+      <div class="min-w-0">
+        <p class="text-[15px] font-bold m-0">#${i+1} · ${esc(w.system||o.system||'—')}</p>
+        <p class="text-sm text-slate-600 mt-1 m-0">${esc(w.content)}</p>
+      </div>
+      ${editable?`<button type="button" class="text-rose-600 text-sm font-semibold shrink-0" data-rm-wi="${i}">Xóa</button>`:''}
+    </div>
+  </article>`).join('')||`<p class="text-sm text-slate-400 px-1">Chưa có hạng mục</p>`;
+
+  const matsHtml=(o.mats||[]).length
+    ? (o.mats||[]).map((m,i)=>`<div class="mat-row">
+        <div class="grow">
+          <div class="text-sm font-medium text-slate-900">${esc(m.code?m.code+' · ':'')}${esc(m.name)}</div>
+          <div class="text-[11px] text-slate-500 mt-0.5">${money(m.price)}${m.supplier?' · '+esc(m.supplier):''}${m.warehouse?' · '+esc(m.warehouse):''} · ${esc(m.tag||'—')}</div>
+        </div>
+        ${editable?`<input type="number" min="0.01" step="0.01" class="qty" data-mat-qty="${i}" value="${m.qty??1}" />
+        <button type="button" class="text-rose-600 text-sm font-semibold shrink-0 self-center" data-rm-mat="${i}">Xóa</button>`
+        :`<div class="text-sm font-semibold tabular-nums shrink-0">×${m.qty??1}</div>`}
+      </div>`).join('')
+    : `<p class="text-sm text-slate-400 px-1 py-2">${editable?'Chưa có vật tư — chọn từ kho hoặc ghi tay bên dưới':'Chưa có vật tư'}</p>`;
+
+  const matPick=editable?`
+    <div class="p-3 space-y-3 border-t border-slate-100">
+      <div class="rounded-md border border-emerald-200 bg-emerald-50/50 p-3 space-y-2">
+        <div class="text-xs font-semibold text-emerald-800">Chọn vật tư từ kho (PWMS)</div>
+        <div class="ac-wrap">
+          <input id="oPwmsMat" type="search" autocomplete="off" class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm" placeholder="Tìm mã / tên vật tư kho…" />
+          <div class="ac-dropdown hidden" id="oPwmsMatDd"></div>
+        </div>
+      </div>
+      <div class="rounded-md border border-amber-200 bg-amber-50/50 p-3 space-y-2">
+        <div class="text-xs font-semibold text-amber-800">Vật tư ghi tay / mua ngoài</div>
+        <div class="ac-wrap">
+          <input id="oKtvMat" type="search" autocomplete="off" class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm" placeholder="Tìm hoặc nhập tên vật tư mới…" />
+          <div class="ac-dropdown hidden" id="oKtvMatDd"></div>
+        </div>
+      </div>
+      <div class="rounded-md border border-slate-200 bg-slate-50 p-3 space-y-2">
+        <div class="text-xs font-semibold text-slate-800">Thêm hạng mục công việc</div>
+        <div class="ac-wrap">
+          <input id="oAddWi" type="search" autocomplete="off" class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm" placeholder="Tìm và thêm hạng mục…" />
+          <div class="ac-dropdown hidden" id="oAddWiDd"></div>
+        </div>
+      </div>
+    </div>`:'';
 
   $('#orderPanel').innerHTML=`
   <div class="m-3 surface overflow-hidden">
@@ -464,7 +574,8 @@ function renderOrder(){
       <h1 class="text-lg font-bold text-blue-600 m-0 leading-snug">Phiếu: ${o.code}</h1>
       ${baseLine}
       <div class="mt-2 flex flex-wrap gap-1">${approvalBadge(o.approval)} ${statusBadge(o.status)} ${mhBadge(o.mh)} ${baseBadge(o.base)}</div>
-      <div class="mt-3 flex flex-wrap gap-2">${acts.join('')}</div>
+      ${editHint}
+      <div class="mt-3 flex flex-wrap gap-2">${acts.join('')||'<span class="text-xs text-slate-400">Không có thao tác</span>'}</div>
     </div>
     <div class="p-3 space-y-3">
       <div class="grid gap-3">
@@ -472,29 +583,29 @@ function renderOrder(){
         <div class="surface p-3"><p class="text-sm text-slate-500 m-0">Số hạng mục</p><p class="text-xl font-bold m-0">${(o.workItems&&o.workItems.length)||1}</p></div>
       </div>
       <section class="surface overflow-hidden">
-        <div class="sec-h">Thông tin chung</div>
+        <div class="sec-h">Thông tin chung ${editable?`<button type="button" class="btn btn-outline !h-8 !min-h-8 !text-xs !px-2" id="btnEditOrder2">Sửa</button>`:''}</div>
         <div class="grid gap-y-3 p-4 text-sm">
           <div><div class="text-slate-500">Phương tiện</div><div class="font-medium">${veh(o.vehicleId)?.plate||'—'}</div></div>
-          <div><div class="text-slate-500">Nội dung</div><div class="font-medium">${o.content}</div></div>
-          <div><div class="text-slate-500">Nơi thực hiện</div><div class="font-medium">${o.garage}</div></div>
-          <div><div class="text-slate-500">Nguồn</div><div class="font-medium">${o.source}</div></div>
+          <div><div class="text-slate-500">Nội dung</div><div class="font-medium">${esc(o.content)}</div></div>
+          <div><div class="text-slate-500">Nơi thực hiện</div><div class="font-medium">${esc(o.garage)}</div></div>
+          <div><div class="text-slate-500">Ngày · Odo</div><div class="font-medium">${esc(o.date)} · ${kmFmt(o.km)} km</div></div>
+          <div><div class="text-slate-500">Hệ thống · Nguồn</div><div class="font-medium">${esc(o.system||'—')} · ${esc(o.source||'—')}</div></div>
         </div>
       </section>
       <section class="surface overflow-hidden">
-        <div class="sec-h"><span>Hạng mục công việc</span></div>
-        <div class="p-3 space-y-2">${
-          (o.workItems&&o.workItems.length?o.workItems:[{content:o.content,system:o.system}]).map((w,i)=>`<article class="card10 p-3">
-          <div class="flex justify-between"><p class="text-[15px] font-bold m-0">#${i+1} · ${esc(w.system||o.system||'—')}</p>${i===0?`<p class="text-sm font-semibold text-emerald-700 m-0">${money(o.cost)}</p>`:''}</div>
-          <p class="text-sm text-slate-600 mt-1 m-0">${esc(w.content)}</p>
-          ${i===0?(o.mats||[]).map(m=>`<div class="text-xs text-slate-500 mt-1">${esc(m.name)} ×${m.qty} · ${money(m.price)}${m.supplier?' · '+esc(m.supplier):''}${m.warehouse?' · '+esc(m.warehouse):''} (${m.tag||'—'}${m.snapshotAt?' · lưu kèm '+esc(m.snapshotAt):''}${m.snapshotFrozen?' · đã khóa':''})</div>`).join(''):''}
-        </article>`).join('')
-        }</div>
+        <div class="sec-h"><span>Hạng mục công việc</span>${editable?`<span class="text-[11px] font-normal text-slate-500">Thêm/xóa được</span>`:''}</div>
+        <div class="p-3 space-y-2">${wiHtml}</div>
+      </section>
+      <section class="surface overflow-hidden">
+        <div class="sec-h"><span>Vật tư dự kiến</span>${editable?`<span class="text-[11px] font-normal text-emerald-700">Chọn bên dưới</span>`:''}</div>
+        <div class="px-3">${matsHtml}</div>
+        ${matPick}
       </section>
     </div>
   </div>`;
 
-  $('#btnStart')?.addEventListener('click',()=>{o.status='IN_PROGRESS';toast('Đã bắt đầu');renderOrder()});
-  $('#btnComplete')?.addEventListener('click',()=>{o.status='COMPLETED';toast('Đã hoàn thành');renderOrder()});
+  $('#btnStart')?.addEventListener('click',()=>{o.status='IN_PROGRESS';(o.log=o.log||[]).push({at:'Vừa xong',text:'Bắt đầu thực hiện'});toast('Đã bắt đầu');renderOrder()});
+  $('#btnComplete')?.addEventListener('click',()=>{o.status='COMPLETED';(o.log=o.log||[]).push({at:'Vừa xong',text:'Hoàn thành phiếu'});toast('Đã hoàn thành');renderOrder()});
   $('#btnSyncBase')?.addEventListener('click',()=>{
     o.base.status='SYNCING';renderOrder();toast('Đang đồng bộ BASE…');
     setTimeout(()=>{o.base={status:'SYNCED',code:o.base.code||('BASE-'+o.code.replace(/^RO-/,'')),baseStatus:'APPROVED'};o.log.push({at:'Vừa xong',text:'Đồng bộ BASE · '+o.base.code});toast('Đã đồng bộ · '+o.base.code);renderOrder()},900);
@@ -510,12 +621,184 @@ function renderOrder(){
         const next=Math.round((cat?.refPrice||m.price||100000)*1.05);
         return{...m,price:next,supplier:cat?.supplier||m.supplier||PWMS_SUPPLIERS[0],warehouse:cat?.warehouse||m.warehouse||PWMS_WH[0],tag:'Đã ĐB MH · giá xuất',snapshotAt:at,snapshotFrozen:true};
       });
-      o.cost=(o.mats||[]).reduce((a,m)=>a+(m.price||0)*(m.qty||1),0);
+      recalcOrderCostMobile(o);
       o.log.push({at:'Vừa xong',text:'Đồng bộ mua hàng · giá xuất + NCC · đã lưu kèm phiếu'});
       toast('Đã đồng bộ mua hàng · lưu kèm phiếu');
       renderOrder();
     },1000);
   });
+  $('#btnEditOrder')?.addEventListener('click',()=>openEditOrderSheet(o));
+  $('#btnEditOrder2')?.addEventListener('click',()=>openEditOrderSheet(o));
+  $('#btnSubmitOrder')?.addEventListener('click',()=>{
+    ensureOrderWorkItems(o);
+    if(!(o.workItems||[]).length){toast('Cần ít nhất 1 hạng mục');return}
+    const wasRejected=o.approval==='REJECTED';
+    o.approval='PENDING_APPROVAL';
+    (o.log=o.log||[]).push({at:'Vừa xong',text:wasRejected?'Nộp lại duyệt':'Nộp duyệt'});
+    toast(wasRejected?'Đã nộp lại':'Đã nộp duyệt');
+    renderOrder();
+  });
+  $$('[data-rm-wi]').forEach(b=>b.onclick=()=>{
+    o.workItems.splice(+b.dataset.rmWi,1);
+    syncOrderContentFromItems(o);
+    toast('Đã xóa hạng mục');
+    renderOrder();
+  });
+  $$('[data-rm-mat]').forEach(b=>b.onclick=()=>{
+    o.mats.splice(+b.dataset.rmMat,1);
+    if((o.mats||[]).some(m=>(m.tag||'').includes('Kho')||m.code)&&o.mh==='NA')o.mh='NONE';
+    if(!(o.mats||[]).length&&o.mh==='NONE')o.mh='NA';
+    recalcOrderCostMobile(o);
+    toast('Đã xóa vật tư');
+    renderOrder();
+  });
+  $$('[data-mat-qty]').forEach(inp=>inp.onchange=()=>{
+    const i=+inp.dataset.matQty;
+    o.mats[i].qty=Number(inp.value)||1;
+    recalcOrderCostMobile(o);
+    renderOrder();
+  });
+  if(editable) bindOrderDetailPickers(o);
+}
+
+function bindOrderDetailPickers(o){
+  ['oPwmsMat','oKtvMat','oAddWi'].forEach(id=>{const el=$('#'+id);if(el)delete el.dataset.acBound});
+  bindCreatableAc($('#oPwmsMat'),$('#oPwmsMatDd'),{
+    getOptions:materialMasterOptions,
+    allowCreate:false,
+    format:x=>`${esc(x.code)} · ${esc(x.name)} · tồn ${x.stockQty??'—'} · ${money(x.refPrice)}`,
+    onPick:x=>{
+      enrichMat(x,false);
+      o.mats=o.mats||[];
+      const exist=o.mats.find(m=>m.code&&m.code===x.code);
+      if(exist){exist.qty=(Number(exist.qty)||1)+1;toast('Đã tăng SL vật tư kho')}
+      else{
+        o.mats.push({name:x.name,code:x.code,qty:1,price:x.refPrice||0,supplier:x.supplier||'',warehouse:x.warehouse||'',tag:'Kho MH · giá tham chiếu',snapshotAt:new Date().toLocaleString('vi-VN'),snapshotFrozen:false});
+        toast('Đã thêm vật tư kho');
+      }
+      if(o.mh==='NA')o.mh='NONE';
+      recalcOrderCostMobile(o);
+      if($('#oPwmsMat'))$('#oPwmsMat').value='';
+      renderOrder();
+    }
+  });
+  bindCreatableAc($('#oKtvMat'),$('#oKtvMatDd'),{
+    getOptions:()=>[...materialLocalOptions(),...materialMasterOptions().map(m=>({...m,source:'master'}))],
+    format:x=>x.code?`${esc(x.code)} · ${esc(x.name)}`:`${esc(x.name)}`,
+    onPick:x=>{
+      o.mats=o.mats||[];
+      o.mats.push({name:x.name,code:x.code||'',qty:1,price:x.refPrice||0,tag:x.source==='local'?'KTV/ngoài kho · nội bộ':'KTV/ngoài kho',snapshotAt:new Date().toLocaleString('vi-VN'),snapshotFrozen:false,local:x.source==='local'});
+      toast('Đã thêm vật tư ghi tay');
+      recalcOrderCostMobile(o);
+      if($('#oKtvMat'))$('#oKtvMat').value='';
+      renderOrder();
+    },
+    onCreate:name=>{
+      const item={id:'lm'+Date.now(),name,code:''};
+      LOCAL.materials=LOCAL.materials||[];
+      LOCAL.materials.unshift(item);
+      saveLocalLookups(LOCAL);
+      toast('Đã lưu vật tư mới · chỉ nội bộ TMS');
+      return{...item,source:'local'};
+    }
+  });
+  bindCreatableAc($('#oAddWi'),$('#oAddWiDd'),{
+    getOptions:contentOptions,
+    format:x=>`${esc(x.name)}${x.system?` <span class="sub">· ${esc(x.system)}</span>`:''}`,
+    onPick:x=>{
+      ensureOrderWorkItems(o);
+      if(o.workItems.some(w=>(w.content||'').toLowerCase()===(x.name||'').toLowerCase())){toast('Hạng mục đã có');return}
+      o.workItems.push({content:x.name,system:x.system||'—',local:x.source==='local'});
+      syncOrderContentFromItems(o);
+      toast('Đã thêm hạng mục');
+      if($('#oAddWi'))$('#oAddWi').value='';
+      renderOrder();
+    },
+    onCreate:name=>{
+      const item={id:'lc'+Date.now(),name,system:'Khác'};
+      LOCAL.contents=LOCAL.contents||[];
+      LOCAL.contents.unshift(item);
+      saveLocalLookups(LOCAL);
+      toast('Đã lưu hạng mục mới · chỉ nội bộ TMS');
+      return{...item,source:'local'};
+    }
+  });
+}
+
+function openEditOrderSheet(o){
+  if(!canEditOrderDetail(o)){toast('Chỉ sửa khi Nháp hoặc Bị từ chối');return}
+  openOrderSheet(`
+    <h2>Sửa thông tin chung</h2>
+    <p class="sub">${esc(o.code)} · ${o.approval==='REJECTED'?'Sửa trước khi nộp lại':'Chỉnh phiếu nháp'}</p>
+    <label class="field"><span>Nội dung thực hiện</span>
+      <div class="ac-wrap">
+        <input id="eContent" type="search" autocomplete="off" value="${esc(o.content||'')}" />
+        <div class="ac-dropdown hidden" id="eContentDd"></div>
+      </div>
+    </label>
+    <div class="grid grid-cols-2 gap-2">
+      <label class="field"><span>Ngày</span><input id="eDate" type="date" value="${esc(o.date||'')}" /></label>
+      <label class="field"><span>Odo (km)</span><input id="eKm" type="number" value="${o.km??''}" /></label>
+    </div>
+    <label class="field"><span>Nơi thực hiện</span>
+      <div class="ac-wrap">
+        <input id="eGarage" type="search" autocomplete="off" value="${esc(o.garage||'')}" />
+        <div class="ac-dropdown hidden" id="eGarageDd"></div>
+      </div>
+    </label>
+    <label class="field"><span>Hệ thống</span>
+      <select id="eSystem">${systems().map(s=>`<option value="${esc(s)}" ${o.system===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
+    </label>
+    <p class="text-[11px] text-slate-500 mb-3">Hạng mục và vật tư: thêm / xóa ngay trên trang chi tiết.</p>
+    <div class="grid grid-cols-2 gap-2">
+      <button type="button" class="btn btn-outline btn-touch" id="eCancel">Hủy</button>
+      <button type="button" class="btn btn-primary btn-touch" id="eSave">Lưu</button>
+    </div>`);
+  $('#eCancel').onclick=closeOrderSheet;
+  $('#orderSheetBg').onclick=e=>{if(e.target===$('#orderSheetBg'))closeOrderSheet()};
+  ['eContent','eGarage'].forEach(id=>{const el=$('#'+id);if(el)delete el.dataset.acBound});
+  bindCreatableAc($('#eContent'),$('#eContentDd'),{
+    getOptions:contentOptions,
+    format:x=>`${esc(x.name)}${x.system?` <span class="sub">· ${esc(x.system)}</span>`:''}`,
+    onPick:x=>{
+      $('#eContent').value=x.name;
+      if(x.system&&[...$('#eSystem').options].some(op=>op.value===x.system))$('#eSystem').value=x.system;
+    },
+    onCreate:name=>{
+      const item={id:'lc'+Date.now(),name,system:'Khác'};
+      LOCAL.contents=LOCAL.contents||[];
+      LOCAL.contents.unshift(item);
+      saveLocalLookups(LOCAL);
+      toast('Đã lưu nội dung mới · chỉ nội bộ TMS');
+      return{...item,source:'local'};
+    }
+  });
+  bindCreatableAc($('#eGarage'),$('#eGarageDd'),{
+    getOptions:()=>garageOptions().map(name=>({id:name,name,source:(LOCAL.garages||[]).some(g=>(g.name||g)===name)?'local':'master'})),
+    onPick:x=>{$('#eGarage').value=x.name},
+    onCreate:name=>{
+      LOCAL.garages=LOCAL.garages||[];
+      if(!LOCAL.garages.some(g=>(g.name||g).toLowerCase()===name.toLowerCase())){
+        LOCAL.garages.unshift({id:'lg'+Date.now(),name});
+        saveLocalLookups(LOCAL);
+        toast('Đã lưu nơi thực hiện mới · chỉ nội bộ TMS');
+      }
+      return{id:name,name,source:'local'};
+    }
+  });
+  $('#eSave').onclick=()=>{
+    o.content=($('#eContent').value||'').trim()||o.content;
+    o.date=$('#eDate').value||o.date;
+    o.km=Number($('#eKm').value)||o.km;
+    o.garage=($('#eGarage').value||'').trim()||o.garage;
+    o.system=$('#eSystem').value||o.system;
+    ensureOrderWorkItems(o);
+    if(o.workItems.length===1){o.workItems[0].content=o.content;o.workItems[0].system=o.system}
+    (o.log=o.log||[]).push({at:'Vừa xong',text:'Sửa thông tin chung'});
+    closeOrderSheet();
+    toast('Đã lưu thông tin chung');
+    renderOrder();
+  };
 }
 
 /* ===== EVAL (giữ SC/Thay chọn hạng mục & VT) ===== */
