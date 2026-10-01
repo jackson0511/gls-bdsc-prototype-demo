@@ -3,273 +3,417 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GLS · IT · tích hợp dữ liệu BD/SC</title>
+  <title>GLS · ERD &amp; tích hợp BD/SC (QLX ↔ PWMS ↔ BASE)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
     :root {
-      --ink: #0f172a; --muted: #475569; --line: #e2e8f0;
-      --brand: #0b6e4f; --brand-dark: #0f513f; --sky: #0369a1;
-      --surface: #fff; --bg: #f1f5f9;
+      --bg: #f4f6f8; --card: #fff; --ink: #12151a; --mute: #667085;
+      --line: #e4e7ec; --acc: #0e7490; --acc2: #c2410c;
+      --pk: #b45309; --pkbg: #fef3c7; --fk: #075985; --fkbg: #e0f2fe;
+      --warn: #fff7ed; --warnb: #c2410c; --ok: #ecfdf5; --okb: #047857;
+      --code: #f1f3f5; --brand: #0b6e4f;
     }
     * { box-sizing: border-box; }
-    body {
-      margin: 0; font-family: "Segoe UI", system-ui, sans-serif; color: var(--ink);
-      background:
-        radial-gradient(900px 420px at 8% -8%, #cfeee3 0%, transparent 55%),
-        radial-gradient(700px 360px at 100% 0%, #dbeafe 0%, transparent 45%),
-        var(--bg);
-      line-height: 1.55;
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 "Be Vietnam Pro", system-ui, sans-serif; }
+    code, .mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: .86em; }
+    code { background: var(--code); padding: 1px 5px; border-radius: 4px; }
+    a { color: var(--acc); }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+    header.hero { padding: 28px 0 20px; border-bottom: 1px solid var(--line); background: var(--card); }
+    .eyebrow { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--brand); font-weight: 600; }
+    h1 { font-size: clamp(22px, 4vw, 28px); line-height: 1.25; margin: 6px 0 8px; }
+    h2 { font-size: 21px; margin: 0 0 8px; }
+    h3 { font-size: 16px; margin: 16px 0 8px; }
+    .sub { color: var(--mute); max-width: 880px; margin: 0; }
+    .topbar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .topbar a {
+      text-decoration: none; color: var(--ink); font-size: 13px; font-weight: 600;
+      padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg);
     }
-    a { color: var(--brand); }
-    .top {
-      position: sticky; top: 0; z-index: 20;
-      backdrop-filter: blur(10px); background: rgba(255,255,255,.9);
-      border-bottom: 1px solid var(--line);
-    }
-    .top-inner {
-      max-width: 1120px; margin: 0 auto; padding: 12px 20px;
-      display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
-    }
-    .top .brand {
-      font-size: 12px; font-weight: 700; letter-spacing: .04em;
-      text-transform: uppercase; color: var(--brand); margin-right: auto;
-    }
-    .top nav { display: flex; flex-wrap: wrap; gap: 6px; }
-    .top a.nav {
-      text-decoration: none; font-size: 12px; font-weight: 600;
-      padding: 5px 9px; border-radius: 8px; color: var(--ink);
-      border: 1px solid transparent;
-    }
-    .top a.nav:hover { background: #f8fafc; border-color: var(--line); }
-    .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 20px 72px; }
-    h1 { margin: 0 0 8px; font-size: clamp(1.5rem, 3.2vw, 1.95rem); line-height: 1.2; }
-    .lead { margin: 0 0 20px; color: var(--muted); max-width: 78ch; font-size: 15px; }
-    .phases {
-      display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      margin-bottom: 28px;
-    }
-    .phases a {
-      text-decoration: none; color: inherit; background: #fff;
-      border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
-      font-size: 12px;
-    }
-    .phases a:hover { border-color: var(--brand); }
-    .phases strong { display: block; font-size: 13px; margin-bottom: 2px; }
-    .phases span { color: var(--muted); }
-    .toc { display: grid; gap: 12px; margin-bottom: 32px; }
-    @media (min-width: 720px) { .toc { grid-template-columns: 1fr 1fr; } }
-    .toc > a {
-      display: block; text-decoration: none; color: inherit;
-      background: var(--surface); border: 1px solid var(--line);
-      border-radius: 12px; padding: 16px 18px;
-    }
-    .toc > a:hover { border-color: var(--brand); }
-    .tag {
-      display: inline-block; font-size: 11px; font-weight: 700;
-      letter-spacing: .03em; text-transform: uppercase;
-      padding: 3px 8px; border-radius: 999px; margin-bottom: 8px;
-    }
-    .tag.ops { background: #ecfdf5; color: var(--brand-dark); }
-    .tag.it { background: #eff6ff; color: var(--sky); }
-    .toc strong { display: block; margin-bottom: 4px; }
-    .toc span { font-size: 14px; color: var(--muted); }
-    section.panel {
-      background: var(--surface); border: 1px solid var(--line);
-      border-radius: 16px; padding: 22px 20px 28px; margin-bottom: 28px;
-    }
-    section.panel h2 {
-      margin: 0 0 6px; font-size: 1.2rem;
-      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-    }
-    section.panel .sub { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
-    h3.block {
-      margin: 22px 0 10px; font-size: 15px; color: var(--brand-dark);
-      padding-bottom: 6px; border-bottom: 1px solid var(--line);
-    }
-    h3.block:first-of-type { margin-top: 4px; }
+    .topbar a.on { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
+    nav.toc { position: sticky; top: 0; z-index: 20; background: var(--card); border-bottom: 1px solid var(--line); }
+    nav.toc .wrap { display: flex; gap: 4px; overflow-x: auto; padding: 8px 16px; -webkit-overflow-scrolling: touch; }
+    nav.toc a { white-space: nowrap; color: var(--mute); text-decoration: none; font-size: 13px; padding: 6px 10px; border-radius: 6px; }
+    nav.toc a:hover { background: var(--code); color: var(--ink); }
+    section { padding: 28px 0 10px; }
+    .lead { color: var(--mute); margin: 0 0 16px; max-width: 920px; }
+    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-top: 16px; }
+    .kpi { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+    .kpi b { display: block; font-size: 24px; line-height: 1.1; }
+    .kpi span { font-size: 12px; color: var(--mute); }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 820px) { .grid2 { grid-template-columns: 1fr; } }
+    .call { border-left: 4px solid var(--warnb); background: var(--warn); border-radius: 8px; padding: 12px 14px; margin: 10px 0; font-size: 14px; }
+    .call.ok { border-color: var(--okb); background: var(--ok); }
+    .call > b:first-child { display: block; margin-bottom: 4px; }
     .diagram {
-      overflow-x: auto; background: #f8fafc; border: 1px solid var(--line);
-      border-radius: 12px; padding: 14px 10px; margin-bottom: 14px;
+      background: #fff; border: 1px solid var(--line); border-radius: 12px;
+      overflow: auto; min-height: 220px; padding: 12px; -webkit-overflow-scrolling: touch;
     }
-    .mermaid { display: flex; justify-content: center; }
-    .explain p, .explain li { font-size: 14px; color: #334155; }
-    .explain ul, .explain ol { margin: 6px 0 0; padding-left: 1.2rem; }
-    .explain li { margin: 4px 0; }
-    .grid-2, .grid-3 { display: grid; gap: 12px; margin-top: 12px; }
-    @media (min-width: 800px) {
-      .grid-2 { grid-template-columns: 1fr 1fr; }
-      .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .diagram .mermaid { display: flex; justify-content: center; }
+    .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--mute); margin: 8px 0 12px; }
+    .lg { display: inline-flex; align-items: center; gap: 6px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+    .tab {
+      border: 1px solid var(--line); background: var(--card); color: var(--ink);
+      border-radius: 999px; padding: 7px 12px; font: 500 13px "Be Vietnam Pro"; cursor: pointer;
     }
-    .box {
-      border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
-      background: #f8fafc; font-size: 13px;
+    .tab.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .erdwrap { display: grid; grid-template-columns: 1fr minmax(240px, 300px); gap: 12px; }
+    @media (max-width: 900px) { .erdwrap { grid-template-columns: 1fr; } }
+    .erd-stage {
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      overflow: auto; min-height: 420px; max-height: 70vh; padding: 10px;
+      background-image: radial-gradient(var(--line) 1px, transparent 1px);
+      background-size: 16px 16px;
     }
-    .box.amber { border-color: #fcd34d; background: #fffbeb; }
-    .box.sky { border-color: #7dd3fc; background: #f0f9ff; }
-    .box.green { border-color: #6ee7b7; background: #ecfdf5; }
-    .box.violet { border-color: #c4b5fd; background: #f5f3ff; }
-    .box.slate { border-color: #cbd5e1; background: #f8fafc; }
-    .box strong { display: block; margin-bottom: 4px; }
-    .legend {
-      display: flex; flex-wrap: wrap; gap: 10px 16px;
-      font-size: 12px; color: var(--muted); margin: 0 0 10px;
+    .side {
+      background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      padding: 14px; max-height: 70vh; overflow: auto; font-size: 13.5px;
     }
-    .legend i {
-      display: inline-block; width: 10px; height: 10px; border-radius: 2px;
-      margin-right: 6px; vertical-align: middle;
+    .side .ph { font: 600 15px "JetBrains Mono", monospace; display: flex; align-items: center; gap: 8px; }
+    .side .pm { color: var(--mute); margin: 6px 0 10px; }
+    .side h4 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--mute); margin: 12px 0 4px; }
+    .side ul { list-style: none; padding: 0; margin: 0; }
+    .side li {
+      padding: 6px 8px; border-radius: 6px; cursor: pointer;
+      display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap;
     }
-    footer {
-      margin-top: 8px; font-size: 12px; color: var(--muted);
-      display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between;
+    .side li:hover { background: var(--code); }
+    .side li .arr { color: var(--mute); }
+    .ent-btn {
+      display: block; width: 100%; text-align: left; border: 1px solid var(--line);
+      background: var(--bg); border-radius: 8px; padding: 8px 10px; margin: 0 0 6px;
+      cursor: pointer; font: 500 13px "Be Vietnam Pro"; color: var(--ink);
     }
-    code {
-      font-family: ui-monospace, Consolas, monospace; font-size: 12px;
-      background: #e2e8f0; padding: 1px 5px; border-radius: 4px;
+    .ent-btn.on { border-color: var(--acc); background: #ecfeff; }
+    .b { display: inline-block; font: 600 11px "JetBrains Mono", monospace; padding: 1px 6px; border-radius: 4px; margin: 0 4px 0 0; }
+    .b.pk { background: var(--pkbg); color: var(--pk); }
+    .b.fk { background: var(--fkbg); color: var(--fk); }
+    details.tbl { background: var(--card); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; }
+    details.tbl summary {
+      cursor: pointer; padding: 12px 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; list-style: none;
     }
-    .note-call {
-      margin: 12px 0 0; padding: 12px 14px; border-radius: 10px;
-      border-left: 4px solid var(--brand); background: #f0fdf4; font-size: 13px;
+    details.tbl summary::-webkit-details-marker { display: none; }
+    details.tbl summary b { font-family: "JetBrains Mono", monospace; font-size: 14px; }
+    .meta { font-size: 12.5px; color: var(--mute); }
+    .sd { flex-basis: 100%; font-size: 13.5px; color: var(--mute); padding-left: 2px; }
+    details.tbl[open] summary { border-bottom: 1px solid var(--line); }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; font-size: 13.5px; }
+    th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--mute); font-weight: 600; background: var(--bg); }
+    .filters { margin-bottom: 10px; }
+    .filters input {
+      width: 100%; max-width: 420px; padding: 9px 12px; border: 1px solid var(--line);
+      border-radius: 8px; background: var(--card); font: 14px "Be Vietnam Pro";
     }
-  
-    .top a.nav.active { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
-    .top.it-theme a.nav.active { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
-    .switch {
-      display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 22px;
-    }
-    .switch a {
-      text-decoration: none; font-size: 13px; font-weight: 600;
-      padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line);
-      background: #fff; color: var(--ink);
-    }
-    .switch a.on-ops { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
-    .switch a.on-it { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
-</style>
+    footer { color: var(--mute); font-size: 12.5px; padding: 24px 0 48px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; }
+    .hint { font-size: 12px; color: var(--mute); margin: 0 0 8px; }
+  </style>
 </head>
 <body>
-  <div class="top it-theme">
-    <div class="top-inner">
-      <div class="brand">GLS · BD/SC prototype</div>
-      <nav>
-        <a class="nav" href="index.html">← Demo</a>
-        <a class="nav" href="console.html">Console</a>
-        <a class="nav " href="diagram-ops.html">Quy trình nghiệp vụ</a>
-        <a class="nav active" href="diagram-it.html">IT · tích hợp</a>
-      </nav>
-    </div>
-  </div>
-
-  <div class="wrap">
-        <div class="switch">
-      <a href="diagram-ops.html">← Quy trình nghiệp vụ</a>
-      <a class="on-it" href="diagram-it.html">Đang xem: IT · tích hợp dữ liệu</a>
-    </div>
-    <h1>Sơ đồ dữ liệu &amp; tích hợp</h1>
-    <p class="lead">
-      Dành cho <strong>đội IT / tích hợp</strong>: phân lớp SoT, quan hệ entity, luồng Plan/Order/PWMS/BASE.
-      Luồng thao tác người dùng nằm ở trang nghiệp vụ.
-    </p>
-
-    <!-- ===================== IT ===================== -->
-    <section class="panel" id="it">
-      <h2><span class="tag it">IT / tích hợp</span> Kiến trúc dữ liệu end-to-end</h2>
-      <p class="sub">SoT theo miền: master kho/serial = PWMS; vận hành kỹ thuật &amp; phiếu = Quản lý xe; duyệt BASE = BASE TMS.</p>
-
-      <h3 class="block">Kiến trúc phân lớp</h3>
-      <div class="diagram">
-        <pre class="mermaid">
-flowchart TB
-  subgraph MASTER_QLX["Master QLX"]
-    Cat[Catalog + rules + catState]
-    Crit[EvalCriteria]
-    Barem[BaremHours + ServiceType]
-    VSys[VehicleSystem]
-  end
-
-  subgraph MASTER_PWMS["Master PWMS"]
-    Product[Product / Stock / Price]
-    Serial[Product_SERI]
-    PObj[Vehicle Object ID]
-  end
-
-  subgraph BRIDGE["Cầu nối"]
-    VMap[pwmsVehicleMaps]
-    SyncMeta[pwmsSyncMeta / valueHistory]
-  end
-
-  subgraph PLAN_L["Lớp kế hoạch"]
-    Tpl[PlanTemplate + items]
-    Plan[MaintenancePlan]
-  end
-
-  subgraph EXEC["Lớp thực tế"]
-    Ord[MaintenanceOrder]
-    WI[WorkItems]
-    MatP[materials dự kiến]
-    MatB[purchaseMaterials]
-    TL[timeline 4 mốc]
-  end
-
-  subgraph EXT["Hệ thống ngoài"]
-    BASE[BASE sync]
-    MH[PWMS issue / external buy]
-  end
-
-  Cat --> Tpl
-  Cat --> Plan
-  Crit --> Asm[PeriodicAssessment]
-  Asm --> Plan
-  Asm --> Ord
-  Tpl --> Plan
-  Plan --> Ord
-  Product --> MatP
-  Product --> Plan
-  VMap --> Ord
-  PObj --> VMap
-  Ord --> WI
-  Ord --> MatP
-  Ord --> MatB
-  Ord --> TL
-  Ord --> BASE
-  Ord --> MH
-  MH --> MatB
-        </pre>
+  <header class="hero">
+    <div class="wrap">
+      <div class="eyebrow">Tài liệu IT · Kiến trúc dữ liệu BD/SC</div>
+      <h1>ERD &amp; tích hợp — Quản lý xe ↔ PWMS ↔ BASE</h1>
+      <p class="sub">
+        Mô tả thực thể, quan hệ và luồng đồng bộ theo prototype BD/SC.
+        Phong cách giải thích / ERD tương tự tài liệu <b>ERD GLSPWMS</b> (AppSheet / BigQuery),
+        nhưng phạm vi tập trung lớp vận hành kỹ thuật trên Quản lý xe và điểm chạm PWMS / BASE.
+      </p>
+      <div class="kpis">
+        <div class="kpi"><b>14</b><span>thực thể lõi (QLX + cầu nối)</span></div>
+        <div class="kpi"><b>2</b><span>cụm vật tư trên phiếu (dự kiến / MH)</span></div>
+        <div class="kpi"><b>3</b><span>hệ thống SoT (QLX · PWMS · BASE)</span></div>
+        <div class="kpi"><b>4</b><span>mốc thời gian event-driven</span></div>
       </div>
+      <div class="topbar">
+        <a href="index.html">← Demo</a>
+        <a href="diagram-ops.html">Quy trình nghiệp vụ</a>
+        <a class="on" href="diagram-it.html">IT · ERD</a>
+        <a href="console.html">Console prototype</a>
+      </div>
+    </div>
+  </header>
 
-      <h3 class="block">Quan hệ entity (rút gọn)</h3>
-      <div class="diagram">
-        <pre class="mermaid">
-erDiagram
-  VEHICLE ||--o{ CAT_STATE : tracks
-  CATALOG ||--o{ CAT_STATE : defines
-  CATALOG ||--o{ PLAN_TEMPLATE_ITEM : used_in
-  PLAN_TEMPLATE ||--o{ PLAN_TEMPLATE_ITEM : has
-  PLAN_TEMPLATE ||--o{ MAINTENANCE_PLAN : generates
-  CATALOG ||--o{ MAINTENANCE_PLAN : optional
-  MAINTENANCE_PLAN ||--o| MAINTENANCE_ORDER : realizes
+  <nav class="toc">
+    <div class="wrap">
+      <a href="#kien-truc">1. Kiến trúc</a>
+      <a href="#erd">2. Sơ đồ ERD</a>
+      <a href="#tu-dien">3. Từ điển thực thể</a>
+      <a href="#tich-hop">4. Luồng tích hợp</a>
+      <a href="#quy-uoc">5. Quy ước</a>
+    </div>
+  </nav>
+
+  <main class="wrap">
+    <section id="kien-truc">
+      <h2>1. Kiến trúc tổng quan</h2>
+      <p class="lead">
+        <b>PWMS</b> là nguồn sự thật (SoT) cho Product, tồn, serial, Object ID xe và chứng từ xuất/mua ngoài.
+        <b>Quản lý xe</b> là SoT phiếu BD/SC, kế hoạch, danh mục chu kỳ, đánh giá.
+        <b>BASE</b> là SoT trạng thái duyệt nghiệp vụ BASE. Snapshot giá/NCC lưu kèm phiếu — không lấy live PWMS làm chi phí khóa.
+      </p>
+      <div class="legend">
+        <span class="lg"><i class="dot" style="background:#ede9fe"></i>Master QLX</span>
+        <span class="lg"><i class="dot" style="background:#d1fae5"></i>Kế hoạch / thực tế QLX</span>
+        <span class="lg"><i class="dot" style="background:#cffafe"></i>PWMS</span>
+        <span class="lg"><i class="dot" style="background:#fee2e2"></i>BASE</span>
+      </div>
+      <div class="card"><div class="diagram" id="flow"></div></div>
+      <div class="grid2" style="margin-top:12px">
+        <div class="call ok">
+          <b>Hai cụm vật tư trên phiếu</b>
+          ① <code>materials</code> = dự kiến kỹ thuật nhập (PWMS / EXTERNAL / TECHNICIAN).
+          ② <code>purchaseMaterials</code> = snapshot sau «Đồng bộ mua hàng» theo mã phiếu — không ghi đè cụm ①.
+        </div>
+        <div class="call">
+          <b>Ánh xạ xe</b>
+          <code>pwmsVehicleMaps</code>: <code>tmsVehicleId</code> ↔ <code>pwmsObjectId</code> (Object ID bất biến).
+          Bắt buộc trước khi gửi phiếu sang mua hàng.
+        </div>
+      </div>
+    </section>
+
+    <section id="erd">
+      <h2>2. Sơ đồ ERD (Mermaid)</h2>
+      <p class="lead">
+        Chọn nhóm quan hệ bên dưới. Bấm tên thực thể ở cột phải để xem giải thích và quan hệ cha/con
+        (cùng ý tưởng panel giải thích như ERD GLSPWMS).
+      </p>
+      <div class="tabs" id="erdTabs" role="tablist">
+        <button type="button" class="tab on" data-k="core">Lõi phiếu &amp; VT</button>
+        <button type="button" class="tab" data-k="plan">Kế hoạch &amp; master</button>
+        <button type="button" class="tab" data-k="int">Tích hợp PWMS/BASE</button>
+        <button type="button" class="tab" data-k="all">Toàn cảnh</button>
+      </div>
+      <p class="hint">Vuốt / cuộn trong khung sơ đồ trên mobile. Zoom trình duyệt nếu cần.</p>
+      <div class="erdwrap">
+        <div class="erd-stage"><div class="diagram" id="erdView" style="border:0;min-height:400px;background:transparent;padding:0"></div></div>
+        <aside class="side" id="erdPanel">
+          <div class="ph">Chưa chọn thực thể</div>
+          <p class="pm">Chọn một bảng trong danh sách hoặc đổi tab sơ đồ. Panel này giải thích vai trò và quan hệ.</p>
+          <h4>Thực thể trong view</h4>
+          <div id="erdList"></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="tu-dien">
+      <h2>3. Từ điển thực thể</h2>
+      <p class="lead">Mở từng bảng để xem cột chính, kiểu, và ý nghĩa nghiệp vụ / tích hợp.</p>
+      <div class="filters"><input id="dictFilter" placeholder="Lọc theo tên bảng, cột, mô tả…" /></div>
+      <div id="dictRoot"></div>
+    </section>
+
+    <section id="tich-hop">
+      <h2>4. Luồng tích hợp</h2>
+      <p class="lead">On-demand theo prototype; production có thể thêm cron reconcile theo <code>orderCode</code>.</p>
+      <div class="card"><div class="diagram" id="intFlow"></div></div>
+      <div class="grid2" style="margin-top:12px">
+        <div class="call ok">
+          <b>Timeline event-driven</b>
+          <code>startedAt</code> ← START;
+          <code>materialRequestedAt</code> ← min(BASE sync, send MH);
+          <code>materialReadyAt</code> ← max(<code>purchaseMaterials.issuedAt</code>);
+          <code>repairCompletedAt</code> ← COMPLETE.
+        </div>
+        <div class="call">
+          <b>Hình thức VT (resolve khi chọn kho)</b>
+          Tồn ≥ SL → <code>PWMS</code> (xuất kho);
+          thiếu/không mã → <code>EXTERNAL</code> (sửa ngoài);
+          nhập tay → <code>TECHNICIAN</code>.
+        </div>
+      </div>
+    </section>
+
+    <section id="quy-uoc">
+      <h2>5. Quy ước khoá &amp; SoT</h2>
+      <div class="card tscroll" style="padding:0;overflow:auto">
+        <table>
+          <thead><tr><th>Miền</th><th>SoT</th><th>Ghi chú</th></tr></thead>
+          <tbody>
+            <tr><td>Product / tồn / serial / Object xe</td><td>PWMS</td><td>QLX lookup + snapshot</td></tr>
+            <tr><td>Catalog chu kỳ, Plan, Order, Assessment</td><td>Quản lý xe</td><td>Không đẩy cả phiếu kỹ thuật sang Sheet làm gốc</td></tr>
+            <tr><td>Duyệt BASE</td><td>BASE TMS</td><td><code>baseSync.*</code> trên Order</td></tr>
+            <tr><td>Chi phí khóa trên phiếu</td><td>Snapshot MH trên Order</td><td>Ưu tiên <code>purchaseMaterials</code> khi SYNCED</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer>
+      <span>GLS · ERD BD/SC · Mermaid · tham chiếu phong cách ERD_GLSPWMS</span>
+      <span><a href="diagram-ops.html">Quy trình nghiệp vụ</a> · <a href="index.html">Demo</a></span>
+    </footer>
+  </main>
+
+  <script>
+    const ENTITIES = {
+      Vehicle: {
+        color: '#ffedd5', desc: 'Xe / mooc trên Quản lý xe (TMS).',
+        cols: [
+          { name: 'id', keys: ['PK'], type: 'number', note: 'Định danh TMS' },
+          { name: 'plate', keys: [], type: 'string', note: 'Biển số (có thể lệch PWMS)' },
+          { name: 'type / brand / model / year', keys: [], type: 'string', note: 'Phạm vi mẫu kế hoạch' },
+          { name: 'odo', keys: [], type: 'number', note: 'Km hiện tại — nhắc BD' },
+        ],
+      },
+      Catalog: {
+        color: '#ede9fe', desc: 'Danh mục bảo dưỡng định mức (mốc km/tháng, OR, lặp).',
+        cols: [
+          { name: 'id', keys: ['PK'], type: 'number', note: '' },
+          { name: 'code / name / system', keys: [], type: 'string', note: 'Nhãn & hệ thống xe' },
+          { name: 'rules[]', keys: [], type: 'json', note: 'seq, type, value, forceReplace, repeat, maxOccurrences' },
+        ],
+      },
+      CatState: {
+        color: '#ede9fe', desc: 'Trạng thái chu kỳ theo từng xe–danh mục.',
+        cols: [
+          { name: 'vehicleId + catalogId', keys: ['PK'], type: 'composite', note: '' },
+          { name: 'lastKm / lastDate', keys: [], type: 'number|date', note: 'Sau hoàn thành phiếu PERIODIC' },
+          { name: 'nextKm / nextDate', keys: [], type: 'number|date', note: 'Tính từ rules' },
+          { name: 'occurrence', keys: [], type: 'number', note: 'Số lần đã làm' },
+        ],
+      },
+      EvalCriteria: {
+        color: '#ede9fe', desc: 'Nhóm + hạng mục checklist đánh giá định kỳ.',
+        cols: [
+          { name: 'id', keys: ['PK'], type: 'number', note: 'Nhóm tiêu chí' },
+          { name: 'items[]', keys: [], type: 'json', note: 'method, required, active' },
+        ],
+      },
+      PlanTemplate: {
+        color: '#d1fae5', desc: 'Mẫu kế hoạch theo loại xe / kỳ.',
+        cols: [
+          { name: 'id', keys: ['PK'], type: 'string', note: '' },
+          { name: 'vehicleType / brand / model / year', keys: [], type: 'string', note: 'Phạm vi áp mẫu' },
+          { name: 'items[].catalogId', keys: ['FK'], type: 'number', note: '→ Catalog' },
+        ],
+      },
+      MaintenancePlan: {
+        color: '#d1fae5', desc: 'Dòng kế hoạch tháng (dự toán).',
+        cols: [
+          { name: 'id', keys: ['PK'], type: 'string', note: '' },
+          { name: 'vehicleId', keys: ['FK'], type: 'number', note: '→ Vehicle' },
+          { name: 'catalogId', keys: ['FK'], type: 'number', note: '→ Catalog (nullable)' },
+          { name: 'source', keys: [], type: 'enum', note: 'PLAN | PERIODIC_ASSESSMENT | …' },
+          { name: 'qty / unitPrice / vat', keys: [], type: 'number', note: 'Dự toán' },
+        ],
+      },
+      MaintenanceOrder: {
+        color: '#d1fae5', desc: 'Phiếu thực tế BD (PERIODIC) / SC (INCIDENTAL).',
+        cols: [
+          { name: 'id / code', keys: ['PK'], type: 'string', note: 'Mã phiếu — khóa gửi MH' },
+          { name: 'vehicleId', keys: ['FK'], type: 'number', note: '→ Vehicle' },
+          { name: 'approvalStatus / status', keys: [], type: 'enum', note: 'Duyệt nội bộ / thực hiện' },
+          { name: 'startedAt', keys: [], type: 'datetime', note: 'Auto START' },
+          { name: 'materialRequestedAt', keys: [], type: 'datetime', note: 'min(BASE, send MH)' },
+          { name: 'materialReadyAt', keys: [], type: 'datetime', note: 'max(issuedAt) cụm MH' },
+          { name: 'repairCompletedAt', keys: [], type: 'datetime', note: 'Auto COMPLETE' },
+        ],
+      },
+      WorkItem: {
+        color: '#fef3c7', desc: 'Hạng mục công việc trên phiếu (cụm dự kiến).',
+        cols: [
+          { name: 'id', keys: ['PK'], type: 'string', note: '' },
+          { name: 'orderId', keys: ['FK'], type: 'string', note: '→ MaintenanceOrder' },
+          { name: 'system / content / service', keys: [], type: 'string', note: '' },
+          { name: 'standardHours / hours', keys: [], type: 'number', note: 'Barem / thực tế' },
+        ],
+      },
+      MaterialPlanned: {
+        color: '#fef3c7', desc: 'materials[] — vật tư dự kiến kỹ thuật.',
+        cols: [
+          { name: 'id', keys: ['PK'], type: 'string', note: '' },
+          { name: 'source', keys: [], type: 'enum', note: 'PWMS | EXTERNAL | TECHNICIAN' },
+          { name: 'code / name / qty / price', keys: [], type: 'mixed', note: 'Giá tạm / REF' },
+          { name: 'stockAtSelect', keys: [], type: 'number', note: 'Tồn lúc chọn' },
+        ],
+      },
+      MaterialPurchase: {
+        color: '#cffafe', desc: 'purchaseMaterials[] — snapshot MH theo mã phiếu.',
+        cols: [
+          { name: 'id', keys: ['PK'], type: 'string', note: '' },
+          { name: 'plannedMaterialId', keys: ['FK'], type: 'string', note: '→ MaterialPlanned (optional)' },
+          { name: 'purchaseOrderRef', keys: ['FK'], type: 'string', note: '= Order.code' },
+          { name: 'purchaseDocCode', keys: [], type: 'string', note: 'XK-… / MH-NGOAI-…' },
+          { name: 'issuedAt', keys: [], type: 'datetime', note: 'Ngày cấp từ PWMS' },
+          { name: 'price / supplier / warehouse', keys: [], type: 'mixed', note: 'Giá MH thật' },
+        ],
+      },
+      PwmsVehicleMap: {
+        color: '#cffafe', desc: 'Cầu nối TMS vehicle ↔ PWMS Object ID.',
+        cols: [
+          { name: 'tmsVehicleId', keys: ['FK'], type: 'number', note: '→ Vehicle' },
+          { name: 'pwmsObjectId', keys: [], type: 'string', note: 'Bất biến phía PWMS' },
+          { name: 'status', keys: [], type: 'enum', note: 'MAPPED | TMS_MISSING | …' },
+        ],
+      },
+      Product: {
+        color: '#cffafe', desc: 'SoT PWMS — Product (lookup tồn/giá).',
+        cols: [
+          { name: 'productId / code', keys: ['PK'], type: 'string', note: 'PWMS' },
+          { name: 'stockQty / refPrice', keys: [], type: 'number', note: 'Tham chiếu form QLX' },
+          { name: 'supplier / warehouse', keys: [], type: 'string', note: '' },
+        ],
+      },
+      IssueDoc: {
+        color: '#cffafe', desc: 'Chứng từ xuất kho / mua ngoài PWMS (logic).',
+        cols: [
+          { name: 'docCode', keys: ['PK'], type: 'string', note: '' },
+          { name: 'orderCode', keys: ['FK'], type: 'string', note: 'Khớp MaintenanceOrder.code' },
+          { name: 'issuedAt / linePrice', keys: [], type: 'mixed', note: 'Đồng bộ vào purchaseMaterials' },
+        ],
+      },
+      BaseSync: {
+        color: '#fee2e2', desc: 'Trạng thái đồng bộ duyệt BASE trên phiếu.',
+        cols: [
+          { name: 'status / code', keys: [], type: 'string', note: 'NONE|SYNCING|SYNCED' },
+          { name: 'baseStatus', keys: [], type: 'enum', note: 'PENDING|APPROVED|REJECTED' },
+          { name: 'lastSyncedAt', keys: [], type: 'datetime', note: 'Tham gia materialRequestedAt' },
+        ],
+      },
+    };
+
+    const RELS = [
+      ['Vehicle', 'CatState', '1:N', 'tracks'],
+      ['Catalog', 'CatState', '1:N', 'defines'],
+      ['Catalog', 'PlanTemplate', '1:N', 'items'],
+      ['PlanTemplate', 'MaintenancePlan', '1:N', 'generates'],
+      ['Vehicle', 'MaintenancePlan', '1:N', 'has'],
+      ['MaintenancePlan', 'MaintenanceOrder', '0..1:1', 'realizes'],
+      ['Vehicle', 'MaintenanceOrder', '1:N', 'has'],
+      ['Vehicle', 'PwmsVehicleMap', '1:0..1', 'maps'],
+      ['MaintenanceOrder', 'WorkItem', '1:N', 'has'],
+      ['MaintenanceOrder', 'MaterialPlanned', '1:N', 'planned'],
+      ['MaintenanceOrder', 'MaterialPurchase', '1:N', 'from_MH'],
+      ['MaterialPlanned', 'MaterialPurchase', '0..1:N', 'plannedMaterialId'],
+      ['MaintenanceOrder', 'BaseSync', '1:1', 'embeds'],
+      ['PwmsVehicleMap', 'Product', 'N:0', 'lookup via Object'],
+      ['IssueDoc', 'MaterialPurchase', '1:N', 'sync'],
+      ['Product', 'MaterialPlanned', '0..1:N', 'code lookup'],
+      ['EvalCriteria', 'MaintenancePlan', '0:N', 'via assessment'],
+    ];
+
+    const VIEWS = {
+      core: {
+        label: 'Lõi phiếu & VT',
+        nodes: ['MaintenanceOrder', 'WorkItem', 'MaterialPlanned', 'MaterialPurchase', 'Vehicle'],
+        mermaid: `erDiagram
   VEHICLE ||--o{ MAINTENANCE_ORDER : has
-  VEHICLE ||--o| PWMS_VEHICLE_MAP : maps
   MAINTENANCE_ORDER ||--o{ WORK_ITEM : has
   MAINTENANCE_ORDER ||--o{ MATERIAL_PLANNED : planned
-  MAINTENANCE_ORDER ||--o{ MATERIAL_PURCHASE : from_MH
-  EVAL_CRITERIA ||--o{ PERIODIC_ASSESSMENT : checklist
-  PERIODIC_ASSESSMENT ||--o{ MAINTENANCE_PLAN : may_create
-  PERIODIC_ASSESSMENT ||--o{ MAINTENANCE_ORDER : may_create
-
-  CATALOG {
-    int id
-    string code
-    json rules "km|month OR repeat"
-  }
-  MAINTENANCE_PLAN {
-    string id
-    string period
-    int vehicleId
-    int catalogId
-    string source "PLAN|ASSESSMENT|..."
-  }
+  MAINTENANCE_ORDER ||--o{ MATERIAL_PURCHASE : purchase
+  MATERIAL_PLANNED ||--o| MATERIAL_PURCHASE : links
   MAINTENANCE_ORDER {
+    string id PK
     string code
-    string type "PERIODIC|INCIDENTAL"
+    string type
     string approvalStatus
     datetime startedAt
     datetime materialRequestedAt
@@ -277,68 +421,285 @@ erDiagram
     datetime repairCompletedAt
   }
   MATERIAL_PLANNED {
-    string source "PWMS|EXTERNAL|TECHNICIAN"
+    string id PK
+    string source
+    string code
+    number qty
     number price
   }
   MATERIAL_PURCHASE {
-    string purchaseOrderRef
+    string id PK
+    string plannedMaterialId FK
+    string purchaseOrderRef FK
     string purchaseDocCode
     datetime issuedAt
+    number price
   }
-        </pre>
-      </div>
+  WORK_ITEM {
+    string id PK
+    string system
+    string content
+    number hours
+  }
+  VEHICLE {
+    number id PK
+    string plate
+  }`,
+      },
+      plan: {
+        label: 'Kế hoạch & master',
+        nodes: ['Catalog', 'CatState', 'PlanTemplate', 'MaintenancePlan', 'Vehicle', 'EvalCriteria'],
+        mermaid: `erDiagram
+  VEHICLE ||--o{ CAT_STATE : tracks
+  CATALOG ||--o{ CAT_STATE : defines
+  CATALOG ||--o{ PLAN_TEMPLATE_ITEM : used_in
+  PLAN_TEMPLATE ||--o{ PLAN_TEMPLATE_ITEM : has
+  PLAN_TEMPLATE ||--o{ MAINTENANCE_PLAN : generates
+  VEHICLE ||--o{ MAINTENANCE_PLAN : has
+  EVAL_CRITERIA ||--o{ MAINTENANCE_PLAN : may_seed
+  CATALOG {
+    number id PK
+    string code
+    json rules
+  }
+  CAT_STATE {
+    number vehicleId PK
+    number catalogId PK
+    number nextKm
+    date nextDate
+  }
+  PLAN_TEMPLATE {
+    string id PK
+    string vehicleType
+    string period
+  }
+  MAINTENANCE_PLAN {
+    string id PK
+    number vehicleId FK
+    number catalogId FK
+    string source
+  }`,
+      },
+      int: {
+        label: 'Tích hợp',
+        nodes: ['MaintenanceOrder', 'PwmsVehicleMap', 'Product', 'IssueDoc', 'BaseSync', 'MaterialPurchase'],
+        mermaid: `erDiagram
+  VEHICLE ||--o| PWMS_VEHICLE_MAP : maps
+  MAINTENANCE_ORDER ||--o| BASE_SYNC : syncs
+  MAINTENANCE_ORDER ||--o{ MATERIAL_PURCHASE : receives
+  ISSUE_DOC ||--o{ MATERIAL_PURCHASE : provides
+  PRODUCT ||--o{ MATERIAL_PURCHASE : priced_as
+  PWMS_VEHICLE_MAP {
+    number tmsVehicleId FK
+    string pwmsObjectId
+    string status
+  }
+  BASE_SYNC {
+    string status
+    string code
+    string baseStatus
+    datetime lastSyncedAt
+  }
+  ISSUE_DOC {
+    string docCode PK
+    string orderCode FK
+    datetime issuedAt
+  }
+  PRODUCT {
+    string code PK
+    number stockQty
+    number refPrice
+  }`,
+      },
+      all: {
+        label: 'Toàn cảnh',
+        nodes: Object.keys(ENTITIES),
+        mermaid: `erDiagram
+  VEHICLE ||--o{ CAT_STATE : tracks
+  CATALOG ||--o{ CAT_STATE : defines
+  PLAN_TEMPLATE ||--o{ MAINTENANCE_PLAN : generates
+  VEHICLE ||--o{ MAINTENANCE_PLAN : plans
+  VEHICLE ||--o{ MAINTENANCE_ORDER : orders
+  MAINTENANCE_PLAN ||--o| MAINTENANCE_ORDER : realizes
+  MAINTENANCE_ORDER ||--o{ WORK_ITEM : has
+  MAINTENANCE_ORDER ||--o{ MATERIAL_PLANNED : planned
+  MAINTENANCE_ORDER ||--o{ MATERIAL_PURCHASE : purchase
+  VEHICLE ||--o| PWMS_VEHICLE_MAP : maps
+  MAINTENANCE_ORDER ||--o| BASE_SYNC : base
+  ISSUE_DOC ||--o{ MATERIAL_PURCHASE : docs`,
+      },
+    };
 
-      <div class="explain grid-2">
-        <div class="box green">
-          <strong>Luồng dữ liệu kế hoạch</strong>
-          <code>Catalog.rules</code> + <code>catState</code> → nhắc / gợi ý.
-          <code>PlanTemplate</code> (scope xe) → generate <code>MaintenancePlan[]</code>.
-          Đánh giá FAIL → plan/order với <code>source=PERIODIC_ASSESSMENT</code>.
-        </div>
-        <div class="box sky">
-          <strong>Luồng dữ liệu thực tế</strong>
-          Order giữ 2 cụm VT. Gửi MH theo <code>code</code> + <code>pwmsObjectId</code>.
-          Sync MH → <code>purchaseMaterials</code> (snapshot). BASE sync độc lập SoT duyệt.
-        </div>
-      </div>
+    let current = 'core';
+    let selected = null;
 
-      <h3 class="block">API / tích hợp (hướng triển khai)</h3>
-      <ul>
-        <li><strong>PWMS đọc:</strong> Product search, tồn, giá tham chiếu, serial, Object danh sách xe.</li>
-        <li><strong>PWMS ghi (qua tích hợp):</strong> yêu cầu xuất / nhận phiếu BD/SC theo mã; QLX không ghi đè master Product.</li>
-        <li><strong>BASE:</strong> push/pull trạng thái duyệt phiếu SC.</li>
-        <li><strong>Nội bộ QLX:</strong> CRUD master kỹ thuật, template, plan, order, assessment, reminder engine.</li>
-      </ul>
-
-      <div class="box violet" style="margin-top:14px">
-        <strong>Prototype để đối chiếu</strong>
-        Console menu: Danh mục · Tiêu chí · Barem · Vật tư PWMS · Ánh xạ xe · Nhắc · Đánh giá · Kế hoạch (mẫu/danh sách) · Phiếu.
-        Demo phiếu đủ 2 cụm: <code>DEMO-VT-MIX-01</code>.
-      </div>
-    </section>
-    <footer>
-      <span>GLS · IT · tích hợp · GitHub Pages</span>
-      <span><a href="index.html">Trang demo</a> · <a href="console.html">Console</a></span>
-    </footer>
-  </div>
-
-  <script>
     mermaid.initialize({
-      startOnLoad: true,
+      startOnLoad: false,
       theme: 'base',
       securityLevel: 'loose',
-      flowchart: { curve: 'basis', htmlLabels: true, nodeSpacing: 28, rankSpacing: 36 },
+      er: { useMaxWidth: false },
       themeVariables: {
-        fontFamily: 'Segoe UI, system-ui, sans-serif',
+        fontFamily: 'Be Vietnam Pro, system-ui, sans-serif',
         fontSize: '13px',
         primaryColor: '#ecfdf5',
-        primaryTextColor: '#0f172a',
-        primaryBorderColor: '#059669',
-        lineColor: '#64748b',
-        secondaryColor: '#eff6ff',
-        tertiaryColor: '#f8fafc',
+        primaryTextColor: '#12151a',
+        primaryBorderColor: '#0b6e4f',
+        lineColor: '#667085',
       },
     });
+
+    async function put(id, src) {
+      const { svg } = await mermaid.render(id + '_svg_' + Date.now(), src);
+      document.getElementById(id).innerHTML = svg;
+    }
+
+    function parentsOf(id) {
+      return RELS.filter(r => r[1] === id).map(r => ({ from: r[0], card: r[2], label: r[3] }));
+    }
+    function childrenOf(id) {
+      return RELS.filter(r => r[0] === id).map(r => ({ to: r[1], card: r[2], label: r[3] }));
+    }
+
+    function bindEntityList(nodeIds) {
+      const list = document.getElementById('erdList');
+      if (!list) return;
+      list.innerHTML = nodeIds.map(id => {
+        const e = ENTITIES[id];
+        return `<button type="button" class="ent-btn${selected === id ? ' on' : ''}" data-id="${id}"><span class="dot" style="background:${e?.color || '#ccc'}"></span> ${id}</button>`;
+      }).join('');
+      list.querySelectorAll('.ent-btn').forEach(b => {
+        b.onclick = () => selectEntity(b.dataset.id);
+      });
+    }
+
+    function selectEntity(id) {
+      selected = id;
+      const e = ENTITIES[id];
+      const panel = document.getElementById('erdPanel');
+      const nodes = (VIEWS[current] && VIEWS[current].nodes) || Object.keys(ENTITIES);
+      if (!e) {
+        panel.innerHTML = '<div class="ph">Không tìm thấy</div><div id="erdList"></div>';
+        bindEntityList(nodes);
+        return;
+      }
+      const ups = parentsOf(id);
+      const downs = childrenOf(id);
+      panel.innerHTML = `
+        <div class="ph"><span class="dot" style="background:${e.color}"></span>${id}</div>
+        <p class="pm">${e.desc}</p>
+        <h4 style="color:#c2410c">Tham chiếu tới cha (${ups.length})</h4>
+        <ul>${ups.map(u => `<li data-go="${u.from}"><code>${u.from}</code><span class="arr">←</span> ${u.card} · ${u.label}</li>`).join('') || '<li style="cursor:default;color:var(--mute)">—</li>'}</ul>
+        <h4 style="color:#0e7490">Được tham chiếu bởi con (${downs.length})</h4>
+        <ul>${downs.map(d => `<li data-go="${d.to}"><code>${d.to}</code><span class="arr">→</span> ${d.card} · ${d.label}</li>`).join('') || '<li style="cursor:default;color:var(--mute)">—</li>'}</ul>
+        <h4>Cột chính</h4>
+        <ul>${e.cols.map(c => `<li style="cursor:default"><code>${c.name}</code> ${c.keys.map(k => `<span class="b ${k.toLowerCase()}">${k}</span>`).join('')} <span class="meta">${c.type}${c.note ? ' · ' + c.note : ''}</span></li>`).join('')}</ul>
+        <p style="margin:10px 0"><a href="#t-${id}">Xem trong từ điển ↓</a></p>
+        <h4>Thực thể trong view</h4>
+        <div id="erdList"></div>`;
+      panel.querySelectorAll('li[data-go]').forEach(li => {
+        li.onclick = () => selectEntity(li.dataset.go);
+      });
+      bindEntityList(nodes);
+    }
+
+    async function renderErd(key) {
+      current = key;
+      const view = VIEWS[key];
+      document.querySelectorAll('#erdTabs .tab').forEach(t => t.classList.toggle('on', t.dataset.k === key));
+      await put('erdView', view.mermaid);
+      if (selected && view.nodes.includes(selected)) {
+        selectEntity(selected);
+        return;
+      }
+      selected = null;
+      document.getElementById('erdPanel').innerHTML = `
+        <div class="ph">View: ${view.label}</div>
+        <p class="pm">Chọn một thực thể để xem giải thích quan hệ (cha / con) và cột chính — cùng ý tưởng panel bên phải như ERD GLSPWMS.</p>
+        <h4>Thực thể trong view</h4>
+        <div id="erdList"></div>`;
+      bindEntityList(view.nodes);
+    }
+
+    function buildDict() {
+      const root = document.getElementById('dictRoot');
+      root.innerHTML = Object.entries(ENTITIES).map(([id, e]) => `
+        <details class="tbl" id="t-${id}" data-search="${(id + ' ' + e.desc + ' ' + e.cols.map(c => c.name + ' ' + c.note).join(' ')).toLowerCase()}">
+          <summary>
+            <span class="dot" style="background:${e.color}"></span>
+            <b>${id}</b>
+            <span class="meta">${e.cols.length} cột</span>
+            <span class="sd">${e.desc}</span>
+          </summary>
+          <div class="tscroll">
+            <table>
+              <thead><tr><th>Cột</th><th>Khoá</th><th>Kiểu</th><th>Giải thích</th></tr></thead>
+              <tbody>
+                ${e.cols.map(c => `<tr>
+                  <td class="mono">${c.name}</td>
+                  <td>${c.keys.map(k => `<span class="b ${k.toLowerCase()}">${k}</span>`).join('') || '—'}</td>
+                  <td><code>${c.type}</code></td>
+                  <td>${c.note || '—'}</td>
+                </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </details>`).join('');
+    }
+
+    document.getElementById('dictFilter').addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      document.querySelectorAll('#dictRoot details.tbl').forEach(d => {
+        d.style.display = !q || d.dataset.search.includes(q) ? '' : 'none';
+      });
+    });
+
+    document.querySelectorAll('#erdTabs .tab').forEach(t => {
+      t.onclick = () => renderErd(t.dataset.k);
+    });
+
+    (async () => {
+      await put('flow', `flowchart LR
+  subgraph QLX[Quản lý xe]
+    CAT[Catalog / Criteria / Barem]
+    PLAN[PlanTemplate / MaintenancePlan]
+    ORD[MaintenanceOrder]
+    MAT[materials + purchaseMaterials]
+  end
+  subgraph PWMS[PWMS]
+    PRD[Product / Stock]
+    OBJ[Object ID]
+    DOC[Issue / External docs]
+  end
+  subgraph BASE[BASE TMS]
+    BS[Duyệt phiếu]
+  end
+  CAT --> PLAN --> ORD --> MAT
+  PRD -.lookup.-> MAT
+  OBJ --> MAP[pwmsVehicleMaps] --> ORD
+  ORD -->|send / sync| DOC
+  DOC -->|snapshot| MAT
+  ORD <-->|baseSync| BS
+  classDef a fill:#d1fae5,stroke:#0b6e4f
+  classDef b fill:#cffafe,stroke:#0e7490
+  classDef c fill:#fee2e2,stroke:#b91c1c
+  class CAT,PLAN,ORD,MAT a
+  class PRD,OBJ,DOC,MAP b
+  class BS c`);
+
+      await put('intFlow', `flowchart TD
+  A[Order APPROVED] --> B[Send to Purchase<br/>+ Object ID]
+  A --> C[Sync BASE]
+  B --> D[materialRequestedAt = min]
+  C --> D
+  B --> E[PWMS xuất / mua ngoài<br/>theo orderCode]
+  E --> F[Sync Purchase on-demand]
+  F --> G[purchaseMaterials snapshot]
+  G --> H[materialReadyAt = max issuedAt]
+  H --> I[Complete → repairCompletedAt]`);
+
+      buildDict();
+      await renderErd('core');
+    })();
   </script>
 </body>
 </html>
