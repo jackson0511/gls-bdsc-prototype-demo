@@ -224,10 +224,10 @@
             <span class="text-sm font-semibold text-slate-800">Hạng mục công việc *</span>
             <span class="text-[11px] text-slate-500" id="cWiCount">0 hạng mục</span>
           </div>
-          <p class="text-[11px] text-slate-500 m-0">Thêm nhiều hạng mục · autocomplete · nhập mới chỉ lưu nội bộ</p>
-          <div class="ac-wrap">
-            <input id="cContent" type="search" autocomplete="off" placeholder="Tìm và thêm hạng mục…" value="" />
-            <div class="ac-dropdown hidden" id="cContentDd"></div>
+          <p class="text-[11px] text-slate-500 m-0">Chọn từ danh mục · bấm Thêm</p>
+          <div class="flex gap-2">
+            <select id="cContentSelect" class="flex-1 min-h-10 rounded-md border border-slate-300 px-3 text-sm"></select>
+            <button type="button" id="btnAddCreateWi" class="btn btn-outline btn-sm shrink-0">Thêm</button>
           </div>
           <div id="cWiList" class="space-y-1.5"></div>
         </div>
@@ -237,17 +237,17 @@
             <button type="button" id="btnSyncPwmsMat" class="btn btn-outline btn-sm shrink-0 !border-sky-400 !bg-sky-50 text-sky-900">Đồng bộ</button>
           </div>
           <div class="text-[11px] text-slate-500" id="pwmsMatSyncHint">Nguồn PWMS · bấm Đồng bộ để làm mới danh mục</div>
-          <div class="ac-wrap">
-            <input id="cPwmsMat" type="search" autocomplete="off" class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm" placeholder="Tìm mã / tên vật tư kho…" />
-            <div class="ac-dropdown hidden" id="cPwmsMatDd"></div>
+          <div class="flex gap-2">
+            <select id="cPwmsSelect" class="flex-1 min-h-10 rounded-md border border-slate-300 px-3 text-sm"></select>
+            <button type="button" id="btnAddCreatePwms" class="btn btn-outline btn-sm shrink-0">Thêm</button>
           </div>
           <div class="mat-chips" id="cPwmsChips"></div>
         </div>
         <div class="rounded-md border border-amber-200 bg-amber-50/50 p-3 space-y-2">
-          <div class="text-xs font-semibold text-amber-800">Vật tư ghi tay / mua ngoài — nhập mới chỉ lưu nội bộ TMS</div>
-          <div class="ac-wrap">
-            <input id="cKtvMat" type="search" autocomplete="off" class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm" placeholder="Tìm hoặc nhập tên vật tư mới…" />
-            <div class="ac-dropdown hidden" id="cKtvMatDd"></div>
+          <div class="text-xs font-semibold text-amber-800">Vật tư ghi tay / mua ngoài — chọn từ danh sách</div>
+          <div class="flex gap-2">
+            <select id="cKtvSelect" class="flex-1 min-h-10 rounded-md border border-slate-300 px-3 text-sm"></select>
+            <button type="button" id="btnAddCreateKtv" class="btn btn-outline btn-sm shrink-0">Thêm</button>
           </div>
           <div class="mat-chips" id="cKtvChips"></div>
         </div>
@@ -284,6 +284,14 @@ const kmFmt=n=>new Intl.NumberFormat('vi-VN').format(n||0);
 
 const MOBILE_CATALOG=[{"id": 1, "code": "DM-DAU-NHOT", "name": "Thay dầu nhớt động cơ", "system": "Dầu Nhớt", "forceReplaceNext": true, "evalBad": "REPLACE", "cycle": "5000 km / 10000 km", "hint": "Thuộc Dầu Nhớt · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 2, "code": "DM-LOC-NHOT", "name": "Thay lọc nhớt", "system": "Hệ Thống Máy Xe", "forceReplaceNext": true, "evalBad": "REPLACE", "cycle": "10000 km", "hint": "Thuộc Hệ Thống Máy Xe · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 3, "code": "DM-MO", "name": "Bôi mỡ gầm", "system": "Mỡ", "forceReplaceNext": false, "evalBad": "REPAIR", "cycle": "10000 km / 3 tháng", "hint": "Thuộc Mỡ · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 4, "code": "DM-AC-QUY", "name": "Kiểm tra / thay ắc quy", "system": "Ắc Quy", "forceReplaceNext": true, "evalBad": "REPLACE", "cycle": "6 tháng / 2 năm", "hint": "Thuộc Ắc Quy · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 5, "code": "DM-LOP", "name": "Kiểm tra / thay vỏ lốp", "system": "Vỏ Lốp", "forceReplaceNext": true, "evalBad": "REPLACE", "cycle": "80000 km / 3 năm", "hint": "Thuộc Vỏ Lốp · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 6, "code": "DM-MAY-XE", "name": "Bảo dưỡng hệ thống máy xe", "system": "Hệ Thống Máy Xe", "forceReplaceNext": false, "evalBad": "REPAIR", "cycle": "20000 km / 500 giờ", "hint": "Thuộc Hệ Thống Máy Xe · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 7, "code": "DM-GAM", "name": "Bảo dưỡng hệ thống gầm", "system": "Hệ Thống Gầm", "forceReplaceNext": false, "evalBad": "REPAIR", "cycle": "20000 km", "hint": "Thuộc Hệ Thống Gầm · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 8, "code": "DM-LAI", "name": "Bảo dưỡng hệ thống lái", "system": "Hệ Thống Lái", "forceReplaceNext": false, "evalBad": "REPAIR", "cycle": "6 tháng", "hint": "Thuộc Hệ Thống Lái · mẫu từ danh mục PWMS / dự toán HCM"}];
 const REPAIRS=[{"id": "ri1", "name": "Tán Bố Thắng Mooc", "system": "Nhân Công Sửa Chữa"}, {"id": "ri2", "name": "Thay cảm biến tương đương tương đương + dây nguồn cảm biến", "system": "Hệ Thống Điện"}, {"id": "ri3", "name": "Thay cam mới", "system": "Hệ Thống Điện"}, {"id": "ri4", "name": "Công sạc gas lạnh", "system": "Hệ Thống Máy Lạnh"}, {"id": "ri5", "name": "Công kiểm tra", "system": "Hệ Thống Máy Xe"}, {"id": "ri6", "name": "Bấm ống gas lạnh", "system": "Hệ Thống Máy Lạnh"}, {"id": "ri7", "name": "Hàn giàn nóng", "system": "Hệ Thống Máy Lạnh"}, {"id": "ri8", "name": "Gas lạnh điều hòa Sinochem Jincool", "system": "Hệ Thống Máy Lạnh"}, {"id": "ri9", "name": "Dầu máy lạnh", "system": "Hệ Thống Máy Lạnh"}, {"id": "ri10", "name": "Vệ sinh giàn lạnh (Phương pháp nội soi)", "system": "Hệ Thống Máy Lạnh"}, {"id": "ri11", "name": "Gia Công Ron", "system": "Nhân Công Sửa Chữa"}, {"id": "ri12", "name": "Tiện cấy ren cổ pô", "system": "Nhân Công Sửa Chữa"}, {"id": "ri13", "name": "Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)", "system": "Phí Phát Sinh Khác"}, {"id": "ri14", "name": "Nhớt Máy Động Cơ Diesel Hyundai 15W40", "system": "Dầu Nhớt"}, {"id": "ri15", "name": "Lọc nhớt D6CC 2632582600", "system": "Hệ Thống Máy Xe"}, {"id": "ri16", "name": "Mỡ Bò Gầm EPL2", "system": "Mỡ"}, {"id": "ri17", "name": "Lọc nhiên liệu  ( HD250/HD260/HD270/HD700/HD1000 )", "system": "Hệ Thống Máy Xe"}, {"id": "ri18", "name": "Công Bảo Dưỡng Định Kì", "system": "Hệ Thống Máy Xe"}, {"id": "ri19", "name": "Lọc nhiên liệu tinh", "system": "Hệ Thống Máy Xe"}, {"id": "ri20", "name": "Lọc dieziel HD700", "system": "Hệ Thống Máy Xe"}];
+const MOBILE_SERVICE_TYPES=[
+  {id:'st-bd',name:'Bảo dưỡng',systemIds:[]},
+  {id:'st-scn',name:'Sửa chữa nhỏ',systemIds:[]},
+  {id:'st-scl',name:'Sửa chữa lớn',systemIds:[]},
+  {id:'st-aq',name:'Ắc quy',systemIds:['sys-acq']},
+  {id:'st-lop',name:'Vỏ lốp',systemIds:['sys-lop']},
+];
+const MOBILE_DEFAULT_PERFORMER='Nguyễn Văn Kỹ thuật';
 const MATERIALS=[{"id": "m1", "code": "VTU-342-1000002", "name": "Ắc Bi Nhê"}, {"id": "m2", "code": "VTU-342-1000003", "name": "Ắc Mooc 38X150 (Chienyou)"}, {"id": "m3", "code": "VTU-342-1000004", "name": "Ắc Mooc Chienyou ( Nguyên Bộ)"}, {"id": "m4", "code": "VTU-342-1000005", "name": "Ắc Mooc Dài 28X135"}, {"id": "m5", "code": "VTU-342-1000006", "name": "Ắc Nhíp"}, {"id": "m6", "code": "VTU-348-1000007", "name": "Ắc Phi Dê"}, {"id": "m7", "code": "VTU-344-1000008", "name": "Ắc Piston"}, {"id": "m8", "code": "VTU-342-1000009", "name": "Ắc Thỏ ( Chienyou)"}, {"id": "m9", "code": "VTU-342-1000010", "name": "Ắc Thỏ Rơ Mooc Phi 75"}, {"id": "m10", "code": "VTU-211-1000011", "name": "Áo Phản Quang"}, {"id": "m11", "code": "VTU-343-1000012", "name": "Áp Suất Gas"}, {"id": "m12", "code": "VTU-351-1000013", "name": "Axit"}, {"id": "m13", "code": "VTU-348-1000014", "name": "Ba Đờ Sông Dọc"}, {"id": "m14", "code": "VTU-348-1000015", "name": "Ba Đờ Sông Ngang"}, {"id": "m15", "code": "VTU-348-1000016", "name": "Ba Đờ Xông Dọc Hyundai (568107D001)"}, {"id": "m16", "code": "VTU-342-1000017", "name": "Ba lăng treo bánh xe dự phòng rơ mooc"}, {"id": "m17", "code": "VTU-342-1000018", "name": "Bạc Ắc Thỏ Rơ Mooc Phi 75"}, {"id": "m18", "code": "VTU-345-1000019", "name": "Bạc đạn 293601 (cũ)"}, {"id": "m19", "code": "VTU-345-1000020", "name": "Bạc đạn 55026 (cũ)"}, {"id": "m20", "code": "VTU-345-1000021", "name": "Bạc đạn 55437 (cũ)"}];
 const DRIVERS=[{id:1,name:'Trần Minh',phone:'0901 234 567'},{id:2,name:'Nguyễn Văn Tài',phone:'0912 345 678'},{id:3,name:'Lê Hòa',phone:'0987 654 321'}];
 const CHECKLIST=[
@@ -335,7 +343,6 @@ function show(scr){
     const v=veh(S.vehicleId);
     $('#createPlate').textContent=v?.plate||'—';
     if($('#cKm')&&v)$('#cKm').value=v.km;
-    if($('#cContent'))$('#cContent').value='';
     if($('#cGarage')&&v)$('#cGarage').value=v.garage||'';
     S.createPwmsMats=[];
     S.createKtvMats=[];
@@ -343,6 +350,7 @@ function show(scr){
     S.createContentTouched=false;
     renderCreateWorkItems();
     renderCreateMatChips();
+    populateCreateSelects();
     hideAllAc();
     syncCreateType();
   }
@@ -477,11 +485,57 @@ function orderCard(o){
 }
 
 function systems(){
-  const s=new Set(['Hệ Thống Máy Xe','Hệ Thống Điện','Nhân Công Sửa Chữa','Hệ Thống Máy Lạnh','Dầu Nhớt','Mỡ','Khác','Phí Phát Sinh Khác']);
+  const s=new Set(['Hệ Thống Máy Xe','Hệ Thống Điện','Nhân Công Sửa Chữa','Hệ Thống Máy Lạnh','Dầu Nhớt','Mỡ','Khác','Phí Phát Sinh Khác','Ắc Quy','Vỏ Lốp','Hệ Thống Gầm','Hệ Thống Lái']);
   REPAIRS.forEach(r=>{if(r.system)s.add(r.system)});
   MOBILE_CATALOG.forEach(c=>{if(c.system)s.add(c.system)});
   ORDERS.forEach(o=>{if(o.system)s.add(o.system)});
   return [...s].sort((a,b)=>a.localeCompare(b,'vi'));
+}
+function slugSystemId(name){
+  if(name==='Ắc Quy')return 'sys-acq';
+  if(name==='Vỏ Lốp')return 'sys-lop';
+  return 'sys-'+String(name||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'khac';
+}
+let _mobileSystemsCache=null;
+function mobileSystems(){
+  if(_mobileSystemsCache)return _mobileSystemsCache;
+  const map=new Map();
+  systems().forEach(name=>{const id=slugSystemId(name);if(!map.has(id))map.set(id,{id,name})});
+  _mobileSystemsCache=[...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'vi'));
+  return _mobileSystemsCache;
+}
+function systemIdByName(name){return mobileSystems().find(s=>s.name===name)?.id||slugSystemId(name)}
+function systemNameById(id){return mobileSystems().find(s=>s.id===id)?.name||''}
+function mobileServiceTypesForSystem(systemId){
+  if(!systemId)return [];
+  return MOBILE_SERVICE_TYPES.filter(st=>!st.systemIds?.length||st.systemIds.includes(systemId));
+}
+const MOBILE_BAREM=(()=>{
+  const m={},defs=[1.0,1.2,1.5,2.0,0.8,0.5,1.5,1.0];
+  let i=0;
+  REPAIRS.forEach(r=>{m[r.name]=defs[i++%defs.length]});
+  MOBILE_CATALOG.forEach(c=>{if(m[c.name]==null)m[c.name]=1.0});
+  return m;
+})();
+function baremHoursForContent(content){return MOBILE_BAREM[content]??1.0}
+function contentCatalogForSystem(systemName){
+  if(!systemName)return [];
+  const map=new Map();
+  REPAIRS.filter(r=>(r.system||'')===systemName).forEach(r=>map.set(r.name.toLowerCase(),{id:r.id,name:r.name,system:r.system,source:'master'}));
+  MOBILE_CATALOG.filter(c=>(c.system||'')===systemName).forEach(c=>map.set(c.name.toLowerCase(),{id:'cat-'+c.id,name:c.name,system:c.system,source:'catalog'}));
+  (LOCAL?.contents||[]).filter(c=>(c.system||'Khác')===systemName).forEach(c=>map.set(c.name.toLowerCase(),{id:c.id,name:c.name,system:c.system||'Khác',source:'local'}));
+  return [...map.values()];
+}
+function resolveMaterialFulfillment({qty,stockQty}){
+  const q=Number(qty)||1,stock=Number(stockQty);
+  if(Number.isNaN(stock)||stock<q)return {source:'EXTERNAL',reason:Number.isNaN(stock)?'Không có tồn kho':'Tồn '+stock+' < SL '+q};
+  return {source:'PWMS',reason:'Tồn đủ ('+stock+' ≥ '+q+')'};
+}
+function ktvMaterialSelectOptions(){
+  const map=new Map();
+  materialLocalOptions().forEach(m=>map.set(m.name.toLowerCase(),{...m,source:'local'}));
+  materialMasterOptions().forEach(m=>{if(!map.has(m.name.toLowerCase()))map.set(m.name.toLowerCase(),{...m,source:'master'})});
+  return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name,'vi'));
 }
 function canEditOrderDetail(o){return o.approval==='DRAFT'||o.approval==='REJECTED'}
 function nowStampMobile(){
@@ -748,7 +802,8 @@ function renderOrder(){
       <div class="min-w-0">
         <p class="text-[13px] font-bold m-0">${esc(w.system||o.system||'—')}</p>
         <p class="text-sm text-slate-800 mt-1 m-0">${esc(w.content)}</p>
-        ${w.hours!=null?`<p class="text-[11px] text-slate-500 m-0 mt-0.5">${Number(w.hours).toFixed(1)} giờ TT</p>`:''}
+        ${w.service?`<p class="text-[11px] text-slate-500 m-0 mt-0.5">${esc(w.service)}${w.performer?' · '+esc(w.performer):''}</p>`:''}
+        ${w.hours!=null?`<p class="text-[11px] text-slate-500 m-0 mt-0.5">${Number(w.hours).toFixed(1)} giờ TT${w.standardHours!=null&&w.standardHours!==w.hours?' (barem '+Number(w.standardHours).toFixed(1)+')':''}</p>`:''}
       </div>
       ${editable?`<div class="flex flex-col gap-1 shrink-0">
         <button type="button" class="text-blue-600 text-xs font-semibold" data-edit-wi="${i}">Sửa</button>
@@ -765,7 +820,10 @@ function renderOrder(){
           <div class="text-[11px] text-slate-500 mt-0.5">${money(m.price)} · ×${m.qty??1}${m.supplier?' · '+esc(m.supplier):''}</div>
         </div>
         ${editable?`<input type="number" min="0.01" step="0.01" class="qty" data-mat-qty="${i}" value="${m.qty??1}" />
-        <button type="button" class="text-rose-600 text-sm font-semibold shrink-0 self-center" data-rm-mat="${i}">Xóa</button>`
+        <div class="flex flex-col gap-1 shrink-0 self-center">
+          <button type="button" class="text-blue-600 text-xs font-semibold" data-edit-mat="${i}">Sửa</button>
+          <button type="button" class="text-rose-600 text-xs font-semibold" data-rm-mat="${i}">Xóa</button>
+        </div>`
         :`<div class="text-sm font-semibold tabular-nums shrink-0">×${m.qty??1}</div>`}
       </div>`).join('')
     : `<p class="text-sm text-slate-400 px-1 py-2">${editable?'Chưa có vật tư dự kiến':'Chưa có vật tư'}</p>`;
@@ -788,20 +846,9 @@ function renderOrder(){
       </div>`).join('')}</div>`
     : `<p class="text-sm text-slate-400 py-2">${editable?'Chưa có ảnh — thêm bên dưới':'Chưa có ảnh'}</p>`;
 
-  const matPick=editable?`
-    <div class="p-3 space-y-3 border-t border-amber-100">
-      <div class="rounded-md border border-emerald-200 bg-emerald-50/50 p-3 space-y-2">
-        <div class="text-xs font-semibold text-emerald-800">Chọn vật tư từ kho (PWMS)</div>
-        <div class="ac-wrap"><input id="oPwmsMat" type="search" autocomplete="off" class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm" placeholder="Tìm mã / tên vật tư kho…" /><div class="ac-dropdown hidden" id="oPwmsMatDd"></div></div>
-      </div>
-      <div class="rounded-md border border-amber-200 bg-amber-50/50 p-3 space-y-2">
-        <div class="text-xs font-semibold text-amber-800">Vật tư ghi tay / mua ngoài</div>
-        <div class="ac-wrap"><input id="oKtvMat" type="search" autocomplete="off" class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm" placeholder="Tìm hoặc nhập tên vật tư mới…" /><div class="ac-dropdown hidden" id="oKtvMatDd"></div></div>
-      </div>
-      <div class="rounded-md border border-slate-200 bg-slate-50 p-3 space-y-2">
-        <div class="text-xs font-semibold text-slate-800">Thêm hạng mục công việc</div>
-        <div class="ac-wrap"><input id="oAddWi" type="search" autocomplete="off" class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm" placeholder="Tìm và thêm hạng mục…" /><div class="ac-dropdown hidden" id="oAddWiDd"></div></div>
-      </div>
+  const clusterActions=editable?`<div class="flex flex-wrap gap-2 mt-2">
+      <button type="button" class="btn btn-outline btn-sm !h-8 !min-h-8 !text-xs" id="btnAddWi">+ Hạng mục</button>
+      <button type="button" class="btn btn-outline btn-sm !h-8 !min-h-8 !text-xs" id="btnAddMat">+ Vật tư dự kiến</button>
     </div>`:'';
 
   $('#orderPanel').innerHTML=`
@@ -840,9 +887,9 @@ function renderOrder(){
     </section>
 
     <div class="cluster-plan">
-      <div class="ch"><div class="text-sm font-semibold text-amber-950">Cụm dự kiến · kỹ thuật nhập</div><p class="text-[11px] text-amber-900/80 m-0 mt-0.5">Hạng mục + vật tư KTV · không bị ghi đè khi đồng bộ MH</p></div>
+      <div class="ch"><div class="text-sm font-semibold text-amber-950">Cụm dự kiến · kỹ thuật nhập</div><p class="text-[11px] text-amber-900/80 m-0 mt-0.5">Hạng mục + vật tư KTV · không bị ghi đè khi đồng bộ MH</p>${clusterActions}</div>
       <div class="px-3 py-2 border-b border-amber-100"><div class="text-xs font-semibold text-amber-900 mb-2">Hạng mục công việc</div><div class="space-y-2">${wiHtml}</div></div>
-      <div class="px-3 py-2"><div class="flex justify-between items-center mb-2"><span class="text-xs font-semibold text-amber-900">Vật tư dự kiến</span><span class="text-[11px] text-slate-600">Tạm: <strong>${money(sumMatLines(plannedMats(o)))}</strong></span></div>${matsHtml}${matPick}</div>
+      <div class="px-3 py-2"><div class="flex justify-between items-center mb-2"><span class="text-xs font-semibold text-amber-900">Vật tư dự kiến</span><span class="text-[11px] text-slate-600">Tạm: <strong>${money(sumMatLines(plannedMats(o)))}</strong></span></div>${matsHtml}</div>
     </div>
 
     <div class="cluster-buy">
@@ -854,7 +901,6 @@ function renderOrder(){
   </div>`;
 
   bindOrderDetailActions(o);
-  if(editable) bindOrderDetailPickers(o);
 }
 
 function bindOrderDetailActions(o){
@@ -964,7 +1010,10 @@ function bindOrderDetailActions(o){
     syncOrderContentFromItems(o);
     toast('Đã xóa hạng mục');renderOrder();
   });
-  $$('[data-edit-wi]').forEach(b=>b.onclick=()=>openEditWorkItemSheet(o,+b.dataset.editWi));
+  $('#btnAddWi')?.addEventListener('click',()=>openAddWorkItemSheet(o));
+  $('#btnAddMat')?.addEventListener('click',()=>openMaterialSheet(o));
+  $$('[data-edit-wi]').forEach(b=>b.onclick=()=>openWorkItemSheet(o,+b.dataset.editWi));
+  $$('[data-edit-mat]').forEach(b=>b.onclick=()=>openMaterialSheet(o,+b.dataset.editMat));
   $$('[data-rm-mat]').forEach(b=>b.onclick=()=>{
     o.mats.splice(+b.dataset.rmMat,1);
     if(hasPwmsLines(o)&&o.mh==='NA')o.mh='NONE';
@@ -998,114 +1047,278 @@ function bindOrderDetailActions(o){
   });
 }
 
-function bindOrderDetailPickers(o){
-  ['oPwmsMat','oKtvMat','oAddWi'].forEach(id=>{const el=$('#'+id);if(el)delete el.dataset.acBound});
-  bindCreatableAc($('#oPwmsMat'),$('#oPwmsMatDd'),{
-    getOptions:materialMasterOptions,allowCreate:false,
-    format:x=>`${esc(x.code)} · ${esc(x.name)} · tồn ${x.stockQty??'—'} · ${money(x.refPrice)}`,
-    onPick:x=>{
-      enrichMat(x,false);
-      o.mats=o.mats||[];
-      const exist=o.mats.find(m=>m.code&&m.code===x.code);
-      if(exist){exist.qty=(Number(exist.qty)||1)+1;toast('Đã tăng SL')}
-      else{
-        o.mats.push({id:'mt-'+Date.now(),name:x.name,code:x.code,qty:1,price:x.refPrice||0,source:'PWMS',
-          supplier:x.supplier||'',warehouse:x.warehouse||'',tag:'Kho MH · giá tham chiếu',uom:'Cái'});
-        toast('Đã thêm vật tư kho');
-      }
-      if(o.mh==='NA')o.mh='NONE';
-      recalcOrderCostMobile(o);
-      if($('#oPwmsMat'))$('#oPwmsMat').value='';
-      renderOrder();
-    }
-  });
-  bindCreatableAc($('#oKtvMat'),$('#oKtvMatDd'),{
-    getOptions:()=>[...materialLocalOptions(),...materialMasterOptions().map(m=>({...m,source:'master'}))],
-    format:x=>x.code?`${esc(x.code)} · ${esc(x.name)}`:esc(x.name),
-    onPick:x=>{
-      o.mats=o.mats||[];
-      o.mats.push({id:'mt-'+Date.now(),name:x.name,code:x.code||'',qty:1,price:x.refPrice||0,source:'TECHNICIAN',
-        tag:x.source==='local'?'KTV/ngoài kho · nội bộ':'KTV/ngoài kho',local:x.source==='local'});
-      toast('Đã thêm vật tư ghi tay');
-      recalcOrderCostMobile(o);
-      if($('#oKtvMat'))$('#oKtvMat').value='';
-      renderOrder();
-    },
-    onCreate:name=>{
-      const item={id:'lm'+Date.now(),name,code:''};
-      LOCAL.materials=LOCAL.materials||[];
-      LOCAL.materials.unshift(item);
-      saveLocalLookups(LOCAL);
-      toast('Đã lưu vật tư mới · chỉ nội bộ TMS');
-      return{...item,source:'local'};
-    }
-  });
-  bindCreatableAc($('#oAddWi'),$('#oAddWiDd'),{
-    getOptions:contentOptions,
-    format:x=>`${esc(x.name)}${x.system?` <span class="sub">· ${esc(x.system)}</span>`:''}`,
-    onPick:x=>{
-      ensureOrderWorkItems(o);
-      if(o.workItems.some(w=>(w.content||'').toLowerCase()===(x.name||'').toLowerCase())){toast('Hạng mục đã có');return}
-      o.workItems.push({content:x.name,system:x.system||'—',local:x.source==='local'});
-      syncOrderContentFromItems(o);
-      toast('Đã thêm hạng mục');
-      if($('#oAddWi'))$('#oAddWi').value='';
-      renderOrder();
-    },
-    onCreate:name=>{
-      const item={id:'lc'+Date.now(),name,system:'Khác'};
-      LOCAL.contents=LOCAL.contents||[];
-      LOCAL.contents.unshift(item);
-      saveLocalLookups(LOCAL);
-      toast('Đã lưu hạng mục mới · chỉ nội bộ TMS');
-      return{...item,source:'local'};
-    }
-  });
+function bindOrderDetailPickers(o){/* inline pickers removed — use sheet buttons */}
+
+function renderWiSheetForm(sysId,svcId,content,actHours,performer,useCustom,customText){
+  const sysName=systemNameById(sysId);
+  const svcOpts=mobileServiceTypesForSystem(sysId);
+  const contents=contentCatalogForSystem(sysName);
+  const barem=content?baremHoursForContent(content):1.0;
+  const act=actHours!=null&&actHours!==''?actHours:barem;
+  return `
+    <label class="field"><span>Hệ thống *</span>
+      <select id="wiSystem" required>
+        <option value="">— Chọn hệ thống —</option>
+        ${mobileSystems().map(s=>`<option value="${esc(s.id)}" ${sysId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}
+      </select>
+    </label>
+    <label class="field"><span>Loại dịch vụ *</span>
+      <select id="wiService" ${!sysId?'disabled':''} required>
+        <option value="">— Chọn loại dịch vụ —</option>
+        ${svcOpts.map(st=>`<option value="${esc(st.id)}" ${svcId===st.id?'selected':''}>${esc(st.name)}</option>`).join('')}
+      </select>
+    </label>
+    <label class="field"><span>Nội dung *</span>
+      <select id="wiContent" ${!sysId||useCustom?'disabled':''} required>
+        <option value="">— Chọn nội dung —</option>
+        ${contents.map(c=>`<option value="${esc(c.name)}" ${content===c.name?'selected':''}>${esc(c.name)} · ${baremHoursForContent(c.name).toFixed(1)}h</option>`).join('')}
+      </select>
+    </label>
+    <label class="flex items-center gap-2 text-sm mb-2"><input type="checkbox" id="wiUseCustom" class="size-4 accent-blue-600" ${useCustom?'checked':''} /><span class="text-slate-600">Không có trong danh mục</span></label>
+    <div id="wiCustomWrap" class="${useCustom?'':'hidden'} mb-3">
+      <input id="wiCustomContent" type="text" class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm" placeholder="Nhập nội dung (chỉ khi không có trong danh mục)" value="${esc(customText||'')}" />
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <label class="field"><span>Giờ barem</span><input id="wiBarem" type="number" step="0.1" value="${(content||(useCustom&&customText))?baremHoursForContent(useCustom?customText:content).toFixed(1):''}" readonly class="!bg-slate-50" /></label>
+      <label class="field"><span>Giờ thực tế</span><input id="wiHours" type="number" step="0.1" min="0" value="${act}" /></label>
+    </div>
+    <label class="field"><span>Người thực hiện</span><input id="wiPerformer" type="text" value="${esc(performer||MOBILE_DEFAULT_PERFORMER)}" /></label>`;
 }
 
-function openEditWorkItemSheet(o,idx){
+function openWorkItemSheet(o,idx){
   if(!canEditOrderDetail(o)){toast('Chỉ sửa khi Nháp hoặc Bị từ chối');return}
-  const w=o.workItems[idx]||{};
+  const isNew=idx==null||idx<0;
+  const w=isNew?{}:(o.workItems[idx]||{});
+  let state={
+    sysId:w.systemId||systemIdByName(w.system||o.system||''),
+    svcId:w.serviceTypeId||MOBILE_SERVICE_TYPES.find(st=>st.name===(w.service||''))?.id||'',
+    content:w.content||'',
+    hours:w.hours??(w.content?baremHoursForContent(w.content):1.0),
+    performer:w.performer||MOBILE_DEFAULT_PERFORMER,
+    useCustom:!!w.local&&!contentCatalogForSystem(w.system||'').some(c=>c.name===w.content),
+    customText:w.local?w.content||'':'',
+  };
   openOrderSheet(`
-    <h2>Sửa hạng mục #${idx+1}</h2>
-    <p class="sub">${esc(o.code)}</p>
-    <label class="field"><span>Hệ thống</span>
-      <select id="wiSystem">${systems().map(s=>`<option value="${esc(s)}" ${(w.system||'')===s?'selected':''}>${esc(s)}</option>`).join('')}</select>
-    </label>
-    <label class="field"><span>Loại dịch vụ</span><input id="wiService" value="${esc(w.service||'')}" placeholder="VD: Sửa chữa" /></label>
-    <label class="field"><span>Nội dung</span>
-      <div class="ac-wrap"><input id="wiContent" type="search" autocomplete="off" value="${esc(w.content||'')}" /><div class="ac-dropdown hidden" id="wiContentDd"></div></div>
-    </label>
-    <label class="field"><span>Giờ thực tế</span><input id="wiHours" type="number" step="0.1" min="0" value="${w.hours??''}" /></label>
-    <div class="grid grid-cols-2 gap-2">
+    <h2>${isNew?'Thêm hạng mục':'Sửa hạng mục'+(idx>=0?' #'+(idx+1):'')}</h2>
+    <p class="sub">${esc(o.code)} · chọn hệ thống → loại DV → nội dung</p>
+    <div id="wiFormWrap">${renderWiSheetForm(state.sysId,state.svcId,state.content,state.hours,state.performer,state.useCustom,state.customText)}</div>
+    <div class="grid grid-cols-2 gap-2 mt-2">
       <button type="button" class="btn btn-outline btn-touch" id="wiCancel">Hủy</button>
-      <button type="button" class="btn btn-primary btn-touch" id="wiSave">Lưu</button>
+      <button type="button" class="btn btn-primary btn-touch" id="wiSave">${isNew?'Thêm':'Lưu'}</button>
     </div>`);
   $('#wiCancel').onclick=closeOrderSheet;
   $('#orderSheetBg').onclick=e=>{if(e.target===$('#orderSheetBg'))closeOrderSheet()};
-  ['wiContent'].forEach(id=>{const el=$('#'+id);if(el)delete el.dataset.acBound});
-  bindCreatableAc($('#wiContent'),$('#wiContentDd'),{
-    getOptions:contentOptions,
-    format:x=>`${esc(x.name)}${x.system?` <span class="sub">· ${esc(x.system)}</span>`:''}`,
-    onPick:x=>{$('#wiContent').value=x.name;if(x.system)$('#wiSystem').value=x.system},
-    onCreate:name=>{
-      const item={id:'lc'+Date.now(),name,system:'Khác'};
-      LOCAL.contents=LOCAL.contents||[];LOCAL.contents.unshift(item);saveLocalLookups(LOCAL);
-      toast('Đã lưu nội dung mới · chỉ nội bộ TMS');
-      return{...item,source:'local'};
-    }
-  });
-  $('#wiSave').onclick=()=>{
-    w.system=$('#wiSystem').value||w.system;
-    w.service=($('#wiService').value||'').trim()||undefined;
-    w.content=($('#wiContent').value||'').trim()||w.content;
-    const h=$('#wiHours').value;
-    w.hours=h===''?undefined:Number(h);
-    o.workItems[idx]=w;
-    syncOrderContentFromItems(o);
-    pushLog(o,'EDIT','Sửa hạng mục #'+ (idx+1));
-    closeOrderSheet();toast('Đã lưu hạng mục');renderOrder();
+  const bindWi=()=>{
+    $('#wiSystem')?.addEventListener('change',()=>{
+      state.sysId=$('#wiSystem').value;
+      state.svcId='';state.content='';state.useCustom=false;state.customText='';
+      const barem=1.0;
+      state.hours=barem;
+      $('#wiFormWrap').innerHTML=renderWiSheetForm(state.sysId,'','',barem,state.performer,false,'');
+      bindWi();
+    },{once:true});
+    $('#wiContent')?.addEventListener('change',()=>{
+      state.content=$('#wiContent').value;
+      const b=baremHoursForContent(state.content);
+      state.hours=b;
+      $('#wiBarem').value=b.toFixed(1);
+      $('#wiHours').value=b;
+    },{once:true});
+    $('#wiUseCustom')?.addEventListener('change',e=>{
+      state.useCustom=e.target.checked;
+      $('#wiCustomWrap')?.classList.toggle('hidden',!state.useCustom);
+      $('#wiContent').disabled=state.useCustom;
+    },{once:true});
+    $('#wiSave').onclick=()=>{
+      state.sysId=$('#wiSystem').value;
+      state.svcId=$('#wiService').value;
+      state.useCustom=$('#wiUseCustom')?.checked;
+      state.content=state.useCustom?($('#wiCustomContent').value||'').trim():($('#wiContent').value||'').trim();
+      state.hours=Number($('#wiHours').value)||baremHoursForContent(state.content);
+      state.performer=($('#wiPerformer').value||'').trim()||MOBILE_DEFAULT_PERFORMER;
+      const sys=mobileSystems().find(s=>s.id===state.sysId);
+      const st=MOBILE_SERVICE_TYPES.find(s=>s.id===state.svcId);
+      if(!sys){toast('Chọn hệ thống');return}
+      if(!st){toast('Chọn loại dịch vụ');return}
+      if(!state.content){toast('Chọn nội dung công việc');return}
+      const standardHours=baremHoursForContent(state.content);
+      const item={
+        id:w.id||('wi-'+Date.now()),
+        systemId:sys.id,system:sys.name,
+        serviceTypeId:st.id,service:st.name,
+        content:state.content,standardHours,hours:state.hours,
+        performer:state.performer,local:!!state.useCustom,
+      };
+      ensureOrderWorkItems(o);
+      if(!isNew){
+        if(o.workItems.some((x,i)=>i!==idx&&(x.content||'').toLowerCase()===state.content.toLowerCase())){toast('Hạng mục đã có');return}
+        o.workItems[idx]=item;
+        pushLog(o,'EDIT','Sửa hạng mục #'+(idx+1));
+      }else{
+        if(o.workItems.some(x=>(x.content||'').toLowerCase()===state.content.toLowerCase())){toast('Hạng mục đã có');return}
+        o.workItems.push(item);
+        pushLog(o,'ADD','Thêm hạng mục · '+state.content);
+      }
+      if(state.useCustom){
+        LOCAL.contents=LOCAL.contents||[];
+        if(!LOCAL.contents.some(c=>c.name.toLowerCase()===state.content.toLowerCase())){
+          LOCAL.contents.unshift({id:'lc'+Date.now(),name:state.content,system:sys.name});
+          saveLocalLookups(LOCAL);
+        }
+      }
+      syncOrderContentFromItems(o);
+      closeOrderSheet();toast(isNew?'Đã thêm hạng mục':'Đã lưu hạng mục');renderOrder();
+    };
   };
+  bindWi();
+}
+function openAddWorkItemSheet(o){openWorkItemSheet(o,-1)}
+
+function renderMatPwmsFields(m,fulfill){
+  return `
+    <div id="matPwmsFields" class="space-y-2">
+      <label class="field"><span>Chọn vật tư *</span>
+        <select id="matCatalog">
+          <option value="">— Chọn vật tư kho —</option>
+          ${materialMasterOptions().map(x=>{
+            enrichMat(x,false);
+            return `<option value="${esc(x.id)}" data-code="${esc(x.code)}" data-name="${esc(x.name)}" data-uom="Cái" data-price="${x.refPrice}" data-supplier="${esc(x.supplier||'')}" data-warehouse="${esc(x.warehouse||'')}" data-stock="${x.stockQty??''}" ${m?.code===x.code?'selected':''}>${esc(x.code)} · ${esc(x.name)} · tồn ${x.stockQty??'—'} · ${money(x.refPrice)}</option>`;
+          }).join('')}
+        </select>
+      </label>
+      <div class="grid grid-cols-2 gap-2">
+        <label class="field"><span>Mã</span><input id="matCode" readonly class="!bg-slate-50" value="${esc(m?.code||'')}" /></label>
+        <label class="field"><span>ĐVT</span><input id="matUom" readonly class="!bg-slate-50" value="${esc(m?.uom||'Cái')}" /></label>
+      </div>
+      <label class="field"><span>Tên</span><input id="matName" readonly class="!bg-slate-50" value="${esc(m?.name||'')}" /></label>
+      <div class="grid grid-cols-2 gap-2">
+        <label class="field"><span>Đơn giá</span><input id="matPrice" readonly class="!bg-slate-50" value="${m?.price??''}" /></label>
+        <label class="field"><span>NCC</span><input id="matSupplier" readonly class="!bg-slate-50" value="${esc(m?.supplier||'')}" /></label>
+      </div>
+      <label class="field"><span>Kho</span><input id="matWarehouse" readonly class="!bg-slate-50" value="${esc(m?.warehouse||'')}" /></label>
+      <p id="matFulfillHint" class="text-[11px] text-slate-600 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">${fulfill?esc(fulfill.reason):'Chọn vật tư → kiểm tra tồn: đủ → Xuất kho; thiếu → Sửa ngoài'}</p>
+    </div>`;
+}
+
+function renderMatTechFields(m){
+  const opts=ktvMaterialSelectOptions();
+  const selId=m?.local?opts.find(x=>x.name===m.name)?.id:(m?.code?opts.find(x=>x.code===m.code)?.id:opts.find(x=>x.name===m?.name)?.id)||'';
+  return `
+    <div id="matTechFields" class="space-y-2">
+      <label class="field"><span>Chọn vật tư</span>
+        <select id="matTechSelect">
+          <option value="">— Chọn từ danh sách —</option>
+          ${opts.map(x=>`<option value="${esc(x.id)}" data-name="${esc(x.name)}" data-code="${esc(x.code||'')}" data-local="${x.source==='local'?1:0}" ${String(x.id)===String(selId)?'selected':''}>${x.code?esc(x.code)+' · ':''}${esc(x.name)}${x.source==='local'?' (nội bộ)':''}</option>`).join('')}
+        </select>
+      </label>
+      <label class="field"><span>Tên (nếu không có trong danh sách)</span>
+        <input id="matTechName" type="text" value="${esc(m?.name&&!selId?m.name:'')}" placeholder="Chỉ khi không có trong danh sách" />
+      </label>
+    </div>`;
+}
+
+function openMaterialSheet(o,idx){
+  if(!canEditOrderDetail(o)){toast('Chỉ sửa khi Nháp hoặc Bị từ chối');return}
+  const isNew=idx==null||idx<0;
+  const m=isNew?null:o.mats[idx];
+  const initSource=m?.source==='TECHNICIAN'?'TECHNICIAN':'PWMS';
+  let matState={source:initSource,qty:m?.qty??1};
+  const getFulfill=()=>{
+    if(matState.source!=='PWMS')return null;
+    return resolveMaterialFulfillment({qty:matState.qty,stockQty:$('#matCatalog')?.selectedOptions?.[0]?.dataset?.stock});
+  };
+  openOrderSheet(`
+    <h2>${isNew?'Thêm vật tư dự kiến':'Sửa vật tư'}</h2>
+    <p class="sub">${esc(o.code)} · chọn kho PWMS hoặc KTV ghi tay</p>
+    <label class="field"><span>Cách nhập</span>
+      <select id="matSource">
+        <option value="PWMS" ${initSource==='PWMS'?'selected':''}>Chọn từ danh mục kho</option>
+        <option value="TECHNICIAN" ${initSource==='TECHNICIAN'?'selected':''}>Kỹ thuật viên ghi tay</option>
+      </select>
+    </label>
+    <div id="matModeWrap">${initSource==='PWMS'?renderMatPwmsFields(m,getFulfill()):renderMatTechFields(m)}</div>
+    <label class="field"><span>Số lượng *</span><input id="matQty" type="number" step="0.01" min="0.01" value="${m?.qty??1}" /></label>
+    <div class="grid grid-cols-2 gap-2 mt-2">
+      <button type="button" class="btn btn-outline btn-touch" id="matCancel">Hủy</button>
+      <button type="button" class="btn btn-primary btn-touch" id="matSave">${isNew?'Thêm':'Lưu'}</button>
+    </div>`);
+  $('#matCancel').onclick=closeOrderSheet;
+  $('#orderSheetBg').onclick=e=>{if(e.target===$('#orderSheetBg'))closeOrderSheet()};
+  const refreshFulfill=()=>{
+    const f=getFulfill();
+    const el=$('#matFulfillHint');
+    if(!el||matState.source!=='PWMS')return;
+    if(!f){el.textContent='Chọn vật tư → kiểm tra tồn';return}
+    el.innerHTML=f.source==='PWMS'
+      ?`Hình thức: <strong class="text-emerald-700">Xuất kho</strong> · ${esc(f.reason)}`
+      :`Hình thức: <strong class="text-violet-700">Sửa ngoài</strong> · ${esc(f.reason)}`;
+  };
+  const fillFromCatalog=()=>{
+    const opt=$('#matCatalog')?.selectedOptions?.[0];
+    if(!opt?.value)return;
+    $('#matCode').value=opt.dataset.code||'';
+    $('#matName').value=opt.dataset.name||'';
+    $('#matUom').value=opt.dataset.uom||'Cái';
+    $('#matPrice').value=opt.dataset.price||0;
+    $('#matSupplier').value=opt.dataset.supplier||'';
+    $('#matWarehouse').value=opt.dataset.warehouse||'';
+    refreshFulfill();
+  };
+  const bindMat=()=>{
+    $('#matSource')?.addEventListener('change',()=>{
+      matState.source=$('#matSource').value;
+      $('#matModeWrap').innerHTML=matState.source==='PWMS'?renderMatPwmsFields(m,null):renderMatTechFields(m);
+      bindMat();
+    },{once:true});
+    $('#matCatalog')?.addEventListener('change',fillFromCatalog,{once:true});
+    $('#matQty')?.addEventListener('input',()=>{matState.qty=Number($('#matQty').value)||1;refreshFulfill()},{once:true});
+    if($('#matCatalog')?.value)fillFromCatalog();
+    $('#matSave').onclick=()=>{
+      matState.qty=Number($('#matQty').value)||1;
+      o.mats=o.mats||[];
+      let row;
+      if(matState.source==='PWMS'){
+        const opt=$('#matCatalog')?.selectedOptions?.[0];
+        if(!opt?.value){toast('Chọn vật tư kho');return}
+        const ful=resolveMaterialFulfillment({qty:matState.qty,stockQty:opt.dataset.stock});
+        row={
+          id:m?.id||('mt-'+Date.now()),source:ful.source,
+          code:opt.dataset.code,name:opt.dataset.name,uom:opt.dataset.uom||'Cái',
+          qty:matState.qty,price:Number(opt.dataset.price)||0,
+          supplier:opt.dataset.supplier||'',warehouse:opt.dataset.warehouse||'',
+          tag:ful.source==='PWMS'?'Kho MH · giá tham chiếu':'Sửa ngoài · thiếu tồn',
+        };
+      }else{
+        const opt=$('#matTechSelect')?.selectedOptions?.[0];
+        let name=(opt?.dataset?.name||$('#matTechName').value||'').trim();
+        if(!name){toast('Chọn hoặc nhập tên vật tư');return}
+        const isLocal=opt?.dataset?.local==='1';
+        if(!opt?.value&&!isLocal){
+          LOCAL.materials=LOCAL.materials||[];
+          if(!LOCAL.materials.some(x=>x.name.toLowerCase()===name.toLowerCase())){
+            LOCAL.materials.unshift({id:'lm'+Date.now(),name,code:''});
+            saveLocalLookups(LOCAL);
+          }
+        }
+        row={
+          id:m?.id||('mt-'+Date.now()),source:'TECHNICIAN',
+          code:opt?.dataset?.code||'',name,qty:matState.qty,price:0,
+          tag:isLocal?'KTV/ngoài kho · nội bộ':'KTV/ngoài kho',local:isLocal||!opt?.value,
+        };
+      }
+      if(!isNew)o.mats[idx]=row;
+      else{
+        const exist=row.code&&o.mats.find(x=>x.code===row.code);
+        if(exist){exist.qty=(Number(exist.qty)||1)+matState.qty;toast('Đã tăng SL')}
+        else{o.mats.push(row);toast('Đã thêm vật tư')}
+      }
+      if(hasPwmsLines(o)&&o.mh==='NA')o.mh='NONE';
+      if(!hasPwmsLines(o)&&o.mh==='NONE')o.mh='NA';
+      recalcOrderCostMobile(o);
+      closeOrderSheet();renderOrder();
+    };
+  };
+  bindMat();
 }
 
 function openEditOrderSheet(o){
@@ -1440,7 +1653,7 @@ function renderCreateWorkItems(){
   if(count)count.textContent=items.length+' hạng mục';
   if(!list)return;
   if(!items.length){
-    list.innerHTML='<div class="rounded-md border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-400">Chưa có hạng mục — tìm và chọn bên trên</div>';
+    list.innerHTML='<div class="rounded-md border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-400">Chưa có hạng mục — chọn danh mục và bấm Thêm</div>';
     return;
   }
   list.innerHTML=items.map((w,i)=>`<div class="flex items-start gap-2 rounded-md border border-slate-200 bg-white px-3 py-2">
@@ -1507,24 +1720,23 @@ function bindCreatableAc(input,dd,opts){
   input.addEventListener('keydown',e=>{if(e.key==='Escape')hideAllAc()});
 }
 
-function initCreateAutocomplete(){
-  bindCreatableAc($('#cContent'),$('#cContentDd'),{
-    getOptions:contentOptions,
-    format:o=>`${esc(o.name)}${o.system?` <span class="sub">· ${esc(o.system)}</span>`:''}`,
-    onPick:o=>{
-      addCreateWorkItem(o);
-      $('#cContent').value='';
-    },
-    onCreate:name=>{
-      const item={id:'lc'+Date.now(),name,system:'Khác'};
-      LOCAL.contents=LOCAL.contents||[];
-      LOCAL.contents.unshift(item);
-      saveLocalLookups(LOCAL);
-      toast('Đã lưu hạng mục mới · chỉ nội bộ TMS');
-      return{...item,source:'local'};
-    }
-  });
+function populateCreateSelects(){
+  const wiSel=$('#cContentSelect');
+  if(wiSel){
+    const opts=contentOptions();
+    wiSel.innerHTML='<option value="">— Chọn hạng mục —</option>'+opts.map(o=>`<option value="${esc(o.id)}" data-name="${esc(o.name)}" data-system="${esc(o.system||'Khác')}" data-source="${esc(o.source||'master')}">${esc(o.name)}${o.system?' · '+esc(o.system):''}</option>`).join('');
+  }
+  const pwmsSel=$('#cPwmsSelect');
+  if(pwmsSel){
+    pwmsSel.innerHTML='<option value="">— Chọn vật tư kho —</option>'+materialMasterOptions().map(m=>`<option value="${esc(m.id)}" data-code="${esc(m.code)}" data-name="${esc(m.name)}" data-price="${m.refPrice}" data-supplier="${esc(m.supplier||'')}" data-warehouse="${esc(m.warehouse||'')}">${esc(m.code)} · ${esc(m.name)} · tồn ${m.stockQty??'—'} · ${money(m.refPrice)}</option>`).join('');
+  }
+  const ktvSel=$('#cKtvSelect');
+  if(ktvSel){
+    ktvSel.innerHTML='<option value="">— Chọn vật tư ghi tay —</option>'+ktvMaterialSelectOptions().map(m=>`<option value="${esc(m.id)}" data-name="${esc(m.name)}" data-code="${esc(m.code||'')}" data-local="${m.source==='local'?1:0}">${m.code?esc(m.code)+' · ':''}${esc(m.name)}${m.source==='local'?' (nội bộ)':''}</option>`).join('');
+  }
+}
 
+function initCreateAutocomplete(){
   bindCreatableAc($('#cGarage'),$('#cGarageDd'),{
     getOptions:()=>garageOptions().map(name=>({id:name,name,source:(LOCAL.garages||[]).some(g=>(g.name||g)===name)?'local':'master'})),
     onPick:o=>{$('#cGarage').value=o.name},
@@ -1539,44 +1751,40 @@ function initCreateAutocomplete(){
     }
   });
 
-  bindCreatableAc($('#cPwmsMat'),$('#cPwmsMatDd'),{
-    getOptions:materialMasterOptions,
-    allowCreate:false,
-    format:o=>`${esc(o.code)} · ${esc(o.name)} · ${money(o.refPrice)}`,
-    onPick:o=>{
-      if(!S.createPwmsMats.some(x=>x.id===o.id))S.createPwmsMats.push({
-        id:o.id,code:o.code,name:o.name,qty:1,
-        price:o.refPrice||0,supplier:o.supplier||'',warehouse:o.warehouse||'',
-        stockQty:o.stockQty,tag:'Kho MH · giá tham chiếu'
-      });
-      $('#cPwmsMat').value='';
-      renderCreateMatChips();
-      toast('Đã điền giá / NCC từ PWMS');
-    },
-    onCreate:()=>null
-  });
-
-  bindCreatableAc($('#cKtvMat'),$('#cKtvMatDd'),{
-    getOptions:()=>[...materialLocalOptions(),...materialMasterOptions().map(m=>({...m,source:'master'}))],
-    format:o=>o.code?`${esc(o.code)} · ${esc(o.name)}`:esc(o.name),
-    onPick:o=>{
-      const local=o.source==='local';
-      if(!S.createKtvMats.some(x=>x.name.toLowerCase()===o.name.toLowerCase())){
-        S.createKtvMats.push({id:o.id,code:o.code||'',name:o.name,qty:1,price:0,tag:'KTV/ngoài kho',local});
-      }
-      $('#cKtvMat').value='';
-      renderCreateMatChips();
-    },
-    onCreate:name=>{
-      const item={id:'lm'+Date.now(),code:'',name};
-      LOCAL.materials=LOCAL.materials||[];
-      LOCAL.materials.unshift(item);
-      saveLocalLookups(LOCAL);
-      toast('Đã lưu vật tư mới · chỉ nội bộ TMS (không sync PWMS)');
-      return{...item,source:'local'};
-    }
-  });
 }
+
+$('#btnAddCreateWi')?.addEventListener('click',()=>{
+  const sel=$('#cContentSelect')?.selectedOptions?.[0];
+  if(!sel?.value){toast('Chọn hạng mục');return}
+  addCreateWorkItem({id:sel.value,name:sel.dataset.name,system:sel.dataset.system,source:sel.dataset.source});
+  $('#cContentSelect').value='';
+});
+$('#btnAddCreatePwms')?.addEventListener('click',()=>{
+  const sel=$('#cPwmsSelect')?.selectedOptions?.[0];
+  if(!sel?.value){toast('Chọn vật tư kho');return}
+  const id=sel.value;
+  if(!S.createPwmsMats.some(x=>x.id===id)){
+    S.createPwmsMats.push({
+      id,code:sel.dataset.code,name:sel.dataset.name,qty:1,
+      price:Number(sel.dataset.price)||0,supplier:sel.dataset.supplier||'',warehouse:sel.dataset.warehouse||'',
+      tag:'Kho MH · giá tham chiếu'
+    });
+    toast('Đã thêm vật tư kho');
+  }else toast('Vật tư đã có');
+  $('#cPwmsSelect').value='';
+  renderCreateMatChips();
+});
+$('#btnAddCreateKtv')?.addEventListener('click',()=>{
+  const sel=$('#cKtvSelect')?.selectedOptions?.[0];
+  if(!sel?.value){toast('Chọn vật tư ghi tay');return}
+  const name=sel.dataset.name;
+  if(!S.createKtvMats.some(x=>x.name.toLowerCase()===name.toLowerCase())){
+    S.createKtvMats.push({id:sel.value,code:sel.dataset.code||'',name,qty:1,price:0,tag:'KTV/ngoài kho',local:sel.dataset.local==='1'});
+    toast('Đã thêm vật tư ghi tay');
+  }else toast('Vật tư đã có');
+  $('#cKtvSelect').value='';
+  renderCreateMatChips();
+});
 
 function syncCreateType(){
   const periodic=$('#cType')?.value==='PERIODIC';
@@ -1635,6 +1843,7 @@ $('#btnSyncPwmsMat')?.addEventListener('click',()=>{
       row.tag='Kho MH · giá tham chiếu';
     });
     renderCreateMatChips();
+    populateCreateSelects();
     const at=new Date().toLocaleString('vi-VN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'});
     if(hint)hint.textContent='Đã đồng bộ lúc '+at+' · giá + NCC + tồn · '+MATERIALS.length+' VT';
     if(btn){btn.disabled=false;btn.textContent='Đồng bộ lại'}
@@ -1646,17 +1855,6 @@ $('#btnCreateSave')?.addEventListener('click',()=>{
   const v=veh(S.vehicleId);
   const type=$('#cType').value;
   const cat=type==='PERIODIC'?MOBILE_CATALOG.find(c=>String(c.id)===$('#cCatalog').value):null;
-  const pending=($('#cContent').value||'').trim();
-  if(pending){
-    const found=contentOptions().find(o=>o.name.toLowerCase()===pending.toLowerCase());
-    if(found)addCreateWorkItem(found);
-    else{
-      const item={id:'lc'+Date.now(),name:pending,system:'Khác'};
-      LOCAL.contents.unshift(item);saveLocalLookups(LOCAL);
-      addCreateWorkItem({...item,source:'local'});
-    }
-    $('#cContent').value='';
-  }
   if(!(S.createWorkItems||[]).length){
     toast('Thêm ít nhất 1 hạng mục công việc');return;
   }
