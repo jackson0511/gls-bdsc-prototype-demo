@@ -13,7 +13,7 @@
     *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     body{margin:0;font-family:Inter,system-ui,sans-serif;background:#0f172a;color:#0f172a}
     .desk-hint{display:none;text-align:center;color:#94a3b8;font-size:12px;margin:0 0 12px}
-    .app{max-width:430px;margin:0 auto;min-height:100dvh;background:#f8fafc;display:flex;flex-direction:column;position:relative}
+    .app{max-width:430px;margin:0 auto;min-height:100dvh;background:#f8fafc;display:flex;flex-direction:column;position:relative;overflow-x:hidden}
     @media(min-width:480px){
       body{padding:24px 16px;background:radial-gradient(800px 400px at 20% 0%,#1e3a5f 0%,transparent 50%),#0f172a}
       .desk-hint{display:block}
@@ -21,7 +21,7 @@
     }
     .scr{display:none;flex:1;flex-direction:column;min-height:0;background:#f8fafc}
     .scr.on{display:flex}
-    .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+    .scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;min-width:0}
     .surface{border:1px solid #e2e8f0;background:#fff;border-radius:.375rem;box-shadow:0 1px 2px rgba(15,23,42,.04)}
     .card10{border:1px solid #e2e8f0;background:#fff;border-radius:10px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;min-height:36px;border-radius:.375rem;border:1px solid #cbd5e1;padding:0 14px;font-size:14px;font-weight:500;box-shadow:0 1px 2px rgba(15,23,42,.05);font-family:inherit;cursor:pointer;background:#fff;color:#334155;box-sizing:border-box}
@@ -56,7 +56,7 @@
     .shell-ftr{background:#fff;border-top:1px solid #e2e8f0;padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));display:grid;gap:8px}
     .field{display:block;margin-bottom:12px}
     .field>span{display:block;font-size:13px;font-weight:500;color:#334155;margin-bottom:4px}
-    .field input,.field select,.field textarea{width:100%;min-height:40px;border:1px solid #cbd5e1;border-radius:.375rem;padding:8px 12px;font-size:16px;background:#fff;font-family:inherit}
+    .field input,.field select,.field textarea{width:100%;max-width:100%;min-height:40px;border:1px solid #cbd5e1;border-radius:.375rem;padding:8px 12px;font-size:16px;background:#fff;font-family:inherit;box-sizing:border-box}
     .field textarea{min-height:72px;resize:vertical}
     .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.25)}
     .steps{display:flex;gap:6px;padding:10px 16px 0}
@@ -83,6 +83,16 @@
     .ac-wrap>input[type=search]::-webkit-search-results-button{display:none}
     .ac-wrap>input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.25)}
     .ac-wrap>input::placeholder{color:#94a3b8;opacity:1}
+    .row-add{display:flex;align-items:stretch;gap:8px;width:100%;min-width:0;max-width:100%}
+    .row-add>select{
+      flex:1 1 0%;min-width:0;max-width:100%;width:100%;
+      min-height:40px;box-sizing:border-box;
+      border:1px solid #cbd5e1;border-radius:.375rem;padding:8px 10px;
+      font-size:14px;line-height:1.25;background:#fff;font-family:inherit;color:#0f172a;
+    }
+    .row-add>select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.25)}
+    .row-add>.btn{flex:0 0 auto;align-self:stretch;height:auto;min-height:40px;white-space:nowrap}
+    .sheet select,.sheet input{max-width:100%;box-sizing:border-box}
     .ac-dropdown{position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:40;max-height:220px;overflow:auto;background:#fff;border:1px solid #e2e8f0;border-radius:.5rem;box-shadow:0 10px 24px rgba(15,23,42,.12)}
     .ac-dropdown.hidden{display:none}
     .ac-opt{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #f1f5f9;background:#fff;padding:10px 12px;font-size:13px;font-family:inherit;color:#0f172a}
@@ -225,9 +235,9 @@
             <span class="text-[11px] text-slate-500" id="cWiCount">0 hạng mục</span>
           </div>
           <p class="text-[11px] text-slate-500 m-0">Chọn từ danh mục · bấm Thêm</p>
-          <div class="flex gap-2">
-            <select id="cContentSelect" class="flex-1 min-h-10 rounded-md border border-slate-300 px-3 text-sm"></select>
-            <button type="button" id="btnAddCreateWi" class="btn btn-outline btn-sm shrink-0">Thêm</button>
+          <div class="row-add">
+            <select id="cContentSelect"></select>
+            <button type="button" id="btnAddCreateWi" class="btn btn-outline btn-sm">Thêm</button>
           </div>
           <div id="cWiList" class="space-y-1.5"></div>
         </div>
@@ -237,17 +247,17 @@
             <button type="button" id="btnSyncPwmsMat" class="btn btn-outline btn-sm shrink-0 !border-sky-400 !bg-sky-50 text-sky-900">Đồng bộ</button>
           </div>
           <div class="text-[11px] text-slate-500" id="pwmsMatSyncHint">Nguồn PWMS · bấm Đồng bộ để làm mới danh mục</div>
-          <div class="flex gap-2">
-            <select id="cPwmsSelect" class="flex-1 min-h-10 rounded-md border border-slate-300 px-3 text-sm"></select>
-            <button type="button" id="btnAddCreatePwms" class="btn btn-outline btn-sm shrink-0">Thêm</button>
+          <div class="row-add">
+            <select id="cPwmsSelect"></select>
+            <button type="button" id="btnAddCreatePwms" class="btn btn-outline btn-sm">Thêm</button>
           </div>
           <div class="mat-chips" id="cPwmsChips"></div>
         </div>
         <div class="rounded-md border border-amber-200 bg-amber-50/50 p-3 space-y-2">
           <div class="text-xs font-semibold text-amber-800">Vật tư ghi tay / mua ngoài — chọn từ danh sách</div>
-          <div class="flex gap-2">
-            <select id="cKtvSelect" class="flex-1 min-h-10 rounded-md border border-slate-300 px-3 text-sm"></select>
-            <button type="button" id="btnAddCreateKtv" class="btn btn-outline btn-sm shrink-0">Thêm</button>
+          <div class="row-add">
+            <select id="cKtvSelect"></select>
+            <button type="button" id="btnAddCreateKtv" class="btn btn-outline btn-sm">Thêm</button>
           </div>
           <div class="mat-chips" id="cKtvChips"></div>
         </div>
