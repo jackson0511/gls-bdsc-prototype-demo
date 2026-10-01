@@ -329,7 +329,8 @@ flowchart TD
   D --> E[Bắt đầu làm việc trên xưởng]
   E --> F[Mua hàng xuất kho<br/>hoặc mua ngoài theo mã phiếu]
   F --> G[Đồng bộ lại từ mua hàng<br/>thành phần dữ liệu thật]
-  G --> H[Hoàn thành phiếu]
+  G --> H[Hoàn thành từng hạng mục<br/>so giờ thực tế với barem]
+  H --> I[Đủ hạng mục → phiếu tự<br/>chuyển Hoàn thành]
         </pre>
       </div>
       <div class="cards two">
@@ -349,10 +350,10 @@ flowchart TD
       </div>
       <h3 class="step" style="border:none;padding:0;margin:16px 0 8px;font-size:15px">Bốn mốc giờ — hệ thống tự ghi, không nhập tay</h3>
       <ul class="times">
-        <li><b>Thời gian bắt đầu</b>Khi bấm «Bắt đầu thực hiện»</li>
+        <li><b>Thời gian bắt đầu</b>Khi bấm «Bắt đầu thực hiện» hoặc khi hoàn thành hạng mục đầu</li>
         <li><b>Thời gian đề nghị cấp vật tư</b>Lần gửi sớm nhất sang BASE hoặc sang mua hàng</li>
         <li><b>Thời gian có đủ vật tư</b>Ngày cấp vật tư <em>sau cùng</em> trên chứng từ mua hàng / xuất kho</li>
-        <li><b>Thời gian hoàn thiện sửa chữa</b>Khi bấm «Hoàn thành phiếu»</li>
+        <li><b>Thời gian hoàn thiện sửa chữa</b>Khi đủ hạng mục công việc đã hoàn thành (phiếu tự chuyển Hoàn thành)</li>
       </ul>
     </section>
 
