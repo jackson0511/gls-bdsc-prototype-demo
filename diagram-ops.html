@@ -202,7 +202,7 @@
       <a href="#b4"><strong>4.</strong> Làm phiếu</a>
       <a href="#b5"><strong>5.</strong> Đối chiếu</a>
       <a href="#b6"><strong>6.</strong> Vỏ lốp / ắc quy</a>
-      <a href="#b7"><strong>7.</strong> Lịch KTV</a>
+      <a href="#b7"><strong>7.</strong> Giờ SC KTV</a>
     </nav>
 
     <section class="panel">
@@ -222,7 +222,7 @@ flowchart TD
   D --> E[5. So sánh kế hoạch<br/>với thực tế · xem lịch sử]
   B --> F[6. Vỏ lốp / ắc quy<br/>đồng bộ PWMS · cảnh báo]
   F --> C
-  D --> G[7. Lịch KTV<br/>theo màu trạng thái]
+  D --> G[7. Giờ SC KTV<br/>tổng hợp · lịch tháng · barem]
 
   style A fill:#fef3c7,stroke:#d97706
   style B fill:#dbeafe,stroke:#0284c8
@@ -421,22 +421,30 @@ flowchart TD
     </section>
 
     <section class="panel" id="b7">
-      <h3 class="step">Bước 7 — Lịch kỹ thuật viên (theo màu trạng thái)</h3>
-      <p class="sub">Giống phân hệ Quản lý xe hiện tại: xem tiến độ công việc theo tháng / người.</p>
+      <h3 class="step">Bước 7 — Giờ sửa chữa kỹ thuật viên (báo cáo + barem)</h3>
+      <p class="sub">Khớp phân hệ Quản lý xe: không phải trang «lịch» riêng — lịch nằm trong màn giờ KTV cá nhân.</p>
       <div class="diagram">
         <pre class="mermaid">
-flowchart LR
-  A[Phiếu / hạng mục<br/>đã gán KTV] --> B[Lịch tháng KTV]
-  B --> C[Màu: chưa làm]
-  B --> D[Màu: đang làm]
-  B --> E[Màu: hoàn thành]
-  C --> F[Theo dõi tải việc<br/>và giờ vs barem]
+flowchart TD
+  A[Hạng mục hoàn thành<br/>bắt đầu → kết thúc] --> B[Giờ thực tế tự tính]
+  C[Cài đặt giờ sửa chữa KTV<br/>catalog barem theo hệ thống + nội dung] --> D[Giờ barem theo hạng mục]
+  B --> E[Bảng tổng hợp giờ SC theo KTV<br/>heatmap KTV × ngày]
+  D --> E
+  B --> F[Bảng giờ sửa chữa Kỹ Thuật Viên<br/>tab Lịch tháng + bảng theo ngày]
   D --> F
-  E --> F
+  E --> G[KPI: giờ thực tế · vượt barem · số phiếu]
+  F --> H[Tổng thực tế / barem · màu ≤ / &gt; barem]
         </pre>
       </div>
-      <div class="tip">
-        Lịch KTV nằm trên bản mẫu console để đủ luồng phân công — báo cáo giờ công (#95) dùng cùng nguồn bắt đầu / hoàn thành hạng mục.
+      <div class="cards two">
+        <div class="box g">
+          <strong>Bảng tổng hợp (quản lý)</strong>
+          Lọc tháng / KTV / trạng thái · 3 KPI · tab heatmap năng suất theo KTV · tab bảng theo ngày (cột giờ barem, thực tế, vượt, chờ VT…).
+        </div>
+        <div class="box y">
+          <strong>Bảng giờ KTV (cá nhân)</strong>
+          Tab «Lịch giờ sửa chữa tháng» (màu: không DL / chưa HT / ≤ barem / &gt; barem) · tab bảng theo ngày. Cài đặt barem bắt buộc có trước khi đối chiếu.
+        </div>
       </div>
     </section>
 

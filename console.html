@@ -218,12 +218,13 @@
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="pwmsHistory">Lịch sử giá / NCC <span class="ml-auto text-[9px] text-sky-400">PWMS</span></a>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="repairItems">Nội dung sửa chữa <span class="ml-auto text-[9px] text-sky-400">PWMS</span></a>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="serviceTypes">Loại dịch vụ</a>
-        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="baremHours">Barem giờ công</a>
+        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="baremHours">Cài đặt giờ sửa chữa KTV</a>
+        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="repairHoursReport">Bảng tổng hợp giờ SC theo KTV</a>
+        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="technicianWorkHours">Bảng giờ sửa chữa Kỹ Thuật Viên</a>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="catalog">Danh mục bảo dưỡng</a>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="criteria">Tiêu chí đánh giá</a>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="settings">Cài đặt nhắc đánh giá</a>
         <div class="mb-1 mt-4 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Khác</div>
-        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="ktvCalendar">Lịch kỹ thuật viên</a>
         <span class="nav-item disabled mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2">Kế hoạch xe - tài xế hàng ngày</span>
         <span class="nav-item disabled mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2">Đánh giá phương tiện trước chuyến</span>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="tireBattery">Vỏ lốp / ắc quy <span class="ml-auto text-[9px] text-sky-400">PWMS</span></a>
@@ -6527,9 +6528,17 @@ function defaultFilters() {
     mapStatus: 'ALL',
     dateFrom: '',
     dateTo: '',
-    ktvMonth: '',
-    ktvTech: 'ALL',
     tbKind: 'ALL',
+    rhMonth: '',
+    rhTech: 'ALL',
+    rhStatus: 'ALL',
+    rhTab: 'heatmap',
+    rhDay: '',
+    twMonth: '',
+    twTech: 'ktv-01',
+    twStatus: 'ALL',
+    twTab: 'calendar',
+    twDay: '',
   };
 }
 function F() { return view.filters; }
@@ -8127,6 +8136,7 @@ function summary() {
 function render() {
   (DB.catalog || []).forEach(normalizeCatalog);
   (DB.baremHours || []).forEach(normalizeBaremRow);
+  if (typeof ensureRepairHoursSeed === 'function') ensureRepairHoursSeed();
   enrichAllMaterials(false);
   ensurePwmsValueHistory();
   ensurePwmsVehicleMaps();
@@ -8167,7 +8177,8 @@ function render() {
   else if (view.name === 'criteria') main.innerHTML = pageCriteriaMaster();
   else if (view.name === 'criteriaDetail') main.innerHTML = pageCriteriaDetail();
   else if (view.name === 'settings') main.innerHTML = pageSettings();
-  else if (view.name === 'ktvCalendar') main.innerHTML = pageKtvCalendar();
+  else if (view.name === 'repairHoursReport') main.innerHTML = pageRepairHoursReport();
+  else if (view.name === 'technicianWorkHours') main.innerHTML = pageTechnicianWorkHours();
   else if (view.name === 'tireBattery') main.innerHTML = pageTireBattery();
   else main.innerHTML = pageHistory();
   bind();
@@ -9930,69 +9941,432 @@ function openPickVehiclesModal(tpl) {
   };
 }
 
-/* ----- LỊCH KTV ----- */
-function pageKtvCalendar() {
-  const f = F();
-  const month = f.ktvMonth || (new Date().toISOString().slice(0, 7));
-  const techs = [...new Set((DB.orders || []).flatMap(o => {
-    const names = [o.technician || ''].concat((o.workItems || []).map(w => w.assignee || ''));
-    return names.filter(Boolean);
-  }))];
-  if (!techs.length) techs.push('KTV A', 'KTV B');
-  const tech = f.ktvTech || 'ALL';
-  const daysInMonth = (() => { const [y, m] = month.split('-').map(Number); return new Date(y, m, 0).getDate(); })();
-  const cells = [];
-  for (let d = 1; d <= daysInMonth; d++) {
-    const day = `${month}-${String(d).padStart(2, '0')}`;
-    const items = (DB.orders || []).filter(o => {
-      const od = (o.date || '').slice(0, 10);
-      if (od !== day && !(o.startedAt || '').startsWith(day) && !(o.completedAt || '').startsWith(day)) return false;
-      if (tech !== 'ALL') {
-        const names = [o.technician || ''].concat((o.workItems || []).map(w => w.assignee || ''));
-        if (!names.some(n => n === tech)) return false;
-      }
-      return true;
-    });
-    cells.push({ day, d, items });
+/* ===== STT 95 — Giờ sửa chữa KTV (giống fleet-000411) ===== */
+function lookupBaremHours(systemName, content, asOf) {
+  const sys = (DB.vehicleSystems || []).find(s => s.name === systemName || s.id === systemName);
+  if (sys && typeof resolveBaremHours === 'function') {
+    const h = resolveBaremHours(sys.id, content, asOf || todayDateKey());
+    if (h != null) return h;
   }
-  const color = (o) => o.status === 'COMPLETED' ? 'bg-emerald-100 border-emerald-300 text-emerald-900'
-    : o.status === 'IN_PROGRESS' ? 'bg-amber-100 border-amber-300 text-amber-950'
-    : 'bg-slate-100 border-slate-300 text-slate-700';
-  const label = (o) => o.status === 'COMPLETED' ? 'HT' : o.status === 'IN_PROGRESS' ? 'Đang' : 'Chưa';
+  const row = (DB.baremHours || []).find(b =>
+    String(b.content) === String(content) && (!systemName || b.system === systemName)
+  );
+  return row != null ? Number(row.baremHours) : null;
+}
+
+const REPAIR_HOUR_TECHS = [
+  { id: 'ktv-01', name: 'Nguyễn Văn An' },
+  { id: 'ktv-02', name: 'Trần Minh Bình' },
+  { id: 'ktv-03', name: 'Lê Hoàng Cường' },
+  { id: 'ktv-04', name: 'Phạm Đức Dũng' },
+  { id: 'ktv-05', name: 'Võ Thị Em' },
+  { id: 'ktv-06', name: 'Hoàng Quốc Phong' },
+  { id: 'ktv-07', name: 'Đặng Văn Giang' },
+  { id: 'ktv-08', name: 'Bùi Thanh Hải' },
+];
+
+function hoursFmt(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return '—';
+  return (Math.round(x * 10) / 10).toFixed(1) + 'h';
+}
+
+function toneRepairHours(actual, barem, completed) {
+  if (!completed) return 'incomplete';
+  if (actual == null || barem == null || !(actual > 0 || barem > 0)) return 'none';
+  return actual > barem + 0.05 ? 'over' : 'within';
+}
+
+const RH_TONE_CLASS = {
+  none: 'border-slate-200 bg-slate-50 text-slate-400',
+  incomplete: 'border-amber-300 bg-amber-100 text-amber-900',
+  within: 'border-emerald-300 bg-emerald-100 text-emerald-900',
+  over: 'border-rose-300 bg-rose-100 text-rose-900',
+};
+
+function ensureRepairHoursSeed() {
+  if (DB._repairHoursSeeded) return;
+  DB._repairHoursSeeded = true;
+  // Bổ sung giờ / KTV / mốc thời gian trên workItems hiện có
+  const techs = REPAIR_HOUR_TECHS;
+  (DB.orders || []).forEach((o, oi) => {
+    const wis = o.workItems || [];
+    wis.forEach((w, wi) => {
+      const tech = techs[(oi + wi) % techs.length];
+      if (!w.assignee && !w.performer) w.assignee = tech.name;
+      else if (!w.assignee && w.performer && /TRUNG|BÌNH|GARAGE|XƯỞNG|garage/i.test(w.performer)) w.assignee = tech.name;
+      else if (!w.assignee) w.assignee = w.performer || tech.name;
+      const barem = lookupBaremHours(w.system, w.content, o.date) ?? Number(w.baremHours) ?? 1.5;
+      w.baremHours = barem;
+      const completed = o.status === 'COMPLETED' || w.status === 'COMPLETED';
+      if (w.hours == null && completed) {
+        const drift = ((oi * 3 + wi * 7) % 9) * 0.1 - 0.3;
+        w.hours = Math.max(0.3, Math.round((barem + drift) * 10) / 10);
+      }
+      if (!w.startedAt && (completed || o.status === 'IN_PROGRESS')) {
+        const base = (o.date || '2026-01-13') + ' 08:00';
+        w.startedAt = base;
+      }
+      if (!w.completedAt && completed) {
+        const h = Number(w.hours) || barem;
+        const startH = 8;
+        const endH = startH + h;
+        const hh = String(Math.floor(endH)).padStart(2, '0');
+        const mm = String(Math.round((endH % 1) * 60)).padStart(2, '0');
+        w.completedAt = (o.date || '2026-01-13') + ` ${hh}:${mm}`;
+      }
+      if (!w.status) w.status = completed ? 'COMPLETED' : (o.status === 'IN_PROGRESS' ? 'IN_PROGRESS' : 'NOT_STARTED');
+    });
+  });
+  // Seed dòng demo tháng hiện tại (để lịch / heatmap đủ dữ liệu)
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth(); // 0-based
+  const daysInMonth = new Date(y, m + 1, 0).getDate();
+  const demo = [];
+  const contents = (DB.baremHours || []).slice(0, 12);
+  let n = 0;
+  for (let d = 1; d <= Math.min(daysInMonth, 28); d++) {
+    if (d % 7 === 0) continue; // CN trống một phần
+    const day = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const perDay = 2 + (d % 3);
+    for (let k = 0; k < perDay; k++) {
+      const tech = techs[(d + k) % techs.length];
+      const b = contents[n % Math.max(1, contents.length)] || { system: 'Hệ Thống Máy Xe', content: 'Thay dầu nhớt', baremHours: 1.5 };
+      const barem = Number(b.baremHours) || 1.5;
+      const over = (d + k) % 5 === 0;
+      const incomplete = (d + k) % 11 === 0;
+      const actual = incomplete ? null : Math.round((barem + (over ? 0.8 : ((d % 5) - 2) * 0.1)) * 10) / 10;
+      const v = (DB.vehicles || [])[(d + k) % Math.max(1, (DB.vehicles || []).length)];
+      demo.push({
+        id: `rh-demo-${n++}`,
+        orderId: null,
+        orderCode: `RO-DEMO-${String(1000 + n)}`,
+        date: day,
+        vehicleId: v?.id,
+        plate: v?.plate || '51D-198.21',
+        mooc: v?.isTrailer ? v.plate : (d % 4 === 0 ? '50R-11892' : ''),
+        garage: ['Hyundai Phú Lâm', 'Xưởng nội bộ Cát Lái', 'Garage Tân Cảng'][d % 3],
+        technicianId: tech.id,
+        technicianName: tech.name,
+        system: b.system,
+        content: b.content,
+        baremHours: barem,
+        actualHours: actual,
+        overrunHours: actual != null ? Math.max(0, actual - barem) : 0,
+        waitingPartsHours: (d + k) % 9 === 0 ? 2.5 : 0,
+        status: incomplete ? 'IN_PROGRESS' : (over ? 'COMPLETED' : 'COMPLETED'),
+        delayReason: over ? 'Hạng mục phát sinh ngoài barem' : ((d + k) % 9 === 0 ? 'Chờ phụ tùng nhập kho' : ''),
+        completed: !incomplete,
+      });
+    }
+  }
+  DB.repairHourDemo = demo;
+}
+
+function collectRepairHourLines() {
+  ensureRepairHoursSeed();
+  const lines = [];
+  (DB.orders || []).forEach(o => {
+    const v = vehicleById(o.vehicleId);
+    (o.workItems || []).forEach((w, i) => {
+      const barem = Number(w.baremHours) || lookupBaremHours(w.system, w.content, o.date) || 1;
+      const actual = w.hours != null ? Number(w.hours) : null;
+      const completed = w.status === 'COMPLETED' || (o.status === 'COMPLETED' && actual != null);
+      const date = (w.completedAt || w.startedAt || o.date || '').slice(0, 10);
+      if (!date) return;
+      const techName = w.assignee || w.performer || 'KTV';
+      const tech = REPAIR_HOUR_TECHS.find(t => t.name === techName) || { id: 'ktv-x', name: techName };
+      lines.push({
+        id: `${o.id}-wi-${i}`,
+        orderId: o.id,
+        orderCode: o.code,
+        date,
+        vehicleId: o.vehicleId,
+        plate: v?.plate || '—',
+        mooc: '',
+        garage: o.garage || '—',
+        technicianId: tech.id,
+        technicianName: tech.name,
+        system: w.system || o.system || '—',
+        content: w.content || o.content || '—',
+        baremHours: barem,
+        actualHours: actual,
+        overrunHours: actual != null ? Math.max(0, actual - barem) : 0,
+        waitingPartsHours: 0,
+        status: completed ? 'COMPLETED' : (w.status || o.status || 'IN_PROGRESS'),
+        delayReason: '',
+        completed,
+      });
+    });
+  });
+  return lines.concat(DB.repairHourDemo || []);
+}
+
+function filterRepairHourLines(opts) {
+  const { start, end, techId, status, search, day } = opts || {};
+  return collectRepairHourLines().filter(r => {
+    if (start && r.date < start) return false;
+    if (end && r.date > end) return false;
+    if (day && r.date !== day) return false;
+    if (techId && techId !== 'ALL' && r.technicianId !== techId && r.technicianName !== techId) return false;
+    if (status && status !== 'ALL') {
+      if (status === 'COMPLETED' && !r.completed) return false;
+      if (status === 'IN_PROGRESS' && r.completed) return false;
+    }
+    if (search && !matchSearch([r.orderCode, r.plate, r.mooc, r.content, r.technicianName].join(' '), search)) return false;
+    return true;
+  });
+}
+
+function monthBounds(ym) {
+  const [y, m] = (ym || todayDateKey().slice(0, 7)).split('-').map(Number);
+  const start = `${y}-${String(m).padStart(2, '0')}-01`;
+  const last = new Date(y, m, 0).getDate();
+  const end = `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`;
+  return { start, end, y, m, last };
+}
+
+function pageRepairHoursReport() {
+  ensureRepairHoursSeed();
+  const f = F();
+  const ym = f.rhMonth || todayDateKey().slice(0, 7);
+  const { start, end, last } = monthBounds(ym);
+  const techId = f.rhTech || 'ALL';
+  const status = f.rhStatus || 'ALL';
+  const tab = f.rhTab || 'heatmap';
+  const day = f.rhDay || '';
+  const lines = filterRepairHourLines({ start, end, techId, status, search: f.search });
+  const dayLines = day ? filterRepairHourLines({ start, end, techId, status, search: f.search, day }) : lines;
+  const kpiActual = lines.reduce((s, r) => s + (r.completed ? (r.actualHours || 0) : 0), 0);
+  const kpiOver = lines.reduce((s, r) => s + (r.completed ? (r.overrunHours || 0) : 0), 0);
+  const kpiTickets = new Set(lines.map(r => r.orderCode)).size;
+  const techs = REPAIR_HOUR_TECHS.filter(t => techId === 'ALL' || t.id === techId);
+  const dates = Array.from({ length: last }, (_, i) => `${ym}-${String(i + 1).padStart(2, '0')}`);
+
+  const cellMap = {};
+  lines.forEach(r => {
+    const key = r.technicianId + '|' + r.date;
+    if (!cellMap[key]) cellMap[key] = { actual: 0, barem: 0, allDone: true, n: 0 };
+    cellMap[key].n++;
+    cellMap[key].barem += r.baremHours || 0;
+    if (r.completed && r.actualHours != null) cellMap[key].actual += r.actualHours;
+    else cellMap[key].allDone = false;
+  });
+
+  const heatmap = `
+    <div class="mb-2 flex flex-wrap gap-3 text-[11px]">
+      <span class="inline-flex items-center gap-1"><i class="inline-block size-3 rounded border ${RH_TONE_CLASS.none}"></i>Không có DL</span>
+      <span class="inline-flex items-center gap-1"><i class="inline-block size-3 rounded border ${RH_TONE_CLASS.incomplete}"></i>Chưa hoàn thành</span>
+      <span class="inline-flex items-center gap-1"><i class="inline-block size-3 rounded border ${RH_TONE_CLASS.within}"></i>SC thực tế ≤ barem</span>
+      <span class="inline-flex items-center gap-1"><i class="inline-block size-3 rounded border ${RH_TONE_CLASS.over}"></i>SC thực tế &gt; barem</span>
+    </div>
+    <div class="card overflow-x-auto">
+      <table class="min-w-full text-[11px] border-collapse">
+        <thead><tr class="bg-slate-50">
+          <th class="border border-slate-200 px-2 py-1.5 text-left sticky left-0 bg-slate-50">KTV</th>
+          ${dates.map(d => `<th class="border border-slate-200 px-1 py-1.5 font-medium">${d.slice(8)}</th>`).join('')}
+        </tr></thead>
+        <tbody>
+          ${techs.map(t => `<tr>
+            <td class="border border-slate-200 px-2 py-1 text-left font-medium sticky left-0 bg-white">${esc(t.name)}</td>
+            ${dates.map(d => {
+              const c = cellMap[t.id + '|' + d];
+              if (!c) return `<td class="border border-slate-200 px-1 py-1 text-center ${RH_TONE_CLASS.none}">—</td>`;
+              const tone = toneRepairHours(c.actual, c.barem, c.allDone);
+              return `<td class="border border-slate-200 px-1 py-1 text-center cursor-pointer ${RH_TONE_CLASS[tone]}" data-rh-pick-day="${d}" data-rh-pick-tech="${t.id}" title="${esc(t.name)} · ${d}">${c.allDone ? hoursFmt(c.actual) : '…'}</td>`;
+            }).join('')}
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  const table = `
+    <div class="card overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600"><tr>
+          <th class="th text-left">Ngày</th><th class="th text-left">Mã phiếu</th><th class="th text-left">Số xe / Mooc</th>
+          <th class="th text-left">KTV</th><th class="th text-left">Hạng mục</th><th class="th text-left">Nội dung</th>
+          <th class="th text-right">Giờ barem</th><th class="th text-right">Giờ SC thực tế</th><th class="th text-right">Giờ vượt</th>
+          <th class="th text-right">Chờ VT</th><th class="th text-center">TT</th><th class="th text-left">Lý do chậm</th>
+        </tr></thead>
+        <tbody>
+          ${dayLines.map(r => `
+            <tr class="row-h ${r.orderId ? 'cursor-pointer' : ''}" ${r.orderId ? `data-open-order="${r.orderId}"` : ''}>
+              <td class="td whitespace-nowrap">${r.date}</td>
+              <td class="td font-medium text-blue-600">${esc(r.orderCode)}</td>
+              <td class="td">${esc(r.plate)}${r.mooc ? ` / ${esc(r.mooc)}` : ''}</td>
+              <td class="td">${esc(r.technicianName)}</td>
+              <td class="td">${esc(r.system)}</td>
+              <td class="td">${esc(r.content)}</td>
+              <td class="td text-right tabular-nums">${hoursFmt(r.baremHours)}</td>
+              <td class="td text-right tabular-nums font-semibold">${r.completed ? hoursFmt(r.actualHours) : '—'}</td>
+              <td class="td text-right tabular-nums ${r.overrunHours > 0 ? 'text-rose-700 font-semibold' : ''}">${r.completed ? hoursFmt(r.overrunHours) : '—'}</td>
+              <td class="td text-right tabular-nums">${r.waitingPartsHours ? hoursFmt(r.waitingPartsHours) : '—'}</td>
+              <td class="td text-center">${r.completed ? '<span class="chip bg-emerald-100 text-emerald-800">HT</span>' : '<span class="chip bg-amber-100 text-amber-900">Đang</span>'}</td>
+              <td class="td text-xs text-slate-600">${esc(r.delayReason || '—')}</td>
+            </tr>`).join('') || `<tr><td colspan="12" class="px-5 py-10 text-center text-slate-500">Không có dữ liệu trong bộ lọc</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+
   return pageShell(
-    'Lịch kỹ thuật viên',
-    'Theo tháng · màu trạng thái phiếu (chưa làm / đang làm / hoàn thành) · giống phân hệ Quản lý xe',
+    'Bảng tổng hợp giờ sửa chữa theo kỹ thuật viên',
+    'Heatmap KTV × ngày · đối chiếu giờ thực tế với barem · giống phân hệ Quản lý xe (/repair-hours-report)',
     '',
     `
-    <div class="mb-4 flex flex-wrap items-end gap-3">
-      <label class="text-sm">Tháng<input type="month" id="flt-ktvMonth" value="${esc(month)}" class="ml-2 rounded border px-2 py-1" /></label>
-      <label class="text-sm">KTV
-        <select id="flt-ktvTech" class="ml-2 rounded border px-2 py-1">
-          <option value="ALL">Tất cả</option>
-          ${techs.map(x => `<option value="${esc(x)}" ${tech === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}
+    <div class="mb-4 flex flex-wrap items-end gap-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+      <label class="text-xs text-slate-600">Tháng<input type="month" id="flt-rhMonth" value="${esc(ym)}" class="ml-1 rounded border px-2 py-1 text-sm" /></label>
+      <label class="text-xs text-slate-600">KTV
+        <select id="flt-rhTech" class="ml-1 rounded border px-2 py-1 text-sm">
+          <option value="ALL">Tất cả kỹ thuật viên</option>
+          ${REPAIR_HOUR_TECHS.map(t => `<option value="${t.id}" ${techId === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
         </select>
       </label>
-      <div class="flex flex-wrap gap-2 text-xs">
-        <span class="rounded border border-slate-300 bg-slate-100 px-2 py-0.5">Chưa làm</span>
-        <span class="rounded border border-amber-300 bg-amber-100 px-2 py-0.5">Đang làm</span>
-        <span class="rounded border border-emerald-300 bg-emerald-100 px-2 py-0.5">Hoàn thành</span>
-      </div>
+      <label class="text-xs text-slate-600">Trạng thái
+        <select id="flt-rhStatus" class="ml-1 rounded border px-2 py-1 text-sm">
+          <option value="ALL" ${status === 'ALL' ? 'selected' : ''}>Tất cả</option>
+          <option value="COMPLETED" ${status === 'COMPLETED' ? 'selected' : ''}>Hoàn thành</option>
+          <option value="IN_PROGRESS" ${status === 'IN_PROGRESS' ? 'selected' : ''}>Đang thực hiện</option>
+        </select>
+      </label>
+      ${filterSearch('flt-search', 'Mã phiếu, số xe, mooc…', f.search)}
+      ${day ? `<button type="button" id="btnRhClearDay" class="btn btn-outline btn-sm">Bỏ lọc ngày ${esc(day)}</button>` : ''}
     </div>
-    <div class="card p-4 grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-7">
-      ${cells.map(c => `
-        <div class="min-h-[88px] rounded-md border border-slate-200 bg-white p-2">
-          <div class="mb-1 text-xs font-semibold text-slate-500">${c.d}</div>
-          <div class="space-y-1">
-            ${c.items.slice(0, 4).map(o => `
-              <button data-open-order="${o.id}" class="block w-full truncate rounded border px-1.5 py-0.5 text-left text-[10px] ${color(o)}" title="${esc(o.code)} · ${esc(o.content || '')}">
-                ${label(o)} · ${esc(o.code)} · Lần ${o.occurrence || 1}
-              </button>`).join('') || '<span class="text-[10px] text-slate-300">—</span>'}
-            ${c.items.length > 4 ? `<div class="text-[10px] text-slate-400">+${c.items.length - 4}</div>` : ''}
-          </div>
-        </div>`).join('')}
-    </div>`
+    <div class="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div class="card p-4"><p class="text-xs text-slate-500">Tổng giờ SC thực tế</p><p class="mt-1 text-2xl font-bold tabular-nums">${hoursFmt(kpiActual)}</p></div>
+      <div class="card p-4"><p class="text-xs text-slate-500">Giờ vượt barem</p><p class="mt-1 text-2xl font-bold tabular-nums ${kpiOver > 0 ? 'text-rose-700' : ''}">${hoursFmt(kpiOver)}</p></div>
+      <div class="card p-4"><p class="text-xs text-slate-500">Tổng phiếu SC</p><p class="mt-1 text-2xl font-bold tabular-nums">${kpiTickets}</p></div>
+    </div>
+    <div class="mb-3 flex gap-1 border-b border-slate-200">
+      <button type="button" class="px-4 py-2 text-sm font-medium ${tab === 'heatmap' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-600'}" data-rh-tab="heatmap">Bảng giờ năng suất theo KTV</button>
+      <button type="button" class="px-4 py-2 text-sm font-medium ${tab === 'daily' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-600'}" data-rh-tab="daily">Bảng giờ năng suất theo ngày</button>
+    </div>
+    ${tab === 'heatmap' ? heatmap : table}`
   );
 }
+
+function pageTechnicianWorkHours() {
+  ensureRepairHoursSeed();
+  const f = F();
+  const ym = f.twMonth || todayDateKey().slice(0, 7);
+  const { start, end, y, m, last } = monthBounds(ym);
+  // Màn cá nhân: mặc định KTV đầu tiên (giống scope user đăng nhập)
+  const techId = f.twTech || 'ktv-01';
+  const tech = REPAIR_HOUR_TECHS.find(t => t.id === techId) || REPAIR_HOUR_TECHS[0];
+  const status = f.twStatus || 'ALL';
+  const tab = f.twTab || 'calendar';
+  const day = f.twDay || '';
+  const lines = filterRepairHourLines({ start, end, techId: tech.id, status, search: f.search });
+  const dayLines = filterRepairHourLines({ start, end, techId: tech.id, status, search: f.search, day: day || undefined });
+
+  let sumActual = 0, sumBarem = 0;
+  const byDay = {};
+  lines.forEach(r => {
+    if (!byDay[r.date]) byDay[r.date] = { actual: 0, barem: 0, allDone: true };
+    byDay[r.date].barem += r.baremHours || 0;
+    if (r.completed && r.actualHours != null) {
+      byDay[r.date].actual += r.actualHours;
+      sumActual += r.actualHours;
+      sumBarem += r.baremHours || 0;
+    } else byDay[r.date].allDone = false;
+  });
+  // barem for incomplete still counts toward planned? Fleet uses completed for actual compare
+  lines.forEach(r => { if (!r.completed) sumBarem += r.baremHours || 0; });
+
+  const firstDow = (new Date(y, m - 1, 1).getDay() + 6) % 7; // Mon=0
+  const cells = [];
+  for (let i = 0; i < firstDow; i++) cells.push(null);
+  for (let d = 1; d <= last; d++) cells.push(`${ym}-${String(d).padStart(2, '0')}`);
+  while (cells.length % 7) cells.push(null);
+
+  const calendar = `
+    <div class="mb-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm">
+      <strong>Tổng</strong> ${hoursFmt(sumActual)} thực tế / ${hoursFmt(sumBarem)} barem · vượt ${hoursFmt(Math.max(0, sumActual - sumBarem))}
+      <span class="ml-2 text-xs text-slate-500">Chạm một ngày để xem bảng chi tiết.</span>
+    </div>
+    <div class="mb-2 flex flex-wrap gap-3 text-[11px]">
+      <span class="inline-flex items-center gap-1"><i class="inline-block size-3 rounded border ${RH_TONE_CLASS.none}"></i>Không có DL</span>
+      <span class="inline-flex items-center gap-1"><i class="inline-block size-3 rounded border ${RH_TONE_CLASS.incomplete}"></i>Chưa hoàn thành</span>
+      <span class="inline-flex items-center gap-1"><i class="inline-block size-3 rounded border ${RH_TONE_CLASS.within}"></i>≤ barem</span>
+      <span class="inline-flex items-center gap-1"><i class="inline-block size-3 rounded border ${RH_TONE_CLASS.over}"></i>&gt; barem</span>
+    </div>
+    <div class="card p-3">
+      <div class="mb-2 grid grid-cols-7 gap-1 text-center text-[11px] font-semibold text-slate-500">
+        ${['T2','T3','T4','T5','T6','T7','CN'].map(x => `<div>${x}</div>`).join('')}
+      </div>
+      <div class="grid grid-cols-7 gap-1">
+        ${cells.map(d => {
+          if (!d) return '<div class="min-h-[72px]"></div>';
+          const c = byDay[d];
+          const tone = !c ? 'none' : toneRepairHours(c.actual, c.barem, c.allDone);
+          const dayNum = d.slice(8);
+          return `<button type="button" data-tw-day="${d}" class="min-h-[72px] rounded-md border p-1.5 text-left ${RH_TONE_CLASS[tone]} ${day === d ? 'ring-2 ring-blue-500' : ''}">
+            <div class="text-[11px] font-semibold">${dayNum}</div>
+            <div class="mt-1 text-[10px] tabular-nums">${c ? (c.allDone ? hoursFmt(c.actual) : '…') : '—'}</div>
+          </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  const table = `
+    <div class="card overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600"><tr>
+          <th class="th text-left">Ngày</th><th class="th text-left">Mã phiếu</th><th class="th text-left">Số xe / Mooc</th>
+          <th class="th text-left">Hạng mục</th><th class="th text-left">Nội dung</th>
+          <th class="th text-right">Giờ barem</th><th class="th text-right">Giờ SC thực tế</th><th class="th text-right">Giờ vượt</th>
+          <th class="th text-right">Chờ VT</th><th class="th text-center">TT</th><th class="th text-left">Lý do chậm</th>
+        </tr></thead>
+        <tbody>
+          ${(day ? dayLines : lines).map(r => `
+            <tr class="row-h ${r.orderId ? 'cursor-pointer' : ''}" ${r.orderId ? `data-open-order="${r.orderId}"` : ''}>
+              <td class="td whitespace-nowrap">${r.date}</td>
+              <td class="td font-medium text-blue-600">${esc(r.orderCode)}</td>
+              <td class="td">${esc(r.plate)}${r.mooc ? ` / ${esc(r.mooc)}` : ''}</td>
+              <td class="td">${esc(r.system)}</td>
+              <td class="td">${esc(r.content)}</td>
+              <td class="td text-right tabular-nums">${hoursFmt(r.baremHours)}</td>
+              <td class="td text-right tabular-nums font-semibold">${r.completed ? hoursFmt(r.actualHours) : '—'}</td>
+              <td class="td text-right tabular-nums ${r.overrunHours > 0 ? 'text-rose-700 font-semibold' : ''}">${r.completed ? hoursFmt(r.overrunHours) : '—'}</td>
+              <td class="td text-right tabular-nums">${r.waitingPartsHours ? hoursFmt(r.waitingPartsHours) : '—'}</td>
+              <td class="td text-center">${r.completed ? '<span class="chip bg-emerald-100 text-emerald-800">HT</span>' : '<span class="chip bg-amber-100 text-amber-900">Đang</span>'}</td>
+              <td class="td text-xs">${esc(r.delayReason || '—')}</td>
+            </tr>`).join('') || `<tr><td colspan="11" class="px-5 py-10 text-center text-slate-500">Không có dữ liệu</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+
+  return pageShell(
+    'Bảng giờ sửa chữa Kỹ Thuật Viên',
+    'Lịch giờ sửa chữa tháng (màu theo barem) + bảng theo ngày · giống phân hệ (/technician-work-hours)',
+    '',
+    `
+    <div class="mb-4 flex flex-wrap items-end gap-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+      <label class="text-xs text-slate-600">Tháng<input type="month" id="flt-twMonth" value="${esc(ym)}" class="ml-1 rounded border px-2 py-1 text-sm" /></label>
+      <label class="text-xs text-slate-600">KTV (demo đăng nhập)
+        <select id="flt-twTech" class="ml-1 rounded border px-2 py-1 text-sm">
+          ${REPAIR_HOUR_TECHS.map(t => `<option value="${t.id}" ${tech.id === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
+        </select>
+      </label>
+      <label class="text-xs text-slate-600">Trạng thái
+        <select id="flt-twStatus" class="ml-1 rounded border px-2 py-1 text-sm">
+          <option value="ALL" ${status === 'ALL' ? 'selected' : ''}>Tất cả</option>
+          <option value="COMPLETED" ${status === 'COMPLETED' ? 'selected' : ''}>Hoàn thành</option>
+          <option value="IN_PROGRESS" ${status === 'IN_PROGRESS' ? 'selected' : ''}>Đang thực hiện</option>
+        </select>
+      </label>
+      ${filterSearch('flt-search', 'Mã phiếu, số xe…', f.search)}
+      ${day ? `<button type="button" id="btnTwClearDay" class="btn btn-outline btn-sm">Bỏ lọc ngày ${esc(day)}</button>` : ''}
+    </div>
+    <div class="mb-3 flex gap-1 border-b border-slate-200">
+      <button type="button" class="px-4 py-2 text-sm font-medium ${tab === 'calendar' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-600'}" data-tw-tab="calendar">Lịch giờ sửa chữa tháng</button>
+      <button type="button" class="px-4 py-2 text-sm font-medium ${tab === 'daily' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-600'}" data-tw-tab="daily">Bảng giờ sửa chữa theo ngày</button>
+    </div>
+    ${tab === 'calendar' ? calendar : table}`
+  );
+}
+
 
 /* ----- VỎ LỐP / ẮC QUY (hiển thị từ bản đồng bộ PWMS) ----- */
 function pageTireBattery() {
@@ -11044,8 +11418,8 @@ function pageBaremHoursMaster() {
   const pg = paginate(filtered);
   const sysOpts = [['ALL', 'Tất cả'], ...activeVehicleSystems().map(s => [s.id, s.name])];
   return pageShell(
-    'Barem giờ công',
-    'Cấu hình giờ định mức theo hệ thống + nội dung thực hiện · có thời gian áp dụng (từ ngày → đến ngày). Khi lập phiếu lấy dòng đang hiệu lực hôm nay.',
+    'Cài đặt giờ sửa chữa KTV',
+    'Quản lý catalog barem giờ công theo hạng mục hệ thống · có thời gian áp dụng (từ → đến). Khi lập phiếu / báo cáo giờ lấy dòng đang hiệu lực.',
     `<button id="btnAddBarem" class="btn btn-primary">+ Dòng barem</button>`,
     `
     <div class="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700 leading-relaxed">
@@ -14029,9 +14403,13 @@ function bindFilters() {
     'flt-mapStatus': 'mapStatus',
     'flt-dateFrom': 'dateFrom',
     'flt-dateTo': 'dateTo',
-    'flt-ktvMonth': 'ktvMonth',
-    'flt-ktvTech': 'ktvTech',
     'flt-tbKind': 'tbKind',
+    'flt-rhMonth': 'rhMonth',
+    'flt-rhTech': 'rhTech',
+    'flt-rhStatus': 'rhStatus',
+    'flt-twMonth': 'twMonth',
+    'flt-twTech': 'twTech',
+    'flt-twStatus': 'twStatus',
   };
   Object.entries(map).forEach(([id, key]) => {
     const el = document.getElementById(id);
@@ -14673,6 +15051,35 @@ render();
       if (typeof enrichAllMaterials === 'function') enrichAllMaterials(true);
       toast('Đã làm mới danh mục VT PWMS');
     }
+  });
+})();
+</script>
+
+
+<script>
+(function(){
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if (!t) return;
+    var tab = t.getAttribute && t.getAttribute('data-rh-tab');
+    if (tab) { view.filters.rhTab = tab; render(); return; }
+    var twTab = t.getAttribute && t.getAttribute('data-tw-tab');
+    if (twTab) { view.filters.twTab = twTab; render(); return; }
+    var pickDay = t.closest && t.closest('[data-rh-pick-day]');
+    if (pickDay) {
+      view.filters.rhDay = pickDay.getAttribute('data-rh-pick-day');
+      view.filters.rhTech = pickDay.getAttribute('data-rh-pick-tech') || view.filters.rhTech;
+      view.filters.rhTab = 'daily';
+      render(); return;
+    }
+    var twDay = t.closest && t.closest('[data-tw-day]');
+    if (twDay) {
+      view.filters.twDay = twDay.getAttribute('data-tw-day');
+      view.filters.twTab = 'daily';
+      render(); return;
+    }
+    if (t.id === 'btnRhClearDay') { view.filters.rhDay = ''; render(); }
+    if (t.id === 'btnTwClearDay') { view.filters.twDay = ''; render(); }
   });
 })();
 </script>
