@@ -567,9 +567,9 @@ function renderEval(){
       ${!S.periodExempt?`
       <div class="surface p-3 mb-3 border-blue-200 bg-blue-50/50 space-y-2">
         <p class="text-sm font-semibold m-0">Sau khi nộp (có SC / Thay)</p>
-        <p class="text-[11px] text-slate-600 m-0 leading-relaxed">Đánh giá → <strong>dòng kế hoạch</strong> → tạo phiếu thực tế. Tuỳ chọn tạo SC nháp ngay.</p>
-        <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="eCreatePlan" class="mt-0.5 size-4 accent-blue-600" ${S.createPlan?'checked':''}/><span><strong>Tạo dòng kế hoạch</strong> từ SC / Thay</span></label>
-        <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="eCreateSc" class="mt-0.5 size-4 accent-blue-600" ${S.createSc?'checked':''} ${bad.length?'':'disabled'}/><span><strong>Tạo phiếu SC nháp ngay</strong></span></label>
+        <p class="text-[11px] text-slate-600 m-0 leading-relaxed">Chọn <strong>một</strong> hướng: kế hoạch tháng <em>hoặc</em> phiếu SC nháp ngay — không chọn cả hai.</p>
+        <label class="flex items-start gap-2 text-sm"><input type="radio" name="postEvalAction" id="eCreatePlan" value="plan" class="mt-0.5 size-4 accent-blue-600" ${S.createPlan?'checked':''}/><span><strong>Tạo dòng kế hoạch</strong> từ SC / Thay</span></label>
+        <label class="flex items-start gap-2 text-sm"><input type="radio" name="postEvalAction" id="eCreateSc" value="sc" class="mt-0.5 size-4 accent-blue-600" ${S.createSc?'checked':''} ${bad.length?'':'disabled'}/><span><strong>Tạo phiếu SC nháp ngay</strong> (không qua kế hoạch)</span></label>
       </div>`:''}`;
     $('#evalFooter').style.gridTemplateColumns='1fr 1fr 1fr';
     $('#evalFooter').innerHTML=`<button type="button" class="btn btn-outline btn-touch" id="evalPrev">Trước</button><button type="button" class="btn btn-outline btn-touch" id="evalDraft">Nháp</button><button type="button" class="btn btn-primary btn-touch" id="evalSubmit">Nộp</button>`;
@@ -609,13 +609,13 @@ function renderEval(){
       }
       if(S.createSc){
         orderCode='RO-2026-'+(1100+Math.floor(Math.random()*800));
-        ORDERS.unshift({id:'o'+Date.now().toString(36),vehicleId:v.id,code:orderCode,type:'INCIDENTAL',occ:ordersOf(v.id).filter(o=>o.type==='INCIDENTAL').length+1,date:'2026-09-30',km:v.km,garage:v.garage,source:'Đánh giá định kỳ',status:'NOT_STARTED',approval:'DRAFT',content:'SC từ đánh giá ('+badEntries.length+' hạng mục)',cost:0,system:'Từ đánh giá',mh:'NA',base:{status:'NONE',code:null,baseStatus:null},mats:[],log:[{at:'Vừa xong',text:'Tạo từ đánh giá'+(nPlan?' · kèm '+nPlan+' dòng KH':'')}]});
+        ORDERS.unshift({id:'o'+Date.now().toString(36),vehicleId:v.id,code:orderCode,type:'INCIDENTAL',occ:ordersOf(v.id).filter(o=>o.type==='INCIDENTAL').length+1,date:'2026-09-30',km:v.km,garage:v.garage,source:'Đánh giá định kỳ',status:'NOT_STARTED',approval:'DRAFT',content:'SC từ đánh giá ('+badEntries.length+' hạng mục)',cost:0,system:'Từ đánh giá',mh:'NA',base:{status:'NONE',code:null,baseStatus:null},mats:[],log:[{at:'Vừa xong',text:'Tạo từ đánh giá · không qua kế hoạch'}]});
       }
     }
     if(v) v.eval='ok';
     S.evalStep=1;S.rows={};ensureRows();
     if(nPlan){
-      toast('Đã nộp · tạo '+nPlan+' dòng kế hoạch'+(orderCode?' + phiếu '+orderCode:''));
+      toast('Đã nộp · tạo '+nPlan+' dòng kế hoạch');
       S.vehicleTab='plan';
     } else if(orderCode){
       toast('Đã nộp · tạo phiếu '+orderCode);
@@ -629,8 +629,9 @@ function renderEval(){
 }
 function saveConc(){
   if($('#cRep'))S.conclusion={replacement:$('#cRep').value,mechanicRemedies:$('#cMech').value,driverRemedies:$('#cDrv').value,driverOpinion:$('#cOp').value};
-  if($('#eCreatePlan'))S.createPlan=$('#eCreatePlan').checked;
-  if($('#eCreateSc'))S.createSc=$('#eCreateSc').checked;
+  const act=document.querySelector('input[name="postEvalAction"]:checked')?.value || (S.createSc?'sc':'plan');
+  S.createPlan=act==='plan';
+  S.createSc=act==='sc';
 }
 
 function renderCheckItem(it){
