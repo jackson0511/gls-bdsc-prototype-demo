@@ -71,7 +71,18 @@
     .chip button{border:0;background:transparent;color:#64748b;font-size:14px;padding:0 2px}
     .pick{max-height:160px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:.375rem;background:#fff;margin-top:6px}
     .pick button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #f1f5f9;background:#fff;padding:10px 12px;font-size:13px;font-family:inherit}
-    .ac-wrap{position:relative}
+    .ac-wrap{position:relative;display:block;width:100%}
+    .ac-wrap>input{
+      display:block;width:100%;min-height:40px;box-sizing:border-box;
+      border:1px solid #cbd5e1;border-radius:.375rem;padding:8px 12px;
+      font-size:16px;line-height:1.25;background:#fff;font-family:inherit;color:#0f172a;
+      -webkit-appearance:none;appearance:none;
+    }
+    .ac-wrap>input[type=search]::-webkit-search-decoration,
+    .ac-wrap>input[type=search]::-webkit-search-cancel-button,
+    .ac-wrap>input[type=search]::-webkit-search-results-button{display:none}
+    .ac-wrap>input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.25)}
+    .ac-wrap>input::placeholder{color:#94a3b8;opacity:1}
     .ac-dropdown{position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:40;max-height:220px;overflow:auto;background:#fff;border:1px solid #e2e8f0;border-radius:.5rem;box-shadow:0 10px 24px rgba(15,23,42,.12)}
     .ac-dropdown.hidden{display:none}
     .ac-opt{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #f1f5f9;background:#fff;padding:10px 12px;font-size:13px;font-family:inherit;color:#0f172a}
