@@ -54,6 +54,8 @@
       overflow: auto; min-height: 220px; padding: 12px; -webkit-overflow-scrolling: touch;
     }
     .diagram .mermaid { display: flex; justify-content: center; }
+    .diagram foreignObject { overflow: visible !important; }
+    .diagram .nodeLabel, .diagram .nodeLabel p { overflow: visible !important; white-space: normal !important; }
     .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--mute); margin: 8px 0 12px; }
     .lg { display: inline-flex; align-items: center; gap: 6px; }
     .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
@@ -214,6 +216,13 @@
       <h2>4. Luồng tích hợp</h2>
       <p class="lead">On-demand theo prototype; production có thể thêm cron reconcile theo <code>orderCode</code>.</p>
       <div class="card"><div class="diagram" id="intFlow"></div></div>
+      <div class="call ok" style="margin-top:12px">
+        <b>Tên trường kỹ thuật (đối chiếu)</b>
+        Thời điểm yêu cầu vật tư → <code>materialRequestedAt</code>;
+        vật tư sẵn sàng → <code>materialReadyAt</code>;
+        sửa xong → <code>repairCompletedAt</code>;
+        ảnh chụp mua hàng → <code>purchaseMaterials</code>.
+      </div>
       <div class="grid2" style="margin-top:12px">
         <div class="call ok">
           <b>Timeline event-driven</b>
@@ -538,9 +547,17 @@
       theme: 'base',
       securityLevel: 'loose',
       er: { useMaxWidth: false },
+      flowchart: {
+        htmlLabels: true,
+        useMaxWidth: true,
+        wrappingWidth: 320,
+        padding: 14,
+        nodeSpacing: 36,
+        rankSpacing: 48,
+      },
       themeVariables: {
         fontFamily: 'Be Vietnam Pro, system-ui, sans-serif',
-        fontSize: '13px',
+        fontSize: '14px',
         primaryColor: '#ecfdf5',
         primaryTextColor: '#12151a',
         primaryBorderColor: '#0b6e4f',
@@ -550,7 +567,17 @@
 
     async function put(id, src) {
       const { svg } = await mermaid.render(id + '_svg_' + Date.now(), src);
-      document.getElementById(id).innerHTML = svg;
+      const el = document.getElementById(id);
+      el.innerHTML = svg;
+      el.querySelectorAll('foreignObject').forEach(fo => {
+        fo.setAttribute('overflow', 'visible');
+        const w = Number(fo.getAttribute('width') || 0);
+        if (w > 0 && w < 220) fo.setAttribute('width', String(Math.max(w + 48, 240)));
+      });
+      el.querySelectorAll('.nodeLabel, .nodeLabel p, .labelBkg').forEach(n => {
+        n.style.overflow = 'visible';
+        n.style.whiteSpace = 'normal';
+      });
     }
 
     function parentsOf(id) {
@@ -659,26 +686,26 @@
 
     (async () => {
       await put('flow', `flowchart LR
-  subgraph QLX[Quản lý xe]
-    CAT[Catalog / Criteria / Barem]
-    PLAN[PlanTemplate / MaintenancePlan]
-    ORD[MaintenanceOrder]
-    MAT[materials + purchaseMaterials]
+  subgraph QLX["Quản lý xe"]
+    CAT["Danh mục chu kỳ<br/>tiêu chí · barem"]
+    PLAN["Mẫu kế hoạch<br/>kế hoạch tháng"]
+    ORD["Phiếu bảo dưỡng<br/>/ sửa chữa"]
+    MAT["Vật tư dự kiến<br/>+ vật tư mua hàng"]
   end
-  subgraph PWMS[PWMS]
-    PRD[Product / Stock]
-    OBJ[Object ID]
-    DOC[Issue / External docs]
+  subgraph PWMS["Kho PWMS"]
+    PRD["Sản phẩm / tồn kho"]
+    OBJ["Object ID xe"]
+    DOC["Chứng từ xuất<br/>hoặc mua ngoài"]
   end
-  subgraph BASE[BASE TMS]
-    BS[Duyệt phiếu]
+  subgraph BASE["BASE TMS"]
+    BS["Duyệt phiếu BASE"]
   end
   CAT --> PLAN --> ORD --> MAT
-  PRD -.lookup.-> MAT
-  OBJ --> MAP[pwmsVehicleMaps] --> ORD
-  ORD -->|send / sync| DOC
-  DOC -->|snapshot| MAT
-  ORD <-->|baseSync| BS
+  PRD -.tra cứu.-> MAT
+  OBJ --> MAP["Ánh xạ xe TMS↔PWMS"] --> ORD
+  ORD -->|gửi / đồng bộ| DOC
+  DOC -->|ảnh chụp| MAT
+  ORD <-->|đồng bộ duyệt| BS
   classDef a fill:#d1fae5,stroke:#0b6e4f
   classDef b fill:#cffafe,stroke:#0e7490
   classDef c fill:#fee2e2,stroke:#b91c1c
@@ -687,15 +714,15 @@
   class BS c`);
 
       await put('intFlow', `flowchart TD
-  A[Order APPROVED] --> B[Send to Purchase<br/>+ Object ID]
-  A --> C[Sync BASE]
-  B --> D[materialRequestedAt = min]
+  A["Phiếu đã được duyệt"] --> B["Gửi mua hàng<br/>kèm Object ID xe"]
+  A --> C["Đồng bộ duyệt BASE"]
+  B --> D["Thời điểm yêu cầu vật tư<br/>= thời điểm sớm nhất"]
   C --> D
-  B --> E[PWMS xuất / mua ngoài<br/>theo orderCode]
-  E --> F[Sync Purchase on-demand]
-  F --> G[purchaseMaterials snapshot]
-  G --> H[materialReadyAt = max issuedAt]
-  H --> I[Complete → repairCompletedAt]`);
+  B --> E["PWMS xuất kho hoặc mua ngoài<br/>theo mã phiếu"]
+  E --> F["Đồng bộ mua hàng khi cần"]
+  F --> G["Ảnh chụp vật tư mua hàng<br/>lưu trên phiếu"]
+  G --> H["Thời điểm vật tư sẵn sàng<br/>= ngày cấp muộn nhất"]
+  H --> I["Hoàn thành phiếu<br/>→ ghi thời điểm sửa xong"]`);
 
       buildDict();
       await renderErd('core');
