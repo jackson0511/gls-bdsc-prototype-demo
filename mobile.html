@@ -738,8 +738,35 @@ function startWorkItemMobile(o,idx){
     }
   }
   pushLog(o,'WI_START','Bắt đầu hạng mục #'+(idx+1)+' · '+w.content+' · '+fmtStampVi(at));
+  closeOrderSheet();
   toast('Đã bắt đầu hạng mục · '+fmtStampVi(at));
   renderOrder();
+}
+function openStartWorkItemSheet(o,idx){
+  if(!canCompleteWorkItems(o))return;
+  ensureOrderWorkItems(o);
+  const w=o.workItems[idx];
+  if(!w||w.completedAt||w.startedAt)return;
+  const barem=w.standardHours!=null?w.standardHours:baremHoursForContent(w.content);
+  const startAt=nowStampMobile();
+  openOrderSheet(`
+    <h2>Xác nhận bắt đầu hạng mục</h2>
+    <p class="sub">${esc(o.code)} · ${esc(w.content)}</p>
+    <div class="grid grid-cols-2 gap-2 text-sm mb-3">
+      <div class="surface p-2"><div class="text-[11px] text-slate-500">Thời điểm bắt đầu</div><div class="font-medium tabular-nums">${fmtStampVi(startAt)}</div></div>
+      <div class="surface p-2"><div class="text-[11px] text-slate-500">Giờ barem</div><div class="font-medium">${barem!=null?Number(barem).toFixed(1)+' h':'—'}</div></div>
+      <div class="surface p-2 col-span-2"><div class="text-[11px] text-slate-500">Người thực hiện</div><div class="font-medium">${esc(w.performer||'—')}</div></div>
+    </div>
+    <div class="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950 mb-3">
+      Đồng hồ giờ TT bắt đầu chạy từ lúc xác nhận. Khi HT, giờ TT = bắt đầu → hoàn thành (không nhập tay).
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <button type="button" class="btn btn-outline btn-touch" id="wiStartCancel">Hủy</button>
+      <button type="button" class="btn btn-primary btn-touch !bg-sky-600 !border-sky-600" id="wiStartConfirm">Xác nhận bắt đầu</button>
+    </div>`);
+  $('#wiStartCancel').onclick=closeOrderSheet;
+  $('#orderSheetBg').onclick=e=>{if(e.target===$('#orderSheetBg'))closeOrderSheet()};
+  $('#wiStartConfirm').onclick=()=>startWorkItemMobile(o,idx);
 }
 function completeWorkItemMobile(o,idx){
   if(!canCompleteWorkItems(o))return;
@@ -1154,7 +1181,7 @@ function bindOrderDetailActions(o){
     pushLog(o,'START','Bắt đầu thực hiện trên xưởng');
     toast('Đã bắt đầu');renderOrder();
   });
-  $$('[data-start-wi]').forEach(b=>b.addEventListener('click',()=>startWorkItemMobile(o,+b.dataset.startWi)));
+  $$('[data-start-wi]').forEach(b=>b.addEventListener('click',()=>openStartWorkItemSheet(o,+b.dataset.startWi)));
   $$('[data-complete-wi]').forEach(b=>b.addEventListener('click',()=>openCompleteWorkItemSheet(o,+b.dataset.completeWi)));
   $('#btnSendPurchase')?.addEventListener('click',()=>{
     if(o.purchaseSend?.status==='SENDING')return;

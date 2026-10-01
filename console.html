@@ -12773,8 +12773,41 @@ function startWorkItem(orderId, idx) {
     at, action: 'WI_START', by: 'Nguyễn Văn Kỹ thuật',
     note: `Bắt đầu hạng mục: ${w.content} · ${fmtStampVi(at)}`,
   });
+  closeModal();
   toast('Đã bắt đầu hạng mục · ' + fmtStampVi(at));
   render();
+}
+
+function openStartWorkItemModal(orderId, idx) {
+  const o = DB.orders.find(x => x.id === orderId);
+  if (!o || !canCompleteWorkItems(o)) return;
+  ensureOrderApproval(o);
+  const w = o.workItems[idx];
+  if (!w || w.completedAt || w.startedAt) return;
+  const barem = w.standardHours != null ? w.standardHours
+    : (w.systemId && w.content ? resolveBaremHours(w.systemId, w.content) : null);
+  const startAt = nowStamp();
+  openModal(`
+    <div class="border-b border-slate-200 px-5 py-4">
+      <h2 class="text-lg font-bold">Xác nhận bắt đầu hạng mục</h2>
+      <p class="text-sm text-slate-500">${esc(o.code)} · ${esc(w.content)}</p>
+    </div>
+    <div class="space-y-3 px-5 py-4">
+      <dl class="grid gap-2 text-sm sm:grid-cols-2">
+        <div><dt class="text-xs text-slate-500">Thời điểm bắt đầu</dt><dd class="font-medium tabular-nums">${fmtStampVi(startAt)}</dd></div>
+        <div><dt class="text-xs text-slate-500">Giờ barem</dt><dd class="font-medium">${barem != null ? Number(barem).toFixed(1) + ' h' : '—'}</dd></div>
+        <div class="sm:col-span-2"><dt class="text-xs text-slate-500">Người thực hiện</dt><dd class="font-medium">${esc(w.performer || '—')}</dd></div>
+      </dl>
+      <div class="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">
+        Đồng hồ giờ công thực tế bắt đầu chạy từ lúc xác nhận. Khi hoàn thành, giờ TT = bắt đầu → hoàn thành (không nhập tay).
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" data-close class="btn btn-outline">Hủy</button>
+        <button type="button" id="wiStartConfirm" class="btn btn-primary !bg-sky-600 !border-sky-600 hover:!bg-sky-700">Xác nhận bắt đầu</button>
+      </div>
+    </div>`, 'max-w-md');
+  $('[data-close]').onclick = closeModal;
+  $('#wiStartConfirm').onclick = () => startWorkItem(orderId, idx);
 }
 
 function completeWorkItem(orderId, idx) {
@@ -13933,7 +13966,7 @@ function bind() {
   $$('[data-start-work-item]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();
     const [oid, idx] = b.dataset.startWorkItem.split(':');
-    startWorkItem(oid, Number(idx));
+    openStartWorkItemModal(oid, Number(idx));
   });
   $$('[data-complete-work-item]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();
