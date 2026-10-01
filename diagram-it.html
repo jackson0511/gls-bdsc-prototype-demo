@@ -168,7 +168,7 @@
       <div class="call ok">
         <b>Bốn tình huống sync cần hỗ trợ trên mọi API đọc</b>
         (1) Đồng bộ tất cả · (2) Đồng bộ chỉ định (bảng / mã phiếu / mã phiếu kho) ·
-        (3) Đồng bộ theo khoảng <code>updated_from</code> → <code>updated_to</code> (incremental sau lần chạy đầu) ·
+        (3) Đồng bộ theo khoảng <code>updated_from</code> → <code>updated_to</code> (đồng bộ theo khoảng sau lần chạy đầu) ·
         (4) Chỉ bản đang áp dụng (<code>active_only=true</code> / <code>ap_dung</code>) hoặc lấy cả ngưng dùng.
       </div>
     </section>
@@ -186,7 +186,7 @@
           <table>
             <thead><tr><th>Tham số</th><th>Ý nghĩa</th></tr></thead>
             <tbody>
-              <tr><td><code>mode</code></td><td><code>ALL</code> | <code>INCREMENTAL</code> | <code>BY_KEY</code></td></tr>
+              <tr><td><code>mode</code></td><td><code>ALL</code> | <code>RANGE</code> | <code>BY_KEY</code></td></tr>
               <tr><td><code>updated_from</code> / <code>updated_to</code></td><td>ISO-8601 · lọc <code>ngay_cap_nhat</code> / thời gian chứng từ</td></tr>
               <tr><td><code>active_only</code></td><td><code>true</code> = chỉ <code>ap_dung=true</code> · <code>false</code> = tất cả</td></tr>
               <tr><td><code>page</code> / <code>page_size</code></td><td>Phân trang (mặc định 200, tối đa 1000)</td></tr>
@@ -197,8 +197,8 @@
       </div>
       <div class="call sky">
         <b>Gợi ý vận hành</b>
-        Lần đầu: <code>mode=ALL</code> (có thể tách theo bảng). Các lần sau: <code>mode=INCREMENTAL</code> với
-        <code>updated_from = watermark</code> lần sync trước trên TMS. Phiếu MH: ưu tiên <code>BY_KEY</code> theo mã phiếu TMS khi người dùng bấm «Đồng bộ mua hàng».
+        Lần đầu: <code>mode=ALL</code> (có thể tách theo bảng). Các lần sau: <code>mode=RANGE</code> với
+        <code>updated_from = last_synced_at (mốc đồng bộ lần trước)</code> lần sync trước trên TMS. Phiếu MH: ưu tiên <code>BY_KEY</code> theo mã phiếu TMS khi người dùng bấm «Đồng bộ mua hàng».
       </div>
     </section>
 
@@ -222,7 +222,7 @@
         <ul class="modes">
           <li><b>ALL</b> — toàn bộ bản ghi (một hoặc nhiều bảng)</li>
           <li><b>BY_KEY</b> — chỉ định bảng + danh sách id / mã</li>
-          <li><b>INCREMENTAL</b> — theo <code>ngay_cap_nhat</code> trong khoảng</li>
+          <li><b>RANGE</b> — theo <code>ngay_cap_nhat</code> trong khoảng</li>
           <li><b>active_only</b> — chỉ bản đang áp dụng</li>
         </ul>
       </div>
@@ -252,9 +252,9 @@
   "page_size": 200
 }</pre>
 
-      <h3>Request — incremental theo ngày cập nhật</h3>
+      <h3>Request — theo khoảng ngày cập nhật (RANGE)</h3>
       <pre class="payload">{
-  "mode": "INCREMENTAL",
+  "mode": "RANGE",
   "tables": ["Supplier", "Product", "Storage_Type"],
   "updated_from": "2026-09-01T00:00:00+07:00",
   "updated_to": "2026-10-01T23:59:59+07:00",
@@ -276,8 +276,8 @@
       <h3>Response sample</h3>
       <pre class="payload">{
   "request_id": "mst-20261001-001",
-  "mode": "INCREMENTAL",
-  "watermark": "2026-10-01T23:59:59+07:00",
+  "mode": "RANGE",
+  "last_synced_at": "2026-10-01T23:59:59+07:00",
   "tables": {
     "Supplier": {
       "total": 2,
@@ -343,7 +343,7 @@
         </div>
       </div>
 
-      <h3>Request — theo mã phiếu TMS (on-demand)</h3>
+      <h3>Request — theo mã phiếu TMS (khi cần)</h3>
       <pre class="payload">{
   "mode": "BY_KEY",
   "order_codes": ["RO-2026-1002", "RO-2026-3388"],
@@ -351,9 +351,9 @@
   "active_only": false
 }</pre>
 
-      <h3>Request — incremental theo khoảng thời gian (sau lần đầu)</h3>
+      <h3>Request — theo khoảng thời gian (sau lần đầu)</h3>
       <pre class="payload">{
-  "mode": "INCREMENTAL",
+  "mode": "RANGE",
   "updated_from": "2026-09-28T00:00:00+07:00",
   "updated_to": "2026-10-01T18:00:00+07:00",
   "include": ["header", "lines"],
@@ -361,7 +361,7 @@
   "page_size": 100
 }</pre>
 
-      <h3>Request — get all (bootstrap)</h3>
+      <h3>Request — lấy toàn bộ (lần đồng bộ đầu)</h3>
       <pre class="payload">{
   "mode": "ALL",
   "include": ["header", "lines"],
@@ -409,7 +409,7 @@
       <div class="call ok">
         <b>Khuyến nghị TMS</b>
         Nút «Đồng bộ mua hàng» trên chi tiết phiếu gọi <code>BY_KEY</code> với đúng <code>order_codes=[phiếu.code]</code>.
-        Job nền đêm gọi <code>INCREMENTAL</code> để bắt phiếu MH nhập muộn mà KTV chưa bấm sync.
+        Job nền đêm gọi <code>RANGE</code> để bắt phiếu MH nhập muộn mà KTV chưa bấm sync.
       </div>
     </section>
 
@@ -421,7 +421,7 @@
       </p>
       <div class="card">
         <div><span class="method post">POST</span><span class="ep">/api/v1/orders/send</span></div>
-        <p class="lead" style="margin:8px 0 0">Idempotent theo <code>order_code</code> · gửi lại = cập nhật draft phía PWMS nếu chưa chốt.</p>
+        <p class="lead" style="margin:8px 0 0">Gọi lại an toàn theo <code>order_code</code> · gửi lại = cập nhật bản nháp phía PWMS nếu chưa chốt.</p>
       </div>
 
       <h3>Request sample</h3>
@@ -472,7 +472,7 @@
     ]
   },
   "options": {
-    "upsert": true,
+    "create_or_update": true,
     "notify_purchase_team": true
   }
 }</pre>
@@ -503,9 +503,9 @@
         </div>
       </div>
 
-      <h3>Request — incremental (sau bootstrap)</h3>
+      <h3>Request — theo khoảng (sau lần đồng bộ đầu)</h3>
       <pre class="payload">{
-  "mode": "INCREMENTAL",
+  "mode": "RANGE",
   "entities": ["Storage_Transaction", "Storage_Card"],
   "updated_from": "2026-09-20T00:00:00+07:00",
   "updated_to": "2026-10-01T23:59:59+07:00",
@@ -538,8 +538,8 @@
       <h3>Response sample</h3>
       <pre class="payload">{
   "request_id": "stg-20261001-008",
-  "mode": "INCREMENTAL",
-  "watermark": "2026-10-01T23:59:59+07:00",
+  "mode": "RANGE",
+  "last_synced_at": "2026-10-01T23:59:59+07:00",
   "Storage_Card": {
     "total": 1,
     "rows": [
@@ -586,12 +586,12 @@
       <p class="lead">Query / đồng bộ phiếu cấp dầu nội bộ từ bảng <code>Fuel_Card</code>.</p>
       <div class="card">
         <div><span class="method post">POST</span><span class="ep">/api/v1/fuel/sync</span></div>
-        <p class="lead" style="margin:8px 0 0">Tuỳ chọn GET: <code>GET /api/v1/fuel/cards?mode=INCREMENTAL&amp;updated_from=…</code></p>
+        <p class="lead" style="margin:8px 0 0">Tuỳ chọn GET: <code>GET /api/v1/fuel/cards?mode=RANGE&amp;updated_from=…</code></p>
       </div>
 
-      <h3>Request — incremental</h3>
+      <h3>Request — theo khoảng thời gian</h3>
       <pre class="payload">{
-  "mode": "INCREMENTAL",
+  "mode": "RANGE",
   "updated_from": "2026-09-01T00:00:00+07:00",
   "updated_to": "2026-10-01T23:59:59+07:00",
   "filters": {
@@ -643,12 +643,12 @@
       <div class="card"><div class="diagram" id="flow"></div></div>
       <div class="grid2" style="margin-top:12px">
         <div class="call ok">
-          <b>Bootstrap</b>
-          Master ALL → Storage ALL (tuỳ chọn) → Fuel ALL (tuỳ chọn) → lưu watermark trên TMS.
+          <b>Lần đồng bộ đầu</b>
+          Master ALL → Storage ALL (tuỳ chọn) → Fuel ALL (tuỳ chọn) → lưu mốc đồng bộ <code>last_synced_at</code> trên TMS.
         </div>
         <div class="call">
-          <b>Hàng ngày / on-demand</b>
-          Master INCREMENTAL · Storage INCREMENTAL · Fuel INCREMENTAL ·
+          <b>Hàng ngày / khi cần</b>
+          Master RANGE · Storage RANGE · Fuel RANGE ·
           Send order khi duyệt · Purchase BY_KEY khi KTV đồng bộ MH.
         </div>
       </div>
@@ -658,7 +658,7 @@
           <tbody>
             <tr><td>Đồng bộ tất cả</td><td><code>ALL</code></td><td><code>tables</code> / <code>entities</code> · <code>page</code></td></tr>
             <tr><td>Đồng bộ chỉ định</td><td><code>BY_KEY</code></td><td><code>keys</code> · <code>order_codes</code> · <code>tables</code></td></tr>
-            <tr><td>Đồng bộ khoảng thời gian</td><td><code>INCREMENTAL</code></td><td><code>updated_from</code> · <code>updated_to</code></td></tr>
+            <tr><td>Đồng bộ khoảng thời gian</td><td><code>RANGE</code></td><td><code>updated_from</code> · <code>updated_to</code></td></tr>
             <tr><td>Chỉ đang áp dụng</td><td>mọi mode</td><td><code>active_only=true</code></td></tr>
             <tr><td>Lấy cả ngưng dùng</td><td>mọi mode</td><td><code>active_only=false</code></td></tr>
           </tbody>
@@ -689,12 +689,12 @@
     });
     (async () => {
       const src = `flowchart TD
-  A["TMS · bootstrap / job"] --> B["POST /masters/sync<br/>ALL hoặc INCREMENTAL"]
+  A["TMS · job đồng bộ / lần đầu"] --> B["POST /masters/sync<br/>ALL hoặc RANGE"]
   A --> C["POST /storage/sync"]
   A --> D["POST /fuel/sync"]
   E["Phiếu BD/SC đã duyệt"] --> F["POST /orders/send<br/>+ vật tư dự kiến"]
   F --> G["PWMS · mua hàng nhập liệu"]
-  G --> H["POST /purchase/sync<br/>BY_KEY mã phiếu<br/>hoặc INCREMENTAL"]
+  G --> H["POST /purchase/sync<br/>BY_KEY mã phiếu<br/>hoặc RANGE"]
   H --> I["TMS · cụm mua hàng / giá / giờ cấp"]
   C --> I
   classDef a fill:#d1fae5,stroke:#0b6e4f
