@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>11 · Mobile KTV · Xe làm trung tâm</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','system-ui','sans-serif']}}}};</script>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    body{margin:0;font-family:Inter,system-ui,sans-serif;background:#0f172a;color:#0f172a}
+    .desk-hint{display:none;text-align:center;color:#94a3b8;font-size:12px;margin:0 0 12px}
+    .app{max-width:430px;margin:0 auto;min-height:100dvh;background:#f8fafc;display:flex;flex-direction:column;position:relative}
+    @media(min-width:480px){
+      body{padding:24px 16px;background:radial-gradient(800px 400px at 20% 0%,#1e3a5f 0%,transparent 50%),#0f172a}
+      .desk-hint{display:block}
+      .app{min-height:calc(100dvh - 48px);max-height:calc(100dvh - 48px);border-radius:20px;overflow:hidden;border:1px solid #1e293b;box-shadow:0 25px 50px rgba(0,0,0,.45)}
+    }
+    .scr{display:none;flex:1;flex-direction:column;min-height:0;background:#f8fafc}
+    .scr.on{display:flex}
+    .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+    .surface{border:1px solid #e2e8f0;background:#fff;border-radius:.375rem;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+    .card10{border:1px solid #e2e8f0;background:#fff;border-radius:10px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;min-height:36px;border-radius:.375rem;border:1px solid #cbd5e1;padding:0 14px;font-size:14px;font-weight:500;box-shadow:0 1px 2px rgba(15,23,42,.05);font-family:inherit;cursor:pointer;background:#fff;color:#334155;box-sizing:border-box}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+    .btn:hover{background:#f8fafc;border-color:#94a3b8}
+    .btn-primary{background:#2563eb;border-color:#1d4ed8;color:#fff}
+    .btn-primary:hover{background:#1d4ed8;border-color:#1e40af;color:#fff}
+    .btn-emerald{background:#059669;border-color:#047857;color:#fff}
+    .btn-emerald:hover{background:#047857;border-color:#065f46;color:#fff}
+    .btn-outline{background:#fff;border-color:#cbd5e1;color:#334155}
+    .btn-outline:hover{background:#f8fafc;border-color:#94a3b8}
+    .btn-sky{background:#f0f9ff;border-color:#7dd3fc;color:#0c4a6e}
+    .btn-sky:hover{background:#e0f2fe;border-color:#38bdf8}
+    .btn-touch{min-height:40px;height:auto;padding:8px 12px}
+    .btn-block{width:100%}
+    .btn-link{display:inline-flex;flex:1;align-items:center;justify-content:center;min-height:40px;border-radius:.375rem;border:1px solid #93c5fd;background:#fff;color:#2563eb;font-size:14px;font-weight:600}
+    .badge{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;border:1px solid;padding:2px 8px;font-size:11px;font-weight:500;white-space:nowrap;flex-shrink:0;line-height:1.25;max-width:none}
+    .b-ns{border-color:#cbd5e1;background:#f1f5f9;color:#334155}
+    .b-ip{border-color:#fcd34d;background:#fef3c7;color:#92400e}
+    .b-ok{border-color:#6ee7b7;background:#d1fae5;color:#065f46}
+    .b-warn{border-color:#fdba74;background:#fff7ed;color:#9a3412}
+    .b-bad{border-color:#fda4af;background:#ffe4e6;color:#9f1239}
+    .b-mh{border-color:#7dd3fc;background:#e0f2fe;color:#075985}
+    .b-base{border-color:#a5b4fc;background:#eef2ff;color:#3730a3}
+    .b-veh{border-color:#bfdbfe;background:#dbeafe;color:#1e40af}
+    .b-trail{border-color:#fdba74;background:#ffedd5;color:#9a3412}
+    .vtabs{display:flex;gap:0;border-bottom:1px solid #e2e8f0;overflow-x:auto;scrollbar-width:none}
+    .vtabs button{flex:0 0 auto;border:0;background:transparent;padding:10px 12px;margin-bottom:-1px;font-size:13px;font-weight:600;color:#64748b;border-bottom:2px solid transparent;font-family:inherit;white-space:nowrap}
+    .vtabs button.on{color:#2563eb;border-bottom-color:#2563eb}
+    .fab{position:absolute;right:16px;bottom:80px;z-index:30;width:52px;height:52px;border-radius:999px;border:0;background:#2563eb;color:#fff;font-size:28px;line-height:1;box-shadow:0 8px 20px rgba(37,99,235,.35)}
+    .shell-hdr{background:#fff;border-bottom:1px solid #e2e8f0;padding:12px 16px}
+    .shell-ftr{background:#fff;border-top:1px solid #e2e8f0;padding:12px 16px;padding-bottom:max(12px,env(safe-area-inset-bottom));display:grid;gap:8px}
+    .field{display:block;margin-bottom:12px}
+    .field>span{display:block;font-size:13px;font-weight:500;color:#334155;margin-bottom:4px}
+    .field input,.field select,.field textarea{width:100%;min-height:40px;border:1px solid #cbd5e1;border-radius:.375rem;padding:8px 12px;font-size:16px;background:#fff;font-family:inherit}
+    .field textarea{min-height:72px;resize:vertical}
+    .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.25)}
+    .steps{display:flex;gap:6px;padding:10px 16px 0}
+    .steps span{flex:1;text-align:center;font-size:11px;font-weight:600;padding:8px 2px;border-radius:.5rem;background:#f1f5f9;color:#475569}
+    .steps span.on{background:#2563eb;color:#fff}
+    .assess{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+    .assess button{min-height:40px;border-radius:.375rem;border:1px solid #e2e8f0;background:#fff;color:#475569;font-size:13px;font-weight:600;font-family:inherit}
+    .assess .g{border-color:#059669;background:#059669;color:#fff}
+    .assess .r{border-color:#f59e0b;background:#f59e0b;color:#fff}
+    .assess .p{border-color:#dc2626;background:#dc2626;color:#fff}
+    .chip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;border:1px solid #cbd5e1;background:#f8fafc;padding:4px 8px;font-size:12px;margin:0 4px 4px 0}
+    .chip button{border:0;background:transparent;color:#64748b;font-size:14px;padding:0 2px}
+    .pick{max-height:160px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:.375rem;background:#fff;margin-top:6px}
+    .pick button{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #f1f5f9;background:#fff;padding:10px 12px;font-size:13px;font-family:inherit}
+    .ac-wrap{position:relative}
+    .ac-dropdown{position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:40;max-height:220px;overflow:auto;background:#fff;border:1px solid #e2e8f0;border-radius:.5rem;box-shadow:0 10px 24px rgba(15,23,42,.12)}
+    .ac-dropdown.hidden{display:none}
+    .ac-opt{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #f1f5f9;background:#fff;padding:10px 12px;font-size:13px;font-family:inherit;color:#0f172a}
+    .ac-opt:hover,.ac-opt.active{background:#eff6ff;color:#1d4ed8}
+    .ac-opt.create{color:#1d4ed8;font-weight:600;border-top:1px solid #e2e8f0}
+    .ac-opt .sub{color:#94a3b8;font-size:11px;font-weight:400}
+    .ac-opt .local-tag{display:inline-block;margin-left:4px;font-size:10px;font-weight:600;color:#9a3412;background:#ffedd5;border-radius:999px;padding:0 6px}
+    .mat-chips{display:flex;flex-wrap:wrap;gap:6px;min-height:4px;margin-top:6px}
+    .mat-chips:empty{display:none}
+    .field>span .hint{font-weight:400;color:#94a3b8;font-size:11px}
+    .panel{display:none;margin-top:8px;padding:10px;border-radius:.375rem;border:1px solid #e2e8f0;background:#f8fafc}
+    .panel.show{display:block}
+    .panel.sc{border-color:#fcd34d;background:#fffbeb}
+    .panel.th{border-color:#fca5a5;background:#fef2f2}
+    .toast{position:absolute;left:50%;bottom:100px;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;z-index:50;display:none;max-width:90%}
+    .toast.on{display:block}
+    .meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;font-size:13px;color:#64748b}
+    .meta b{color:#0f172a;font-weight:600}
+    .group{background:#f8fafc;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0}
+    .pt{display:inline-flex;width:2rem;height:2rem;align-items:center;justify-content:center;border-radius:.375rem;border:1px solid #e2e8f0;background:#fff;font-size:11px;font-weight:600;color:#475569;flex-shrink:0}
+    .tl{position:relative;padding-left:20px;padding-bottom:14px}
+    .tl::before{content:'';position:absolute;left:4px;top:6px;width:11px;height:11px;border-radius:999px;background:#3b82f6;box-shadow:0 0 0 2px #fff}
+    .tl::after{content:'';position:absolute;left:8px;top:18px;bottom:0;width:2px;background:#e2e8f0}
+    .tl:last-child::after{display:none}
+    .sec-h{padding:12px 16px;border-bottom:1px solid #e2e8f0;font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  </style>
+</head>
+<body>
+<div style="position:sticky;top:0;z-index:9999;background:#0b1f17;color:#dcece5;font:13px/1.4 system-ui,sans-serif;padding:8px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;border-bottom:1px solid rgba(255,255,255,.08)"><a href="index.html" style="color:#fff;font-weight:700;text-decoration:none">← Demo BD/SC</a><span style="opacity:.75">Prototype · dữ liệu mẫu trên trình duyệt</span><span style="flex:1"></span><a href="console.html" style="color:#cfe3da;text-decoration:none">Console</a><a href="mobile.html" style="color:#cfe3da;text-decoration:none">Mobile</a></div>
+
+<p class="desk-hint">Mobile · xe trung tâm · đánh giá · phiếu BD/SC (mẫu kế hoạch quản lý trên web)</p>
+  <div class="app" id="app">
+
+    <!-- 1. LIST XE -->
+    <section class="scr on" data-scr="list">
+      <div class="scroll px-4 py-4 space-y-4" style="padding-bottom:100px">
+        <div>
+          <h1 class="text-xl font-bold text-slate-900 m-0">Bảo dưỡng &amp; sửa chữa</h1>
+          <p class="mt-0.5 text-xs text-slate-600 m-0">Xe làm trung tâm · chọn xe để xem BD / SC / đánh giá</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="surface p-3"><p class="text-xs text-slate-500 m-0">Xe / mooc</p><p class="text-xl font-bold m-0" id="kpiVeh">5</p></div>
+          <div class="surface p-3"><p class="text-xs text-slate-500 m-0">Cần đánh giá</p><p class="text-xl font-bold text-amber-700 m-0" id="kpiEval">3</p></div>
+          <div class="surface p-3"><p class="text-xs text-slate-500 m-0">Đang làm</p><p class="text-xl font-bold text-sky-700 m-0" id="kpiDoing">2</p></div>
+          <div class="surface p-3"><p class="text-xs text-slate-500 m-0">Chờ ĐB</p><p class="text-xl font-bold text-indigo-700 m-0" id="kpiSync">2</p></div>
+        </div>
+        <input id="vehSearch" type="search" class="w-full h-10 rounded-md border border-slate-300 px-3 text-sm" placeholder="Biển số, loại xe, hãng, xưởng…" />
+        <div class="surface overflow-hidden">
+          <div class="px-4 py-3 text-sm font-semibold border-b border-slate-200">Danh sách xe &amp; mooc</div>
+          <div class="p-3 space-y-2.5" id="vehList"></div>
+        </div>
+      </div>
+      <button type="button" class="fab" id="fabCreate" title="Tạo phiếu">+</button>
+    </section>
+
+    <!-- 2. HUB XE -->
+    <section class="scr" data-scr="vehicle">
+      <div class="scroll flex-1 min-h-0" id="vehicleRoot"></div>
+    </section>
+
+    <!-- 3. CHI TIẾT PHIẾU -->
+    <section class="scr" data-scr="order">
+      <div class="px-3 pt-2 shrink-0">
+        <button type="button" class="text-sm font-semibold text-blue-600 bg-transparent border-0 p-0 mb-2" id="backToVehicle">← Về xe</button>
+        <div class="vtabs" id="orderTabs">
+          <button type="button" data-otab="slip" class="on">Phiếu</button>
+          <button type="button" data-otab="system">Hệ thống</button>
+        </div>
+      </div>
+      <div class="scroll flex-1 min-h-0" id="orderPanel"></div>
+    </section>
+
+    <!-- 4. TẠO PHIẾU (parity web) -->
+    <section class="scr" data-scr="create">
+      <div class="shell-hdr">
+        <button type="button" class="text-sm font-semibold text-blue-600 bg-transparent border-0 p-0 mb-1" data-go="vehicle">← Hủy</button>
+        <div class="text-base font-bold">Tạo phiếu · <span id="createPlate">—</span></div>
+        <p class="text-xs text-slate-500 m-0 mt-0.5">Giống web: loại · danh mục · hệ thống xe · vật tư chọn lúc lập phiếu</p>
+      </div>
+      <div class="scroll px-4 py-4 space-y-1">
+        <label class="field"><span>Loại phiếu</span>
+          <select id="cType"><option value="PERIODIC">Bảo dưỡng định kỳ</option><option value="INCIDENTAL" selected>Sửa chữa phát sinh</option></select>
+        </label>
+        <label class="field" id="cCatalogWrap"><span>Danh mục bảo dưỡng</span>
+          <select id="cCatalog">
+            <option value="1">Thay dầu nhớt động cơ · Dầu Nhớt</option>
+            <option value="2">Thay lọc nhớt · Hệ Thống Máy Xe</option>
+            <option value="3">Bôi mỡ gầm · Mỡ</option>
+            <option value="4">Kiểm tra / thay ắc quy · Ắc Quy</option>
+            <option value="5">Kiểm tra / thay vỏ lốp · Vỏ Lốp</option>
+            <option value="6">Bảo dưỡng hệ thống máy xe · Hệ Thống Máy Xe</option>
+            <option value="7">Bảo dưỡng hệ thống gầm · Hệ Thống Gầm</option>
+            <option value="8">Bảo dưỡng hệ thống lái · Hệ Thống Lái</option>
+          </select>
+        </label>
+        <div id="cCatHint" class="mb-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600 hidden"></div>
+        <div class="rounded-md border border-slate-200 bg-slate-50/80 p-3 mb-3 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-sm font-semibold text-slate-800">Hạng mục công việc *</span>
+            <span class="text-[11px] text-slate-500" id="cWiCount">0 hạng mục</span>
+          </div>
+          <p class="text-[11px] text-slate-500 m-0">Thêm nhiều hạng mục · autocomplete · nhập mới chỉ lưu nội bộ</p>
+          <div class="ac-wrap">
+            <input id="cContent" type="search" autocomplete="off" placeholder="Tìm và thêm hạng mục…" value="" />
+            <div class="ac-dropdown hidden" id="cContentDd"></div>
+          </div>
+          <div id="cWiList" class="space-y-1.5"></div>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="field"><span>Ngày</span><input id="cDate" type="date" value="2026-09-30" /></label>
+          <label class="field"><span>Odo (km)</span><input id="cKm" type="number" /></label>
+        </div>
+        <label class="field"><span>Nơi thực hiện <span class="hint">autocomplete · nhập mới chỉ lưu nội bộ</span></span>
+          <div class="ac-wrap">
+            <input id="cGarage" type="search" autocomplete="off" placeholder="Tìm xưởng / garage…" value="" />
+            <div class="ac-dropdown hidden" id="cGarageDd"></div>
+          </div>
+        </label>
+        <label class="field"><span>Nguồn tạo</span>
+          <select id="cSource">
+            <option value="KTV tạo">KTV tạo</option>
+            <option value="Dự toán">Dự toán / kế hoạch</option>
+            <option value="Sự cố">Sự cố</option>
+            <option value="Đánh giá định kỳ">Đánh giá định kỳ</option>
+          </select>
+        </label>
+        <div class="rounded-md border border-emerald-200 bg-emerald-50/50 p-3 mb-3 space-y-2">
+          <div class="text-xs font-semibold text-emerald-800">Vật tư từ kho (master) — chọn từ danh mục</div>
+          <div class="ac-wrap">
+            <input id="cPwmsMat" type="search" autocomplete="off" class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm" placeholder="Tìm mã / tên vật tư kho…" />
+            <div class="ac-dropdown hidden" id="cPwmsMatDd"></div>
+          </div>
+          <div class="mat-chips" id="cPwmsChips"></div>
+        </div>
+        <div class="rounded-md border border-amber-200 bg-amber-50/50 p-3 space-y-2">
+          <div class="text-xs font-semibold text-amber-800">Vật tư ghi tay / mua ngoài — nhập mới chỉ lưu nội bộ TMS</div>
+          <div class="ac-wrap">
+            <input id="cKtvMat" type="search" autocomplete="off" class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm" placeholder="Tìm hoặc nhập tên vật tư mới…" />
+            <div class="ac-dropdown hidden" id="cKtvMatDd"></div>
+          </div>
+          <div class="mat-chips" id="cKtvChips"></div>
+        </div>
+      </div>
+      <div class="shell-ftr" style="grid-template-columns:1fr 1fr">
+        <button type="button" class="btn btn-outline btn-touch" data-go="vehicle">Hủy</button>
+        <button type="button" class="btn btn-primary btn-touch" id="btnCreateSave">Tạo phiếu</button>
+      </div>
+    </section>
+
+    <!-- 5. ĐÁNH GIÁ -->
+    <section class="scr" data-scr="eval">
+      <div class="shell-hdr">
+        <button type="button" class="text-sm font-semibold text-blue-600 bg-transparent border-0 p-0 mb-1" data-go="vehicle">← Về xe</button>
+        <div class="text-base font-bold">Phiếu đánh giá phương tiện định kỳ</div>
+        <div class="text-xs text-slate-500 mt-0.5"><span id="evalPlate">—</span> · Tuần 40 · Tháng 9/2026</div>
+      </div>
+      <div class="steps" id="evalSteps"><span class="on">1. Đầu phiếu</span><span>2. Checklist</span><span>3. Kết luận</span></div>
+      <div class="scroll px-4 py-3" id="evalBody"></div>
+      <div class="shell-ftr" id="evalFooter"></div>
+    </section>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+const $=(s,el=document)=>el.querySelector(s);
+const $$=(s,el=document)=>[...el.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const money=n=>new Intl.NumberFormat('vi-VN').format(n||0)+' ₫';
+const kmFmt=n=>new Intl.NumberFormat('vi-VN').format(n||0);
+
+const MOBILE_CATALOG=[{"id": 1, "code": "DM-DAU-NHOT", "name": "Thay dầu nhớt động cơ", "system": "Dầu Nhớt", "forceReplaceNext": true, "evalBad": "REPLACE", "cycle": "5000 km / 10000 km", "hint": "Thuộc Dầu Nhớt · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 2, "code": "DM-LOC-NHOT", "name": "Thay lọc nhớt", "system": "Hệ Thống Máy Xe", "forceReplaceNext": true, "evalBad": "REPLACE", "cycle": "10000 km", "hint": "Thuộc Hệ Thống Máy Xe · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 3, "code": "DM-MO", "name": "Bôi mỡ gầm", "system": "Mỡ", "forceReplaceNext": false, "evalBad": "REPAIR", "cycle": "10000 km / 3 tháng", "hint": "Thuộc Mỡ · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 4, "code": "DM-AC-QUY", "name": "Kiểm tra / thay ắc quy", "system": "Ắc Quy", "forceReplaceNext": true, "evalBad": "REPLACE", "cycle": "6 tháng / 2 năm", "hint": "Thuộc Ắc Quy · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 5, "code": "DM-LOP", "name": "Kiểm tra / thay vỏ lốp", "system": "Vỏ Lốp", "forceReplaceNext": true, "evalBad": "REPLACE", "cycle": "80000 km / 3 năm", "hint": "Thuộc Vỏ Lốp · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 6, "code": "DM-MAY-XE", "name": "Bảo dưỡng hệ thống máy xe", "system": "Hệ Thống Máy Xe", "forceReplaceNext": false, "evalBad": "REPAIR", "cycle": "20000 km / 500 giờ", "hint": "Thuộc Hệ Thống Máy Xe · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 7, "code": "DM-GAM", "name": "Bảo dưỡng hệ thống gầm", "system": "Hệ Thống Gầm", "forceReplaceNext": false, "evalBad": "REPAIR", "cycle": "20000 km", "hint": "Thuộc Hệ Thống Gầm · mẫu từ danh mục PWMS / dự toán HCM"}, {"id": 8, "code": "DM-LAI", "name": "Bảo dưỡng hệ thống lái", "system": "Hệ Thống Lái", "forceReplaceNext": false, "evalBad": "REPAIR", "cycle": "6 tháng", "hint": "Thuộc Hệ Thống Lái · mẫu từ danh mục PWMS / dự toán HCM"}];
+const REPAIRS=[{"id": "ri1", "name": "Tán Bố Thắng Mooc", "system": "Nhân Công Sửa Chữa"}, {"id": "ri2", "name": "Thay cảm biến tương đương tương đương + dây nguồn cảm biến", "system": "Hệ Thống Điện"}, {"id": "ri3", "name": "Thay cam mới", "system": "Hệ Thống Điện"}, {"id": "ri4", "name": "Công sạc gas lạnh", "system": "Hệ Thống Máy Lạnh"}, {"id": "ri5", "name": "Công kiểm tra", "system": "Hệ Thống Máy Xe"}, {"id": "ri6", "name": "Bấm ống gas lạnh", "system": "Hệ Thống Máy Lạnh"}, {"id": "ri7", "name": "Hàn giàn nóng", "system": "Hệ Thống Máy Lạnh"}, {"id": "ri8", "name": "Gas lạnh điều hòa Sinochem Jincool", "system": "Hệ Thống Máy Lạnh"}, {"id": "ri9", "name": "Dầu máy lạnh", "system": "Hệ Thống Máy Lạnh"}, {"id": "ri10", "name": "Vệ sinh giàn lạnh (Phương pháp nội soi)", "system": "Hệ Thống Máy Lạnh"}, {"id": "ri11", "name": "Gia Công Ron", "system": "Nhân Công Sửa Chữa"}, {"id": "ri12", "name": "Tiện cấy ren cổ pô", "system": "Nhân Công Sửa Chữa"}, {"id": "ri13", "name": "Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)", "system": "Phí Phát Sinh Khác"}, {"id": "ri14", "name": "Nhớt Máy Động Cơ Diesel Hyundai 15W40", "system": "Dầu Nhớt"}, {"id": "ri15", "name": "Lọc nhớt D6CC 2632582600", "system": "Hệ Thống Máy Xe"}, {"id": "ri16", "name": "Mỡ Bò Gầm EPL2", "system": "Mỡ"}, {"id": "ri17", "name": "Lọc nhiên liệu  ( HD250/HD260/HD270/HD700/HD1000 )", "system": "Hệ Thống Máy Xe"}, {"id": "ri18", "name": "Công Bảo Dưỡng Định Kì", "system": "Hệ Thống Máy Xe"}, {"id": "ri19", "name": "Lọc nhiên liệu tinh", "system": "Hệ Thống Máy Xe"}, {"id": "ri20", "name": "Lọc dieziel HD700", "system": "Hệ Thống Máy Xe"}];
+const MATERIALS=[{"id": "m1", "code": "VTU-342-1000002", "name": "Ắc Bi Nhê"}, {"id": "m2", "code": "VTU-342-1000003", "name": "Ắc Mooc 38X150 (Chienyou)"}, {"id": "m3", "code": "VTU-342-1000004", "name": "Ắc Mooc Chienyou ( Nguyên Bộ)"}, {"id": "m4", "code": "VTU-342-1000005", "name": "Ắc Mooc Dài 28X135"}, {"id": "m5", "code": "VTU-342-1000006", "name": "Ắc Nhíp"}, {"id": "m6", "code": "VTU-348-1000007", "name": "Ắc Phi Dê"}, {"id": "m7", "code": "VTU-344-1000008", "name": "Ắc Piston"}, {"id": "m8", "code": "VTU-342-1000009", "name": "Ắc Thỏ ( Chienyou)"}, {"id": "m9", "code": "VTU-342-1000010", "name": "Ắc Thỏ Rơ Mooc Phi 75"}, {"id": "m10", "code": "VTU-211-1000011", "name": "Áo Phản Quang"}, {"id": "m11", "code": "VTU-343-1000012", "name": "Áp Suất Gas"}, {"id": "m12", "code": "VTU-351-1000013", "name": "Axit"}, {"id": "m13", "code": "VTU-348-1000014", "name": "Ba Đờ Sông Dọc"}, {"id": "m14", "code": "VTU-348-1000015", "name": "Ba Đờ Sông Ngang"}, {"id": "m15", "code": "VTU-348-1000016", "name": "Ba Đờ Xông Dọc Hyundai (568107D001)"}, {"id": "m16", "code": "VTU-342-1000017", "name": "Ba lăng treo bánh xe dự phòng rơ mooc"}, {"id": "m17", "code": "VTU-342-1000018", "name": "Bạc Ắc Thỏ Rơ Mooc Phi 75"}, {"id": "m18", "code": "VTU-345-1000019", "name": "Bạc đạn 293601 (cũ)"}, {"id": "m19", "code": "VTU-345-1000020", "name": "Bạc đạn 55026 (cũ)"}, {"id": "m20", "code": "VTU-345-1000021", "name": "Bạc đạn 55437 (cũ)"}];
+const DRIVERS=[{id:1,name:'Trần Minh',phone:'0901 234 567'},{id:2,name:'Nguyễn Văn Tài',phone:'0912 345 678'},{id:3,name:'Lê Hòa',phone:'0987 654 321'}];
+const CHECKLIST=[
+  {group:'ĐÈN CHIẾU SÁNG',items:[{id:'c1',label:'Đèn chiếu sáng / tín hiệu',method:'QS',required:true},{id:'c2',label:'Đèn báo / tín hiệu rẽ',method:'QS',required:true}]},
+  {group:'LÁI · PHANH',items:[{id:'c8',label:'Trợ lực lái',method:'VH',required:true},{id:'c9',label:'Phanh chân / phanh tay',method:'VH',required:true}]},
+  {group:'ĐỘNG CƠ · DẦU',items:[{id:'c11',label:'Mức dầu động cơ / rò rỉ',method:'QS',required:true}]},
+  {group:'LỐP · ĐIỆN',items:[{id:'c14',label:'Áp suất / độ mòn lốp',method:'QS',required:true},{id:'c16',label:'Ắc quy / cực cột',method:'QS',required:true}]},
+];
+
+const VEHICLES=[{"id": 101, "plate": "51C-29273", "type": "Đầu kéo", "brand": "Freightliner", "model": "Freightliner", "year": 2007, "km": 1158402, "garage": "Bảo dưỡng nội bộ", "area": "HCM", "eval": "ok", "isTrailer": false}, {"id": 102, "plate": "50H-87033", "type": "Đầu kéo", "brand": "Freightliner", "model": "Freightliner", "year": 2008, "km": 1710613, "garage": "Bảo dưỡng nội bộ", "area": "HCM", "eval": "soon", "isTrailer": false}, {"id": 103, "plate": "51C-41767", "type": "Đầu kéo", "brand": "Cascadia", "model": "Cascadia", "year": 2009, "km": 1305486, "garage": "Bảo dưỡng nội bộ", "area": "HCM", "eval": "ok", "isTrailer": false}, {"id": 104, "plate": "50E-22295", "type": "Đầu kéo", "brand": "Freightliner", "model": "Freightliner", "year": 2010, "km": 1067785, "garage": "Bảo dưỡng nội bộ", "area": "HCM", "eval": "ok", "isTrailer": false}, {"id": 105, "plate": "50H-69138", "type": "Đầu kéo", "brand": "Cascadia", "model": "Cascadia", "year": 2010, "km": 54538, "garage": "Bảo dưỡng nội bộ", "area": "HCM", "eval": "soon", "isTrailer": false}, {"id": 106, "plate": "50E-21624", "type": "Đầu kéo", "brand": "HD1000", "model": "HD1000", "year": 2015, "km": 120000, "garage": "Bảo dưỡng nội bộ", "area": "HCM", "eval": "ok", "isTrailer": false}, {"id": 107, "plate": "50H-07940", "type": "Đầu kéo", "brand": "HD700", "model": "HD700", "year": 2016, "km": 377230, "garage": "Bảo dưỡng nội bộ", "area": "HCM", "eval": "ok", "isTrailer": false}, {"id": 108, "plate": "50LD-11615", "type": "Đầu kéo", "brand": "HD700", "model": "HD700", "year": 2016, "km": 173339, "garage": "Bảo dưỡng nội bộ", "area": "HCM", "eval": "soon", "isTrailer": false}, {"id": 109, "plate": "50E-36177", "type": "Xe Đầu Kéo", "brand": "CASCADIA", "model": "CASCADIA", "year": 2015, "km": 113171, "garage": "Xưởng Hải Phòng", "area": "Hải Phòng", "eval": "soon", "isTrailer": false}, {"id": 110, "plate": "50E-65517", "type": "Xe Đầu Kéo", "brand": "CASCADIA", "model": "CASCADIA", "year": 2015, "km": 121090, "garage": "Xưởng Hải Phòng", "area": "Hải Phòng", "eval": "due", "isTrailer": false}];
+
+const ORDERS=[{"id": "o1", "vehicleId": 115, "code": "RO-2026-1001", "type": "INCIDENTAL", "occ": 1, "date": "2026-01-13", "km": 98000, "garage": "TRUNG ĐẠT BR-VT", "source": "Sự cố", "status": "IN_PROGRESS", "approval": "APPROVED", "content": "Tán Bố Thắng Mooc", "cost": 4536000, "system": "Nhân Công Sửa Chữa", "mh": "NA", "base": {"status": "NONE", "code": null, "baseStatus": null}, "mats": [], "log": [{"at": "2026-01-13 08:00", "action": "CREATE", "by": "Kỹ thuật GLS", "note": "Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]}, {"id": "o2", "vehicleId": 101, "code": "RO-2026-1002", "type": "INCIDENTAL", "occ": 2, "date": "2026-01-13", "km": 1158402, "garage": "BÌNH ANH", "source": "Sự cố", "status": "NOT_STARTED", "approval": "REJECTED", "content": "Thay cảm biến tương đương tương đương + dây nguồn cảm biến", "cost": 324000, "system": "Hệ Thống Điện", "mh": "NONE", "base": {"status": "NONE", "code": null, "baseStatus": null}, "mats": [{"name": "Thay cảm biến tương đương tương đương + dây nguồn cảm biến", "qty": 1, "price": 300000, "tag": "Kho MH"}], "log": [{"at": "2026-01-13 08:00", "action": "CREATE", "by": "Kỹ thuật GLS", "note": "Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]}, {"id": "o3", "vehicleId": 105, "code": "RO-2026-1003", "type": "INCIDENTAL", "occ": 3, "date": "2026-01-13", "km": 54538, "garage": "BÌNH ANH", "source": "Sự cố", "status": "COMPLETED", "approval": "APPROVED", "content": "Thay cam mới", "cost": 594000, "system": "Hệ Thống Điện", "mh": "SYNCED", "base": {"status": "NONE", "code": null, "baseStatus": null}, "mats": [{"name": "Thay cam mới", "qty": 1, "price": 550000, "tag": "Kho MH"}], "log": [{"at": "2026-01-13 08:00", "action": "CREATE", "by": "Kỹ thuật GLS", "note": "Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]}, {"id": "o4", "vehicleId": 101, "code": "RO-2026-1004", "type": "INCIDENTAL", "occ": 4, "date": "2026-01-08", "km": 1158402, "garage": "HYUNDAI VIỆT NHÂN", "source": "Sự cố", "status": "IN_PROGRESS", "approval": "APPROVED", "content": "Công sạc gas lạnh · Công kiểm tra · Bấm ống gas lạnh · Hàn giàn nóng · Gas lạnh điều hòa Sinochem Jincool · Dầu máy lạnh", "cost": 1765800, "system": "Hệ Thống Máy Lạnh", "mh": "NONE", "base": {"status": "NONE", "code": null, "baseStatus": null}, "mats": [{"name": "Gas lạnh điều hòa Sinochem Jincool", "qty": 0.7, "price": 250000, "tag": "Kho MH"}, {"name": "Dầu máy lạnh", "qty": 0.4, "price": 400000, "tag": "Kho MH"}], "log": [{"at": "2026-01-08 08:00", "action": "CREATE", "by": "Kỹ thuật GLS", "note": "Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]}, {"id": "o5", "vehicleId": 101, "code": "RO-2026-1005", "type": "INCIDENTAL", "occ": 5, "date": "2026-01-07", "km": 1158402, "garage": "HYUNDAI VIỆT NHÂN", "source": "Sự cố", "status": "NOT_STARTED", "approval": "REJECTED", "content": "Công sạc gas lạnh · Công kiểm tra · Bấm ống gas lạnh · Vệ sinh giàn lạnh (Phương pháp nội soi) · Gas lạnh điều hòa Sinochem Jincool · Dầu máy lạnh", "cost": 2089800, "system": "Hệ Thống Máy Lạnh", "mh": "NONE", "base": {"status": "NONE", "code": null, "baseStatus": null}, "mats": [{"name": "Gas lạnh điều hòa Sinochem Jincool", "qty": 0.7, "price": 250000, "tag": "Kho MH"}, {"name": "Dầu máy lạnh", "qty": 0.4, "price": 400000, "tag": "Kho MH"}], "log": [{"at": "2026-01-07 08:00", "action": "CREATE", "by": "Kỹ thuật GLS", "note": "Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]}, {"id": "o6", "vehicleId": 101, "code": "RO-2026-1006", "type": "INCIDENTAL", "occ": 6, "date": "2026-01-05", "km": 1158402, "garage": "TRUNG ĐẠT BR-VT", "source": "Sự cố", "status": "COMPLETED", "approval": "APPROVED", "content": "Tán Bố Thắng Mooc · Gia Công Ron · Tiện cấy ren cổ pô", "cost": 5400000, "system": "Nhân Công Sửa Chữa", "mh": "SYNCED", "base": {"status": "NONE", "code": null, "baseStatus": null}, "mats": [], "log": [{"at": "2026-01-05 08:00", "action": "CREATE", "by": "Kỹ thuật GLS", "note": "Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]}, {"id": "o7", "vehicleId": 103, "code": "RO-2026-1007", "type": "INCIDENTAL", "occ": 7, "date": "2026-01-14", "km": 1305486, "garage": "HYUNDAI PHÚ LÂM", "source": "Sự cố", "status": "IN_PROGRESS", "approval": "APPROVED", "content": "Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)", "cost": 918000, "system": "Phí Phát Sinh Khác", "mh": "NA", "base": {"status": "NONE", "code": null, "baseStatus": null}, "mats": [], "log": [{"at": "2026-01-14 08:00", "action": "CREATE", "by": "Kỹ thuật GLS", "note": "Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]}, {"id": "o8", "vehicleId": 101, "code": "RO-2026-1008", "type": "INCIDENTAL", "occ": 8, "date": "2026-01-14", "km": 1158402, "garage": "HYUNDAI PHÚ LÂM", "source": "Sự cố", "status": "NOT_STARTED", "approval": "REJECTED", "content": "Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)", "cost": 918000, "system": "Phí Phát Sinh Khác", "mh": "NA", "base": {"status": "NONE", "code": null, "baseStatus": null}, "mats": [], "log": [{"at": "2026-01-14 08:00", "action": "CREATE", "by": "Kỹ thuật GLS", "note": "Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]}, {"id": "o9", "vehicleId": 101, "code": "RO-2026-1009", "type": "INCIDENTAL", "occ": 9, "date": "2026-01-14", "km": 1158402, "garage": "HYUNDAI PHÚ LÂM", "source": "Sự cố", "status": "COMPLETED", "approval": "APPROVED", "content": "Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)", "cost": 918000, "system": "Phí Phát Sinh Khác", "mh": "SYNCED", "base": {"status": "NONE", "code": null, "baseStatus": null}, "mats": [], "log": [{"at": "2026-01-14 08:00", "action": "CREATE", "by": "Kỹ thuật GLS", "note": "Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]}, {"id": "o10", "vehicleId": 101, "code": "RO-2026-1010", "type": "INCIDENTAL", "occ": 10, "date": "2026-01-14", "km": 1158402, "garage": "HYUNDAI PHÚ LÂM", "source": "Sự cố", "status": "IN_PROGRESS", "approval": "APPROVED", "content": "Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)", "cost": 918000, "system": "Phí Phát Sinh Khác", "mh": "NA", "base": {"status": "NONE", "code": null, "baseStatus": null}, "mats": [], "log": [{"at": "2026-01-14 08:00", "action": "CREATE", "by": "Kỹ thuật GLS", "note": "Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]}, {"id": "o11", "vehicleId": 101, "code": "RO-2026-1011", "type": "INCIDENTAL", "occ": 11, "date": "2026-01-14", "km": 1158402, "garage": "HYUNDAI PHÚ LÂM", "source": "Sự cố", "status": "NOT_STARTED", "approval": "REJECTED", "content": "Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)", "cost": 918000, "system": "Phí Phát Sinh Khác", "mh": "NA", "base": {"status": "NONE", "code": null, "baseStatus": null}, "mats": [], "log": [{"at": "2026-01-14 08:00", "action": "CREATE", "by": "Kỹ thuật GLS", "note": "Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]}, {"id": "o12", "vehicleId": 101, "code": "RO-2026-1012", "type": "INCIDENTAL", "occ": 12, "date": "2026-01-14", "km": 1158402, "garage": "HYUNDAI PHÚ LÂM", "source": "Sự cố", "status": "COMPLETED", "approval": "APPROVED", "content": "Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)", "cost": 918000, "system": "Phí Phát Sinh Khác", "mh": "SYNCED", "base": {"status": "NONE", "code": null, "baseStatus": null}, "mats": [], "log": [{"at": "2026-01-14 08:00", "action": "CREATE", "by": "Kỹ thuật GLS", "note": "Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]}];
+
+
+const PLANS={"102": [{"id": "p1", "period": "2025-10", "code": "MP-2025-1001", "name": "Delo Gold Ultra Sae 15W40 Ci4", "system": "Dầu Nhớt", "next": "—", "status": "Mới", "source": "TEMPLATE", "qty": 40.0, "uom": "Lít", "templateId": "pt1"}, {"id": "p2", "period": "2025-10", "code": "MP-2025-1002", "name": "Mỡ Bò Gầm EPL2", "system": "Mỡ", "next": "—", "status": "Đã xếp lịch", "source": "TEMPLATE", "qty": 1.0, "uom": "Kg", "templateId": "pt1"}, {"id": "p3", "period": "2025-10", "code": "MP-2025-1003", "name": "Lọc nhớt D6CC 2632582600", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Mới", "source": "TEMPLATE", "qty": 1.0, "uom": "Cái", "templateId": "pt1"}, {"id": "p4", "period": "2025-10", "code": "MP-2025-1004", "name": "Lọc dầu 3194584400 (Lọc Dầu Tinh D6Cc 3194582010)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Đã xếp lịch", "source": "TEMPLATE", "qty": 1.0, "uom": "Cái", "templateId": "pt1"}], "106": [{"id": "p5", "period": "2025-10", "code": "MP-2025-1005", "name": "Công Bảo Dưỡng Định Kì", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Mới", "source": "TEMPLATE", "qty": 1.0, "uom": "Giờ", "templateId": "pt1"}, {"id": "p6", "period": "2025-10", "code": "MP-2025-1006", "name": "Delo Gold Ultra Sae 15W40 Ci4", "system": "Dầu Nhớt", "next": "—", "status": "Đã xếp lịch", "source": "TEMPLATE", "qty": 40.0, "uom": "Lít", "templateId": "pt1"}, {"id": "p7", "period": "2025-10", "code": "MP-2025-1007", "name": "Mỡ Bò Gầm EPL2", "system": "Mỡ", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 1.0, "uom": "Kg", "templateId": null}, {"id": "p8", "period": "2025-10", "code": "MP-2025-1008", "name": "Lọc nhớt D6CC 2632582600", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 1.0, "uom": "Cái", "templateId": null}], "110": [{"id": "p9", "period": "2025-10", "code": "MP-2025-1009", "name": "Công Bảo Dưỡng Định Kì", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 1.0, "uom": "Giờ", "templateId": null}, {"id": "p10", "period": "2025-10", "code": "MP-2025-1010", "name": "Delo Gold Ultra Sae 15W40 Ci4", "system": "Dầu Nhớt", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 40.0, "uom": "Lít", "templateId": null}, {"id": "p11", "period": "2025-10", "code": "MP-2025-1011", "name": "Mỡ Bò Gầm EPL2", "system": "Mỡ", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 1.0, "uom": "Kg", "templateId": null}, {"id": "p12", "period": "2025-10", "code": "MP-2025-1012", "name": "Lọc nhớt D6CC 2632582600", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 1.0, "uom": "Cái", "templateId": null}], "114": [{"id": "p13", "period": "2025-10", "code": "MP-2025-1013", "name": "Bảo dưỡng xe tại Lsip (Note: yêu cầu bơm mỡ cho cả đầu, mooc)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 1.0, "uom": "Lần", "templateId": null}, {"id": "p14", "period": "2025-10", "code": "MP-2025-1014", "name": "Nhớt Máy Dầu Đa Cấp Caltex Delo Gold Ultra Sae 15W40 Ci4", "system": "Dầu Nhớt", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 40.0, "uom": "Lít", "templateId": null}, {"id": "p15", "period": "2025-10", "code": "MP-2025-1015", "name": "Mỡ Bò Multifak EP3", "system": "Hệ Thống Gầm", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 2.0, "uom": "Kg", "templateId": null}, {"id": "p16", "period": "2025-10", "code": "MP-2025-1016", "name": "Lọc Nhớt Máy Hyundai D6Cc (2632084300)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 1.0, "uom": "Cái", "templateId": null}], "103": [{"id": "p17", "period": "2025-10", "code": "MP-2025-1017", "name": "Bảo dưỡng xe tại Lsip (Note: yêu cầu bơm mỡ cho cả đầu, mooc)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 1.0, "uom": "Lần", "templateId": null}, {"id": "p18", "period": "2025-10", "code": "MP-2025-1018", "name": "Nhớt Máy Dầu Đa Cấp Caltex Delo Gold Ultra Sae 15W40 Ci4", "system": "Dầu Nhớt", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 30.0, "uom": "Lít", "templateId": null}, {"id": "p19", "period": "2025-10", "code": "MP-2025-1019", "name": "Mỡ Bò Multifak EP3", "system": "Hệ Thống Gầm", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 2.0, "uom": "Kg", "templateId": null}, {"id": "p20", "period": "2025-10", "code": "MP-2025-1020", "name": "Lọc Nhớt Máy D6Ac (2632583900)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 1.0, "uom": "Bộ", "templateId": null}], "107": [{"id": "p21", "period": "2025-10", "code": "MP-2025-1021", "name": "Bảo dưỡng xe tại Lsip (Note: yêu cầu bơm mỡ cho cả đầu, mooc)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 1.0, "uom": "Lần", "templateId": null}, {"id": "p22", "period": "2025-10", "code": "MP-2025-1022", "name": "Nhớt Máy Dầu Đa Cấp Caltex Delo Gold Ultra Sae 15W40 Ci4", "system": "Dầu Nhớt", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 40.0, "uom": "Lít", "templateId": null}, {"id": "p23", "period": "2025-10", "code": "MP-2025-1023", "name": "Mỡ Bò Multifak EP3", "system": "Hệ Thống Gầm", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 2.0, "uom": "Kg", "templateId": null}, {"id": "p24", "period": "2025-10", "code": "MP-2025-1024", "name": "Lọc Nhớt Máy Hyundai D6Cc (2632084300)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 1.0, "uom": "Cái", "templateId": null}], "111": [{"id": "p25", "period": "2025-10", "code": "MP-2025-1025", "name": "Bảo dưỡng xe tại Lsip (Note: yêu cầu bơm mỡ cho cả đầu, mooc)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 1.0, "uom": "Lần", "templateId": null}, {"id": "p26", "period": "2025-10", "code": "MP-2025-1026", "name": "Nhớt Máy Dầu Đa Cấp Caltex Delo Gold Ultra Sae 15W40 Ci4", "system": "Dầu Nhớt", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 30.0, "uom": "Lít", "templateId": null}, {"id": "p27", "period": "2025-10", "code": "MP-2025-1027", "name": "Mỡ Bò Multifak EP3", "system": "Hệ Thống Gầm", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 2.0, "uom": "Kg", "templateId": null}, {"id": "p28", "period": "2025-10", "code": "MP-2025-1028", "name": "Lọc Nhớt Máy D6Ac (2632583900)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 1.0, "uom": "Bộ", "templateId": null}], "115": [{"id": "p29", "period": "2025-10", "code": "MP-2025-1029", "name": "Bảo dưỡng xe tại Lsip (Note: yêu cầu bơm mỡ cho cả đầu, mooc)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 1.0, "uom": "Lần", "templateId": null}, {"id": "p30", "period": "2025-10", "code": "MP-2025-1030", "name": "Nhớt Máy Dầu Đa Cấp Caltex Delo Gold Ultra Sae 15W40 Ci4", "system": "Dầu Nhớt", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 40.0, "uom": "Lít", "templateId": null}, {"id": "p31", "period": "2025-10", "code": "MP-2025-1031", "name": "Mỡ Bò Multifak EP3", "system": "Hệ Thống Gầm", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 2.0, "uom": "Kg", "templateId": null}, {"id": "p32", "period": "2025-10", "code": "MP-2025-1032", "name": "Lọc Nhớt Máy Hyundai D6Cc (2632084300)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 1.0, "uom": "Cái", "templateId": null}], "104": [{"id": "p33", "period": "2025-10", "code": "MP-2025-1033", "name": "Bảo dưỡng xe tại Lsip (Note: yêu cầu bơm mỡ cho cả đầu, mooc)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 1.0, "uom": "Lần", "templateId": null}, {"id": "p34", "period": "2025-10", "code": "MP-2025-1034", "name": "Nhớt Máy Dầu Đa Cấp Caltex Delo Gold Ultra Sae 15W40 Ci4", "system": "Dầu Nhớt", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 30.0, "uom": "Lít", "templateId": null}, {"id": "p35", "period": "2025-10", "code": "MP-2025-1035", "name": "Mỡ Bò Multifak EP3", "system": "Hệ Thống Gầm", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 2.0, "uom": "Kg", "templateId": null}, {"id": "p36", "period": "2025-10", "code": "MP-2025-1036", "name": "Lọc Nhớt Máy D6Ac (2632583900)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 1.0, "uom": "Bộ", "templateId": null}], "108": [{"id": "p37", "period": "2025-10", "code": "MP-2025-1037", "name": "Bảo dưỡng xe tại Lsip (Note: yêu cầu bơm mỡ cho cả đầu, mooc)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 1.0, "uom": "Lần", "templateId": null}, {"id": "p38", "period": "2025-10", "code": "MP-2025-1038", "name": "Nhớt Máy Dầu Đa Cấp Caltex Delo Gold Ultra Sae 15W40 Ci4", "system": "Dầu Nhớt", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 40.0, "uom": "Lít", "templateId": null}, {"id": "p39", "period": "2025-10", "code": "MP-2025-1039", "name": "Mỡ Bò Multifak EP3", "system": "Hệ Thống Gầm", "next": "—", "status": "Mới", "source": "MANUAL", "qty": 2.0, "uom": "Kg", "templateId": null}, {"id": "p40", "period": "2025-10", "code": "MP-2025-1040", "name": "Lọc Nhớt Máy Hyundai D6Cc (2632084300)", "system": "Hệ Thống Máy Xe", "next": "—", "status": "Đã xếp lịch", "source": "MANUAL", "qty": 1.0, "uom": "Cái", "templateId": null}], "101": [], "105": [], "109": []};
+
+let S={
+  vehicleId:101,vehicleTab:'todo',orderId:'o2',orderTab:'slip',search:'',
+  evalStep:1,periodExempt:false,createPlan:true,createSc:false,
+  identity:{inspector:'Nguyễn Văn Kỹ thuật',km:'',driverId:'1',note:''},
+  conclusion:{replacement:'',mechanicRemedies:'',driverRemedies:'',driverOpinion:''},
+  rows:{},
+  createPwmsMats:[],createKtvMats:[],createWorkItems:[],createContentTouched:false,
+};
+function emptyRow(){return{assessment:'',note:'',repairs:[],materials:[],pickQ:'',matQty:1,showPick:false}}
+function ensureRows(){CHECKLIST.forEach(g=>g.items.forEach(it=>{if(!S.rows[it.id])S.rows[it.id]=emptyRow()}))}
+ensureRows();
+
+function toast(m){const el=$('#toast');el.textContent=m;el.classList.add('on');clearTimeout(toast._t);toast._t=setTimeout(()=>el.classList.remove('on'),2200)}
+function veh(id){return VEHICLES.find(v=>v.id===Number(id))}
+function ordersOf(vid){return ORDERS.filter(o=>o.vehicleId===Number(vid)).sort((a,b)=>b.date.localeCompare(a.date))}
+function evalBadge(st){
+  return({ok:['b-ok','Đúng hạn'],soon:['b-mh','Sắp đến hạn'],due:['b-warn','Đến hạn'],overdue:['b-bad','Quá hạn']})[st]||['b-ns',st];
+}
+function statusBadge(st){return st==='COMPLETED'?'<span class="badge b-ok">Hoàn thành</span>':st==='IN_PROGRESS'?'<span class="badge b-ip">Đang thực hiện</span>':'<span class="badge b-ns">Chưa thực hiện</span>'}
+function approvalBadge(a){return a==='APPROVED'?'<span class="badge b-ok">Đã duyệt</span>':a==='PENDING_APPROVAL'?'<span class="badge b-base">Chờ duyệt</span>':a==='REJECTED'?'<span class="badge b-bad">Từ chối</span>':'<span class="badge b-ns">Nháp</span>'}
+function mhBadge(m){return m==='SYNCED'?'<span class="badge b-ok">Đã ĐB MH</span>':m==='NONE'?'<span class="badge b-mh">Chưa ĐB MH</span>':m==='SYNCING'?'<span class="badge b-mh">Đang ĐB MH…</span>':''}
+function baseBadge(b){return b?.status==='SYNCED'?'<span class="badge b-base">Đã ĐB BASE</span>':b?.status==='SYNCING'?'<span class="badge b-base">Đang ĐB BASE…</span>':'<span class="badge b-ns">Chưa ĐB BASE</span>'}
+function typeLabel(t){return t==='PERIODIC'?'Bảo dưỡng':'Sửa chữa'}
+
+function show(scr){
+  $$('.scr').forEach(s=>s.classList.toggle('on',s.dataset.scr===scr));
+  $('#fabCreate').style.display=scr==='list'?'block':'none';
+  if(scr==='list')renderList();
+  if(scr==='vehicle')renderVehicle();
+  if(scr==='order')renderOrder();
+  if(scr==='eval'){const v=veh(S.vehicleId);$('#evalPlate').textContent=v?.plate||'—';S.identity.km=String(v?.km||'');renderEval()}
+  if(scr==='create'){
+    const v=veh(S.vehicleId);
+    $('#createPlate').textContent=v?.plate||'—';
+    if($('#cKm')&&v)$('#cKm').value=v.km;
+    if($('#cContent'))$('#cContent').value='';
+    if($('#cGarage')&&v)$('#cGarage').value=v.garage||'';
+    S.createPwmsMats=[];
+    S.createKtvMats=[];
+    S.createWorkItems=[];
+    S.createContentTouched=false;
+    renderCreateWorkItems();
+    renderCreateMatChips();
+    hideAllAc();
+    syncCreateType();
+  }
+}
+
+function renderList(){
+  const q=($('#vehSearch')?.value||S.search||'').trim().toLowerCase();
+  S.search=q;
+  const list=VEHICLES.filter(v=>!q||[v.plate,v.type,v.brand,v.model,v.garage,v.area].join(' ').toLowerCase().includes(q));
+  const needEval=VEHICLES.filter(v=>v.eval!=='ok').length;
+  const doing=ORDERS.filter(o=>o.status==='IN_PROGRESS').length;
+  const sync=ORDERS.filter(o=>o.mh==='NONE'||o.base?.status==='NONE').filter(o=>o.status!=='NOT_STARTED'||o.approval==='APPROVED').length;
+  $('#kpiVeh').textContent=VEHICLES.length;
+  $('#kpiEval').textContent=needEval;
+  $('#kpiDoing').textContent=doing;
+  $('#kpiSync').textContent=sync;
+
+  $('#vehList').innerHTML=list.map(v=>{
+    const [ec,el]=evalBadge(v.eval);
+    return `<article class="card10 p-3">
+      <div class="flex items-start justify-between gap-2 mb-1">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <p class="text-[15px] font-bold m-0">${v.plate}</p>
+            <span class="badge ${v.trailer?'b-trail':'b-veh'}">${v.trailer?'Mooc':'Xe'}</span>
+          </div>
+          <p class="text-sm text-slate-500 m-0 mt-0.5">${v.type} · ${esc(v.brand||'')} ${esc(v.model||'')} · ${v.garage}</p>
+        </div>
+        <span class="badge ${ec} shrink-0">${el}</span>
+      </div>
+      <dl class="meta mt-2">
+        <div>Odo: <b>${kmFmt(v.km)} km</b></div>
+        <div>KV: <b>${v.area}</b></div>
+      </dl>
+      <button type="button" class="btn-link mt-2.5 w-full" data-open-vehicle="${v.id}">Mở xe</button>
+    </article>`;
+  }).join('')||'<p class="text-sm text-slate-500 text-center py-6">Không có xe khớp</p>';
+}
+
+function renderVehicle(){
+  const v=veh(S.vehicleId); if(!v) return;
+  const [ec,el]=evalBadge(v.eval);
+  const oo=ordersOf(v.id);
+  const tab=S.vehicleTab;
+  const tabs=[
+    ['todo','Việc cần'],
+    ['plan','Kế hoạch'],
+    ['maintenance','Bảo dưỡng'],
+    ['repair','Sửa chữa'],
+  ];
+
+  let body='';
+  if(tab==='todo'){
+    const need=oo.filter(o=>o.status!=='COMPLETED'||o.mh==='NONE'||o.base?.status!=='SYNCED');
+    const urg=need.filter(o=>o.status==='IN_PROGRESS'||o.approval==='REJECTED'||o.mh==='NONE');
+    body=`
+      <div class="space-y-2.5">
+        ${v.eval!=='ok'?`<div class="card10 p-3 border-amber-200 bg-amber-50/50">
+          <div class="flex justify-between gap-2 items-start">
+            <div><div class="font-semibold text-sm">Đánh giá định kỳ</div><div class="text-xs text-slate-600 mt-0.5">Trạng thái: ${el}</div></div>
+            <span class="badge ${ec}">${el}</span>
+          </div>
+          <button type="button" class="btn btn-primary btn-touch btn-block mt-2.5" data-go="eval">Mở phiếu đánh giá</button>
+        </div>`:`<div class="card10 p-3 text-sm text-emerald-800 bg-emerald-50 border-emerald-100">Đánh giá định kỳ đúng hạn · <button type="button" class="text-blue-600 font-semibold" data-go="eval">Đánh giá lại</button></div>`}
+        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 px-0.5 m-0">Phiếu cần xử lý trên xe này</p>
+        ${(urg.length?urg:need.slice(0,3)).map(orderCard).join('')||'<p class="text-sm text-slate-500">Không có việc tồn.</p>'}
+        <button type="button" class="btn btn-outline btn-touch btn-block" data-go="create">+ Tạo phiếu cho xe này</button>
+      </div>`;
+  } else if(tab==='plan'){
+    const plans=PLANS[v.id]||[];
+    body=`<div class="space-y-2.5">
+      <p class="text-xs text-slate-500 m-0">Kế hoạch gắn xe · <span class="badge b-base">Từ ĐG</span> từ đánh giá · mẫu quản lý trên web</p>
+      ${plans.map(p=>`<div class="card10 p-3">
+        <div class="flex justify-between gap-2 items-start">
+          <div class="font-semibold text-sm text-blue-600">${p.code}${p.source==='PERIODIC_ASSESSMENT'?' <span class="badge b-base">Từ ĐG</span>':''}${p.templateId||p.source==='TEMPLATE'?' <span class="badge b-base">Mẫu</span>':''}</div>
+          <span class="badge b-ns">${p.status}</span>
+        </div>
+        <div class="text-sm mt-1">${p.name}</div>
+        <div class="text-xs text-slate-500 mt-1">${p.period} · ${p.system} · SL ${p.qty||1} ${p.uom||''}${p.next?' · Mốc: '+p.next:''}</div>
+        ${p.note?`<div class="text-[11px] text-slate-500 mt-1">${esc(p.note)}</div>`:''}
+        <button type="button" class="btn-link mt-2.5 w-full" data-plan-to-order="${p.id}">Tạo phiếu từ kế hoạch</button>
+      </div>`).join('')||'<p class="text-sm text-slate-500">Chưa có kế hoạch. Nộp đánh giá có SC/Thay để đề xuất dòng KH.</p>'}
+    </div>`;
+  } else if(tab==='maintenance'||tab==='repair'){
+    const type=tab==='maintenance'?'PERIODIC':'INCIDENTAL';
+    const list=oo.filter(o=>o.type===type);
+    body=`<div class="space-y-2.5">
+      <div class="flex gap-2">
+        <button type="button" class="btn btn-primary btn-touch flex-1" data-go="create" data-ctype="${type}">+ Tạo phiếu ${type==='PERIODIC'?'BD':'SC'}</button>
+      </div>
+      ${list.map(orderCard).join('')||`<p class="text-sm text-slate-500 py-4 text-center">Chưa có phiếu ${type==='PERIODIC'?'bảo dưỡng':'sửa chữa'}.</p>`}
+    </div>`;
+  }
+
+  $('#vehicleRoot').innerHTML=`
+    <div class="px-3 pt-2 pb-3 space-y-3">
+      <button type="button" class="text-sm font-semibold text-blue-600 bg-transparent border-0 p-0" data-go="list">← Bảo dưỡng &amp; sửa chữa</button>
+      <div class="surface p-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="text-xl font-bold m-0">${v.plate}</h1>
+          <span class="badge ${v.trailer?'b-trail':'b-veh'}">${v.trailer?'Mooc':'Xe'}</span>
+          <span class="badge ${ec}">${el}</span>
+        </div>
+        <p class="text-sm text-slate-600 mt-1 m-0">${v.type} · ${esc(v.brand||'')} ${esc(v.model||'')} · Đời ${v.year} · KV ${v.area}</p>
+        <p class="text-sm mt-2 m-0">Odo: <strong class="tabular-nums">${kmFmt(v.km)} km</strong> · ${v.garage}</p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button type="button" class="btn btn-outline btn-touch" data-go="eval">Đánh giá</button>
+          <button type="button" class="btn btn-primary btn-touch" data-go="create">+ Tạo phiếu</button>
+        </div>
+      </div>
+      <div class="vtabs">${tabs.map(([id,lab])=>`<button type="button" data-vtab="${id}" class="${tab===id?'on':''}">${lab}</button>`).join('')}</div>
+      ${body}
+    </div>`;
+}
+
+function orderCard(o){
+  return `<article class="card10 p-3">
+    <div class="flex justify-between gap-2 items-start mb-1">
+      <p class="text-[15px] font-bold m-0 text-blue-600">${o.code}</p>
+      ${statusBadge(o.status)}
+    </div>
+    <p class="text-sm text-slate-800 m-0">${o.content}</p>
+    <div class="flex flex-wrap gap-1 mt-1.5">${approvalBadge(o.approval)} ${mhBadge(o.mh)} ${baseBadge(o.base)}</div>
+    <dl class="meta mt-2">
+      <div>Loại: <b>${typeLabel(o.type)}</b></div>
+      <div>Lần: <b>${o.occ}</b></div>
+      <div>Ngày: <b>${o.date}</b></div>
+      <div>Odo: <b>${kmFmt(o.km)}</b></div>
+    </dl>
+    <button type="button" class="btn-link mt-2.5 w-full" data-open-order="${o.id}">Xem chi tiết</button>
+  </article>`;
+}
+
+function renderOrder(){
+  const o=ORDERS.find(x=>x.id===S.orderId); if(!o) return;
+  if(!o.base)o.base={status:'NONE',code:null,baseStatus:null};
+  $$('#orderTabs [data-otab]').forEach(b=>b.classList.toggle('on',b.dataset.otab===S.orderTab));
+
+  if(S.orderTab==='system'){
+    $('#orderPanel').innerHTML=`<div class="m-3 surface overflow-hidden"><div class="sec-h">Thông tin hệ thống</div><div class="p-4">${(o.log||[]).map(e=>`<div class="tl"><div class="text-sm font-medium">${e.text}</div><div class="text-xs text-slate-500">${e.at}</div></div>`).join('')||'<p class="text-sm text-slate-500">Chưa có sự kiện</p>'}</div></div>`;
+    return;
+  }
+
+  const acts=[];
+  if(o.status==='NOT_STARTED'&&o.approval==='APPROVED')acts.push(`<button type="button" class="btn btn-primary btn-touch" id="btnStart">Bắt đầu thực hiện</button>`);
+  if(o.status==='IN_PROGRESS')acts.push(`<button type="button" class="btn btn-emerald btn-touch" id="btnComplete">Hoàn thành</button>`);
+  acts.push(o.base.status==='SYNCING'?`<button class="btn btn-outline btn-touch" disabled>Đang đồng bộ…</button>`:`<button type="button" class="btn btn-outline btn-touch" id="btnSyncBase">Đồng bộ</button>`);
+  if(o.mh==='NONE'||o.mh==='SYNCING')acts.push(`<button type="button" class="btn btn-sky btn-touch" id="btnSyncMh" ${o.mh==='SYNCING'?'disabled':''}>${o.mh==='SYNCING'?'Đang ĐB mua hàng…':'Đồng bộ mua hàng'}</button>`);
+
+  const baseLine=o.base.code
+    ?`<p class="mt-1 text-sm text-slate-600 m-0">Mã BASE: ${esc(o.base.code)}</p>`
+    :`<p class="mt-1 text-sm text-slate-500 m-0">Chưa đồng bộ BASE</p>`;
+
+  $('#orderPanel').innerHTML=`
+  <div class="m-3 surface overflow-hidden">
+    <div class="px-3 py-2 border-b border-slate-200">
+      <h1 class="text-lg font-bold text-blue-600 m-0 leading-snug">Phiếu: ${o.code}</h1>
+      ${baseLine}
+      <div class="mt-2 flex flex-wrap gap-1">${approvalBadge(o.approval)} ${statusBadge(o.status)} ${mhBadge(o.mh)} ${baseBadge(o.base)}</div>
+      <div class="mt-3 flex flex-wrap gap-2">${acts.join('')}</div>
+    </div>
+    <div class="p-3 space-y-3">
+      <div class="grid gap-3">
+        <div class="surface p-3"><p class="text-sm text-slate-500 m-0">Tổng chi phí phiếu</p><p class="text-xl font-bold m-0">${money(o.cost)}</p></div>
+        <div class="surface p-3"><p class="text-sm text-slate-500 m-0">Số hạng mục</p><p class="text-xl font-bold m-0">${(o.workItems&&o.workItems.length)||1}</p></div>
+      </div>
+      <section class="surface overflow-hidden">
+        <div class="sec-h">Thông tin chung</div>
+        <div class="grid gap-y-3 p-4 text-sm">
+          <div><div class="text-slate-500">Phương tiện</div><div class="font-medium">${veh(o.vehicleId)?.plate||'—'}</div></div>
+          <div><div class="text-slate-500">Nội dung</div><div class="font-medium">${o.content}</div></div>
+          <div><div class="text-slate-500">Nơi thực hiện</div><div class="font-medium">${o.garage}</div></div>
+          <div><div class="text-slate-500">Nguồn</div><div class="font-medium">${o.source}</div></div>
+        </div>
+      </section>
+      <section class="surface overflow-hidden">
+        <div class="sec-h"><span>Hạng mục công việc</span></div>
+        <div class="p-3 space-y-2">${
+          (o.workItems&&o.workItems.length?o.workItems:[{content:o.content,system:o.system}]).map((w,i)=>`<article class="card10 p-3">
+          <div class="flex justify-between"><p class="text-[15px] font-bold m-0">#${i+1} · ${esc(w.system||o.system||'—')}</p>${i===0?`<p class="text-sm font-semibold text-emerald-700 m-0">${money(o.cost)}</p>`:''}</div>
+          <p class="text-sm text-slate-600 mt-1 m-0">${esc(w.content)}</p>
+          ${i===0?(o.mats||[]).map(m=>`<div class="text-xs text-slate-500 mt-1">${esc(m.name)} ×${m.qty} · ${money(m.price)} (${m.tag})</div>`).join(''):''}
+        </article>`).join('')
+        }</div>
+      </section>
+    </div>
+  </div>`;
+
+  $('#btnStart')?.addEventListener('click',()=>{o.status='IN_PROGRESS';toast('Đã bắt đầu');renderOrder()});
+  $('#btnComplete')?.addEventListener('click',()=>{o.status='COMPLETED';toast('Đã hoàn thành');renderOrder()});
+  $('#btnSyncBase')?.addEventListener('click',()=>{
+    o.base.status='SYNCING';renderOrder();toast('Đang đồng bộ BASE…');
+    setTimeout(()=>{o.base={status:'SYNCED',code:o.base.code||('BASE-'+o.code.replace(/^RO-/,'')),baseStatus:'APPROVED'};o.log.push({at:'Vừa xong',text:'Đồng bộ BASE · '+o.base.code});toast('Đã đồng bộ · '+o.base.code);renderOrder()},900);
+  });
+  $('#btnSyncMh')?.addEventListener('click',()=>{
+    o.mh='SYNCING';renderOrder();toast('Đang đồng bộ mua hàng…');
+    setTimeout(()=>{o.mh='SYNCED';o.mats=(o.mats||[]).map(m=>({...m,price:Math.round(m.price*1.05),tag:'Đã ĐB MH'}));o.cost=(o.mats||[]).reduce((a,m)=>a+m.price*m.qty,0);o.log.push({at:'Vừa xong',text:'Đồng bộ mua hàng'});toast('Đã đồng bộ mua hàng');renderOrder()},1000);
+  });
+}
+
+/* ===== EVAL (giữ SC/Thay chọn hạng mục & VT) ===== */
+function renderEval(){
+  const step=S.evalStep;
+  $$('#evalSteps span').forEach((s,i)=>s.classList.toggle('on',i===step-1));
+  if(step===1){
+    const id=S.identity;
+    $('#evalBody').innerHTML=`
+      <div class="surface p-3 mb-3 bg-amber-50/50 border-amber-100 text-center">
+        <p class="text-xs font-semibold uppercase text-slate-700 m-0">Thông tin đầu phiếu</p>
+        <p class="text-[11px] text-slate-600 mt-1 m-0">Gắn với xe ${esc(veh(S.vehicleId)?.plate||'')}</p>
+      </div>
+      <label class="field"><span>Kỹ thuật viên *</span><select id="eInspector"><option>Nguyễn Văn Kỹ thuật</option><option>Trần B</option><option>Lê C</option></select></label>
+      <label class="field"><span>Số km hoạt động *</span><input id="eKm" type="number" value="${esc(id.km)}" /></label>
+      <label class="field"><span>Tài xế</span><select id="eDriver">${DRIVERS.map(d=>`<option value="${d.id}" ${String(id.driverId)===String(d.id)?'selected':''}>${esc(d.name)}</option>`).join('')}</select></label>
+      <label class="field"><span>Ghi chú phiếu</span><textarea id="eNote">${esc(id.note)}</textarea></label>
+      <label class="flex items-start gap-2 text-sm mb-2"><input type="checkbox" id="eExempt" class="mt-1 size-4 accent-blue-600" ${S.periodExempt?'checked':''}/><span><strong>Miễn kỳ</strong> — xe sửa dài ngày</span></label>
+      <div id="exemptWrap" class="${S.periodExempt?'':'hidden'}"><label class="field"><span>Lý do miễn kỳ *</span><textarea id="eExemptReason"></textarea></label></div>`;
+    $('#eExempt')?.addEventListener('change',e=>{S.periodExempt=e.target.checked;$('#exemptWrap').classList.toggle('hidden',!e.target.checked)});
+    $('#evalFooter').style.gridTemplateColumns='1fr';
+    $('#evalFooter').innerHTML=`<button type="button" class="btn btn-primary btn-touch" id="evalNext">${S.periodExempt?'Tiếp · Kết luận':'Tiếp · Checklist'}</button>`;
+  } else if(step===2){
+    if(S.periodExempt){S.evalStep=3;renderEval();return}
+    $('#evalBody').innerHTML=`
+      <p class="text-xs text-slate-500 mb-3 m-0">Tốt / <strong>SC</strong> (chọn hạng mục sửa) / <strong>Thay</strong> (chọn vật tư + SL).</p>
+      ${CHECKLIST.map(g=>`<div class="surface overflow-hidden mb-3"><div class="group">${esc(g.group)}</div>${g.items.map(renderCheckItem).join('')}</div>`).join('')}`;
+    bindCheck();
+    $('#evalFooter').style.gridTemplateColumns='1fr 1fr';
+    $('#evalFooter').innerHTML=`<button type="button" class="btn btn-outline btn-touch" id="evalPrev">Trước</button><button type="button" class="btn btn-primary btn-touch" id="evalNext">Tiếp</button>`;
+  } else {
+    const bad=Object.entries(S.rows).filter(([,r])=>r.assessment==='repair'||r.assessment==='replace');
+    const c=S.conclusion;
+    $('#evalBody').innerHTML=`
+      ${S.periodExempt?'<div class="surface p-3 mb-3 text-sm bg-amber-50">Phiếu miễn kỳ.</div>':`
+      <div class="surface p-3 mb-3 text-sm">
+        <div class="font-semibold mb-1">${bad.length?bad.length+' hạng mục SC / Thay':'Tất cả Tốt'}</div>
+        ${bad.map(([id,r])=>{const it=CHECKLIST.flatMap(g=>g.items).find(x=>x.id===id);const d=r.assessment==='repair'?(r.repairs.map(x=>x.name).join(', ')||'Chưa chọn SC'):(r.materials.map(x=>x.name+'×'+x.qty).join(', ')||'Chưa chọn VT');return `<div class="text-xs text-slate-600 mt-1">• ${esc(it?.label)} · <b>${r.assessment==='repair'?'SC':'Thay'}</b> · ${esc(d)}</div>`}).join('')}
+      </div>`}
+      <section class="surface p-3 mb-3">
+        <h3 class="text-sm font-semibold m-0 mb-2">Kết luận &amp; đề xuất</h3>
+        <label class="field"><span>Đề nghị thay thế</span><textarea id="cRep">${esc(c.replacement)}</textarea></label>
+        <label class="field"><span>KTV / QL xe cần khắc phục</span><textarea id="cMech">${esc(c.mechanicRemedies)}</textarea></label>
+        <label class="field"><span>Tài xế cần khắc phục</span><textarea id="cDrv">${esc(c.driverRemedies)}</textarea></label>
+        <label class="field"><span>Ý kiến lái xe</span><textarea id="cOp">${esc(c.driverOpinion)}</textarea></label>
+      </section>
+      ${!S.periodExempt?`
+      <div class="surface p-3 mb-3 border-blue-200 bg-blue-50/50 space-y-2">
+        <p class="text-sm font-semibold m-0">Sau khi nộp (có SC / Thay)</p>
+        <p class="text-[11px] text-slate-600 m-0 leading-relaxed">Đánh giá → <strong>dòng kế hoạch</strong> → tạo phiếu thực tế. Tuỳ chọn tạo SC nháp ngay.</p>
+        <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="eCreatePlan" class="mt-0.5 size-4 accent-blue-600" ${S.createPlan?'checked':''}/><span><strong>Tạo dòng kế hoạch</strong> từ SC / Thay</span></label>
+        <label class="flex items-start gap-2 text-sm"><input type="checkbox" id="eCreateSc" class="mt-0.5 size-4 accent-blue-600" ${S.createSc?'checked':''} ${bad.length?'':'disabled'}/><span><strong>Tạo phiếu SC nháp ngay</strong></span></label>
+      </div>`:''}`;
+    $('#evalFooter').style.gridTemplateColumns='1fr 1fr 1fr';
+    $('#evalFooter').innerHTML=`<button type="button" class="btn btn-outline btn-touch" id="evalPrev">Trước</button><button type="button" class="btn btn-outline btn-touch" id="evalDraft">Nháp</button><button type="button" class="btn btn-primary btn-touch" id="evalSubmit">Nộp</button>`;
+  }
+  $('#evalNext')?.addEventListener('click',()=>{
+    if(step===1){S.identity={inspector:$('#eInspector')?.value||'',km:$('#eKm')?.value||'',driverId:$('#eDriver')?.value||'',note:$('#eNote')?.value||''};S.evalStep=S.periodExempt?3:2}
+    else S.evalStep=Math.min(3,step+1);
+    renderEval();
+  });
+  $('#evalPrev')?.addEventListener('click',()=>{S.evalStep=(step===3&&S.periodExempt)?1:Math.max(1,step-1);renderEval()});
+  $('#evalDraft')?.addEventListener('click',()=>{saveConc();toast('Đã lưu nháp');show('vehicle')});
+  $('#evalSubmit')?.addEventListener('click',()=>{
+    saveConc();
+    const miss=Object.entries(S.rows).filter(([,r])=>(r.assessment==='repair'&&!r.repairs.length)||(r.assessment==='replace'&&!r.materials.length));
+    if(miss.length&&!S.periodExempt){toast('SC/Thay cần chọn hạng mục hoặc vật tư');S.evalStep=2;renderEval();return}
+    const badEntries=Object.entries(S.rows).filter(([,r])=>r.assessment==='repair'||r.assessment==='replace');
+    const v=veh(S.vehicleId);
+    let nPlan=0, orderCode=null;
+    if(!S.periodExempt && badEntries.length){
+      if(S.createPlan){
+        if(!PLANS[v.id]) PLANS[v.id]=[];
+        const period='2026-09';
+        badEntries.forEach(([id,r])=>{
+          const it=CHECKLIST.flatMap(g=>g.items).find(x=>x.id===id);
+          if(r.assessment==='repair'){
+            r.repairs.forEach(rep=>{
+              PLANS[v.id].unshift({id:'p'+Date.now()+Math.random().toString(36).slice(2,5),period,code:'MP-2026-'+(2000+Math.floor(Math.random()*700)),name:rep.name,system:rep.system||'Từ đánh giá',next:'—',status:'Mới',source:'PERIODIC_ASSESSMENT',qty:1,uom:'Lần',note:'Từ ĐG · '+ (it?.label||'') +' · SC'});
+              nPlan++;
+            });
+          } else {
+            r.materials.forEach(m=>{
+              PLANS[v.id].unshift({id:'p'+Date.now()+Math.random().toString(36).slice(2,5),period,code:'MP-2026-'+(2000+Math.floor(Math.random()*700)),name:(m.code?m.code+' · ':'')+m.name,system:'Vật tư thay thế',next:'—',status:'Mới',source:'PERIODIC_ASSESSMENT',qty:m.qty||1,uom:'Cái',note:'Từ ĐG · Thay · '+(it?.label||'')});
+              nPlan++;
+            });
+          }
+        });
+      }
+      if(S.createSc){
+        orderCode='RO-2026-'+(1100+Math.floor(Math.random()*800));
+        ORDERS.unshift({id:'o'+Date.now().toString(36),vehicleId:v.id,code:orderCode,type:'INCIDENTAL',occ:ordersOf(v.id).filter(o=>o.type==='INCIDENTAL').length+1,date:'2026-09-30',km:v.km,garage:v.garage,source:'Đánh giá định kỳ',status:'NOT_STARTED',approval:'DRAFT',content:'SC từ đánh giá ('+badEntries.length+' hạng mục)',cost:0,system:'Từ đánh giá',mh:'NA',base:{status:'NONE',code:null,baseStatus:null},mats:[],log:[{at:'Vừa xong',text:'Tạo từ đánh giá'+(nPlan?' · kèm '+nPlan+' dòng KH':'')}]});
+      }
+    }
+    if(v) v.eval='ok';
+    S.evalStep=1;S.rows={};ensureRows();
+    if(nPlan){
+      toast('Đã nộp · tạo '+nPlan+' dòng kế hoạch'+(orderCode?' + phiếu '+orderCode:''));
+      S.vehicleTab='plan';
+    } else if(orderCode){
+      toast('Đã nộp · tạo phiếu '+orderCode);
+      S.vehicleTab='repair';
+    } else {
+      toast(S.periodExempt?'Đã nộp miễn kỳ':'Đã nộp phiếu đánh giá');
+      S.vehicleTab='todo';
+    }
+    show('vehicle');
+  });
+}
+function saveConc(){
+  if($('#cRep'))S.conclusion={replacement:$('#cRep').value,mechanicRemedies:$('#cMech').value,driverRemedies:$('#cDrv').value,driverOpinion:$('#cOp').value};
+  if($('#eCreatePlan'))S.createPlan=$('#eCreatePlan').checked;
+  if($('#eCreateSc'))S.createSc=$('#eCreateSc').checked;
+}
+
+function renderCheckItem(it){
+  const r=S.rows[it.id]; const a=r.assessment;
+  return `<div class="p-3 border-b border-slate-100 last:border-0 ${a==='repair'?'bg-amber-50/40':a==='replace'?'bg-red-50/30':''}">
+    <div class="flex gap-2 mb-2 items-start"><span class="pt">${esc(it.method)}</span><div class="text-sm font-semibold">${esc(it.label)}${it.required?' <span class="text-rose-500">*</span>':''}</div></div>
+    <div class="assess mb-2">
+      <button type="button" class="${a==='ok'?'g':''}" data-assess="${it.id}" data-val="ok">Tốt</button>
+      <button type="button" class="${a==='repair'?'r':''}" data-assess="${it.id}" data-val="repair">SC</button>
+      <button type="button" class="${a==='replace'?'p':''}" data-assess="${it.id}" data-val="replace">Thay</button>
+    </div>
+    <input class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm mb-1" data-note="${it.id}" value="${esc(r.note)}" placeholder="${a&&a!=='ok'?'Ghi chú / hạn xử lý…':'Ghi chú (tùy chọn)'}" />
+    <div class="panel sc ${a==='repair'?'show':''}">
+      <div class="text-xs font-semibold text-amber-900 mb-1">Hạng mục cần sửa (SC)</div>
+      <div class="mb-1" data-chips-r="${it.id}">${chipRepairs(it.id)}</div>
+      <input type="search" class="w-full min-h-10 rounded-md border border-slate-300 px-3 text-sm" data-pick-r="${it.id}" placeholder="Tìm hạng mục sửa…" value="${esc(r.pickQ||'')}" />
+      <div class="pick ${r.showPick&&a==='repair'?'':'hidden'}" data-dd-r="${it.id}">${optsRepair(it.id)}</div>
+    </div>
+    <div class="panel th ${a==='replace'?'show':''}">
+      <div class="text-xs font-semibold text-red-800 mb-1">Vật tư cần thay</div>
+      <div class="mb-1" data-chips-m="${it.id}">${chipMats(it.id)}</div>
+      <div class="flex gap-2">
+        <input type="search" class="flex-1 min-h-10 rounded-md border border-slate-300 px-3 text-sm" data-pick-m="${it.id}" placeholder="Tìm vật tư…" value="${esc(r.pickQ||'')}" />
+        <input type="number" min="1" class="w-16 min-h-10 rounded-md border border-slate-300 px-2 text-sm" data-qty="${it.id}" value="${r.matQty||1}" />
+      </div>
+      <div class="pick ${r.showPick&&a==='replace'?'':'hidden'}" data-dd-m="${it.id}">${optsMat(it.id)}</div>
+    </div>
+  </div>`;
+}
+function chipRepairs(id){const l=S.rows[id].repairs;return l.length?l.map((x,i)=>`<span class="chip">${esc(x.name)}<button type="button" data-rm="${id}:r:${i}">×</button></span>`).join(''):'<div class="text-xs text-slate-400">Chưa thêm · tìm bên dưới</div>'}
+function chipMats(id){const l=S.rows[id].materials;return l.length?l.map((x,i)=>`<span class="chip">${esc(x.code)} · ${esc(x.name)} ×${x.qty}<button type="button" data-rm="${id}:m:${i}">×</button></span>`).join(''):'<div class="text-xs text-slate-400">Chưa thêm · tìm bên dưới</div>'}
+function optsRepair(id){const q=(S.rows[id].pickQ||'').toLowerCase();const o=REPAIRS.filter(r=>!q||r.name.toLowerCase().includes(q));return o.length?o.map(r=>`<button type="button" data-add-r="${id}" data-rid="${r.id}"><span class="text-[11px] text-slate-400">${esc(r.system)}</span><br/><strong>${esc(r.name)}</strong></button>`).join(''):`<button type="button" data-add-rc="${id}">+ Thêm “${esc(S.rows[id].pickQ||'…')}”</button>`}
+function optsMat(id){const q=(S.rows[id].pickQ||'').toLowerCase();const o=MATERIALS.filter(m=>!q||m.name.toLowerCase().includes(q)||m.code.toLowerCase().includes(q));return o.map(m=>`<button type="button" data-add-m="${id}" data-mid="${m.id}"><span class="text-[11px] text-slate-400">${esc(m.code)}</span><br/><strong>${esc(m.name)}</strong></button>`).join('')||'<div class="px-3 py-2 text-xs text-slate-400">Không thấy</div>'}
+
+function bindCheck(){
+  $$('[data-assess]').forEach(b=>b.onclick=()=>{const id=b.dataset.assess,val=b.dataset.val;const r=S.rows[id];r.assessment=r.assessment===val?'':val;r.showPick=r.assessment==='repair'||r.assessment==='replace';r.pickQ='';renderEval()});
+  $$('[data-note]').forEach(i=>i.oninput=()=>{S.rows[i.dataset.note].note=i.value});
+  $$('[data-pick-r]').forEach(i=>{const go=()=>{const id=i.dataset.pickR;S.rows[id].pickQ=i.value;S.rows[id].showPick=true;const dd=$(`[data-dd-r="${id}"]`);dd.innerHTML=optsRepair(id);dd.classList.remove('hidden');bindPick()};i.onfocus=go;i.oninput=go});
+  $$('[data-pick-m]').forEach(i=>{const go=()=>{const id=i.dataset.pickM;S.rows[id].pickQ=i.value;S.rows[id].showPick=true;const dd=$(`[data-dd-m="${id}"]`);dd.innerHTML=optsMat(id);dd.classList.remove('hidden');bindPick()};i.onfocus=go;i.oninput=go});
+  $$('[data-qty]').forEach(i=>i.oninput=()=>{S.rows[i.dataset.qty].matQty=+i.value||1});
+  $$('[data-rm]').forEach(b=>b.onclick=e=>{e.stopPropagation();const[id,k,idx]=b.dataset.rm.split(':');if(k==='r')S.rows[id].repairs.splice(+idx,1);else S.rows[id].materials.splice(+idx,1);renderEval()});
+  bindPick();
+}
+function bindPick(){
+  $$('[data-add-r]').forEach(b=>b.onclick=()=>{const id=b.dataset.addR;const r=REPAIRS.find(x=>x.id===b.dataset.rid);if(r&&!S.rows[id].repairs.some(x=>x.id===r.id))S.rows[id].repairs.push({id:r.id,name:r.name,system:r.system});S.rows[id].pickQ='';S.rows[id].showPick=false;toast('Đã thêm SC');renderEval()});
+  $$('[data-add-rc]').forEach(b=>b.onclick=()=>{const id=b.dataset.addRc;const name=(S.rows[id].pickQ||'').trim();if(!name)return;S.rows[id].repairs.push({id:'c'+Date.now(),name,system:'Khác'});S.rows[id].pickQ='';S.rows[id].showPick=false;renderEval()});
+  $$('[data-add-m]').forEach(b=>b.onclick=()=>{const id=b.dataset.addM;const m=MATERIALS.find(x=>x.id===b.dataset.mid);if(m)S.rows[id].materials.push({id:m.id,code:m.code,name:m.name,qty:S.rows[id].matQty||1});S.rows[id].pickQ='';S.rows[id].showPick=false;toast('Đã thêm VT');renderEval()});
+}
+
+document.body.addEventListener('click',e=>{
+  const ov=e.target.closest('[data-open-vehicle]');
+  if(ov){S.vehicleId=+ov.dataset.openVehicle;S.vehicleTab='todo';show('vehicle');return}
+  const oo=e.target.closest('[data-open-order]');
+  if(oo){S.orderId=oo.dataset.openOrder;S.orderTab='slip';show('order');return}
+  const po=e.target.closest('[data-plan-to-order]');
+  if(po){
+    const v=veh(S.vehicleId);
+    const plan=(PLANS[v.id]||[]).find(p=>p.id===po.dataset.planToOrder);
+    if(!plan)return;
+    const id='o'+Date.now().toString(36);
+    const code='RO-2026-'+(1200+Math.floor(Math.random()*700));
+    ORDERS.unshift({id,vehicleId:v.id,code,type:plan.source==='PERIODIC_ASSESSMENT'?'INCIDENTAL':'PERIODIC',occ:ordersOf(v.id).length+1,date:'2026-09-30',km:v.km,garage:v.garage,source:plan.source==='PERIODIC_ASSESSMENT'?'Đánh giá định kỳ':'Dự toán',status:'NOT_STARTED',approval:'DRAFT',content:plan.name,cost:0,system:plan.system,mh:'NA',base:{status:'NONE',code:null,baseStatus:null},mats:[],log:[{at:'Vừa xong',text:'Tạo từ kế hoạch '+plan.code}]});
+    if(plan.status==='Mới')plan.status='Đã xếp lịch';
+    toast('Đã tạo phiếu '+code+' từ '+plan.code);
+    S.orderId=id;S.orderTab='slip';show('order');
+    return;
+  }
+  const vt=e.target.closest('[data-vtab]');
+  if(vt){S.vehicleTab=vt.dataset.vtab;renderVehicle();return}
+  const ot=e.target.closest('[data-otab]');
+  if(ot){S.orderTab=ot.dataset.otab;renderOrder();return}
+  if(e.target.closest('#backToVehicle')){show('vehicle');return}
+  if(e.target.closest('#fabCreate')){
+    if($('.scr.on')?.dataset.scr==='vehicle'){show('create');return}
+    S.vehicleId=VEHICLES[0].id;S.vehicleTab='todo';show('create');return;
+  }
+  const go=e.target.closest('[data-go]');
+  if(!go)return;
+  if(go.dataset.ctype)$('#cType').value=go.dataset.ctype;
+  if(go.dataset.go==='eval'){S.evalStep=1;S.periodExempt=false;S.rows={};ensureRows()}
+  show(go.dataset.go);
+});
+$('#vehSearch')?.addEventListener('input',()=>renderList());
+
+/* —— Lookup nội bộ (nhập mới chỉ lưu TMS/local, không sync PWMS) —— */
+const LOCAL_LS_KEY='fleet-bdsc-mobile-local-lookups';
+function loadLocalLookups(){
+  try{return JSON.parse(localStorage.getItem(LOCAL_LS_KEY)||'{}')}catch{return{}}
+}
+function saveLocalLookups(data){
+  try{localStorage.setItem(LOCAL_LS_KEY,JSON.stringify(data))}catch{}
+}
+let LOCAL=Object.assign({contents:[],garages:[],materials:[]},loadLocalLookups());
+
+function contentOptions(){
+  const map=new Map();
+  REPAIRS.forEach(r=>map.set(r.name.toLowerCase(),{id:r.id,name:r.name,system:r.system||'',source:'master'}));
+  MOBILE_CATALOG.forEach(c=>map.set(c.name.toLowerCase(),{id:'cat-'+c.id,name:c.name,system:c.system||'',source:'catalog'}));
+  ORDERS.forEach(o=>{
+    const n=(o.content||'').trim();
+    if(n&&!map.has(n.toLowerCase()))map.set(n.toLowerCase(),{id:'ord-'+o.id,name:n,system:o.system||'',source:'history'});
+  });
+  (LOCAL.contents||[]).forEach(c=>map.set(c.name.toLowerCase(),{id:c.id,name:c.name,system:c.system||'Khác',source:'local'}));
+  return [...map.values()];
+}
+function garageOptions(){
+  const set=new Set();
+  const seed=['Bảo dưỡng nội bộ','Xưởng Tân Cảng','Xưởng Hải Phòng','TRUNG ĐẠT BR-VT','BÌNH ANH','HYUNDAI VIỆT NHÂN','HYUNDAI PHÚ LÂM'];
+  seed.forEach(g=>set.add(g));
+  VEHICLES.forEach(v=>{if(v.garage)set.add(v.garage)});
+  ORDERS.forEach(o=>{if(o.garage)set.add(o.garage)});
+  (LOCAL.garages||[]).forEach(g=>set.add(typeof g==='string'?g:g.name));
+  return [...set].filter(Boolean).sort((a,b)=>a.localeCompare(b,'vi'));
+}
+function materialMasterOptions(){
+  return MATERIALS.map(m=>({id:m.id,code:m.code,name:m.name,source:'master'}));
+}
+function materialLocalOptions(){
+  return (LOCAL.materials||[]).map(m=>({id:m.id,code:m.code||'',name:m.name,source:'local'}));
+}
+
+function hideAllAc(){$$('.ac-dropdown').forEach(d=>d.classList.add('hidden'))}
+
+function addCreateWorkItem(o){
+  const name=(o.name||'').trim();
+  if(!name)return;
+  if((S.createWorkItems||[]).some(w=>w.content.toLowerCase()===name.toLowerCase())){
+    toast('Hạng mục đã có trong phiếu');return;
+  }
+  S.createWorkItems=S.createWorkItems||[];
+  S.createWorkItems.push({
+    id:o.id||('wi'+Date.now()),
+    content:name,
+    system:o.system||'Khác',
+    local:o.source==='local',
+    source:o.source||'master',
+  });
+  S.createContentTouched=true;
+  renderCreateWorkItems();
+}
+function renderCreateWorkItems(){
+  const list=$('#cWiList'),count=$('#cWiCount');
+  const items=S.createWorkItems||[];
+  if(count)count.textContent=items.length+' hạng mục';
+  if(!list)return;
+  if(!items.length){
+    list.innerHTML='<div class="rounded-md border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-400">Chưa có hạng mục — tìm và chọn bên trên</div>';
+    return;
+  }
+  list.innerHTML=items.map((w,i)=>`<div class="flex items-start gap-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+    <span class="mt-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded bg-slate-100 px-1.5 text-[11px] font-semibold text-slate-600">${i+1}</span>
+    <div class="min-w-0 flex-1">
+      <div class="text-sm font-medium text-slate-900">${esc(w.content)}${w.local?' <span class="local-tag">nội bộ</span>':''}</div>
+      <div class="text-[11px] text-slate-500">${esc(w.system||'—')}</div>
+    </div>
+    <button type="button" class="text-slate-400 text-lg leading-none px-1" data-rm-wi="${i}" aria-label="Xóa">×</button>
+  </div>`).join('');
+  list.querySelectorAll('[data-rm-wi]').forEach(b=>b.onclick=()=>{S.createWorkItems.splice(+b.dataset.rmWi,1);renderCreateWorkItems()});
+}
+
+function renderCreateMatChips(){
+  const pwms=$('#cPwmsChips'),ktv=$('#cKtvChips');
+  if(pwms){
+    pwms.innerHTML=(S.createPwmsMats||[]).map((m,i)=>`<span class="chip">${esc(m.code?m.code+' · ':'')}${esc(m.name)} <button type="button" data-rm-pwms="${i}" aria-label="Xóa">×</button></span>`).join('');
+    pwms.querySelectorAll('[data-rm-pwms]').forEach(b=>b.onclick=()=>{S.createPwmsMats.splice(+b.dataset.rmPwms,1);renderCreateMatChips()});
+  }
+  if(ktv){
+    ktv.innerHTML=(S.createKtvMats||[]).map((m,i)=>`<span class="chip">${esc(m.name)}${m.local?' <span class="local-tag">nội bộ</span>':''} <button type="button" data-rm-ktv="${i}" aria-label="Xóa">×</button></span>`).join('');
+    ktv.querySelectorAll('[data-rm-ktv]').forEach(b=>b.onclick=()=>{S.createKtvMats.splice(+b.dataset.rmKtv,1);renderCreateMatChips()});
+  }
+}
+
+function bindCreatableAc(input,dd,opts){
+  if(!input||!dd||input.dataset.acBound)return;
+  input.dataset.acBound='1';
+  const render=()=>{
+    const raw=input.value.trim();
+    const q=raw.toLowerCase();
+    let list=(opts.getOptions()||[]).filter(o=>{
+      const hay=((o.name||'')+' '+(o.code||'')+' '+(o.system||'')).toLowerCase();
+      return!q||hay.includes(q);
+    }).slice(0,10);
+    let html=list.map(o=>{
+      const label=opts.format?opts.format(o):esc(o.name);
+      const local=o.source==='local'?'<span class="local-tag">nội bộ</span>':'';
+      return `<button type="button" class="ac-opt" data-pick="${esc(o.id)}">${label}${local}</button>`;
+    }).join('');
+    if(raw){
+      const exists=(opts.getOptions()||[]).some(o=>(o.name||'').toLowerCase()===q||(o.code||'').toLowerCase()===q);
+      if(!exists&&opts.allowCreate!==false){
+        html+=`<button type="button" class="ac-opt create" data-create="1">+ Tạo mới (chỉ lưu nội bộ): “${esc(raw)}”</button>`;
+      }
+    }
+    if(!html)html='<div class="px-3 py-2 text-xs text-slate-400">Không có kết quả</div>';
+    dd.innerHTML=html;
+    dd.classList.remove('hidden');
+    dd.querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
+      const o=(opts.getOptions()||[]).find(x=>String(x.id)===String(b.dataset.pick));
+      if(!o)return;
+      opts.onPick(o);
+      hideAllAc();
+    });
+    dd.querySelectorAll('[data-create]').forEach(b=>b.onclick=()=>{
+      const created=opts.onCreate(raw);
+      if(created)opts.onPick(created);
+      hideAllAc();
+    });
+  };
+  input.addEventListener('focus',render);
+  input.addEventListener('input',()=>{if(opts.onInput)opts.onInput();render()});
+  input.addEventListener('keydown',e=>{if(e.key==='Escape')hideAllAc()});
+}
+
+function initCreateAutocomplete(){
+  bindCreatableAc($('#cContent'),$('#cContentDd'),{
+    getOptions:contentOptions,
+    format:o=>`${esc(o.name)}${o.system?` <span class="sub">· ${esc(o.system)}</span>`:''}`,
+    onPick:o=>{
+      addCreateWorkItem(o);
+      $('#cContent').value='';
+    },
+    onCreate:name=>{
+      const item={id:'lc'+Date.now(),name,system:'Khác'};
+      LOCAL.contents=LOCAL.contents||[];
+      LOCAL.contents.unshift(item);
+      saveLocalLookups(LOCAL);
+      toast('Đã lưu hạng mục mới · chỉ nội bộ TMS');
+      return{...item,source:'local'};
+    }
+  });
+
+  bindCreatableAc($('#cGarage'),$('#cGarageDd'),{
+    getOptions:()=>garageOptions().map(name=>({id:name,name,source:(LOCAL.garages||[]).some(g=>(g.name||g)===name)?'local':'master'})),
+    onPick:o=>{$('#cGarage').value=o.name},
+    onCreate:name=>{
+      LOCAL.garages=LOCAL.garages||[];
+      if(!LOCAL.garages.some(g=>(g.name||g).toLowerCase()===name.toLowerCase())){
+        LOCAL.garages.unshift({id:'lg'+Date.now(),name});
+        saveLocalLookups(LOCAL);
+        toast('Đã lưu nơi thực hiện mới · chỉ nội bộ TMS');
+      }
+      return{id:name,name,source:'local'};
+    }
+  });
+
+  bindCreatableAc($('#cPwmsMat'),$('#cPwmsMatDd'),{
+    getOptions:materialMasterOptions,
+    allowCreate:false,
+    format:o=>`${esc(o.code)} · ${esc(o.name)}`,
+    onPick:o=>{
+      if(!S.createPwmsMats.some(x=>x.id===o.id))S.createPwmsMats.push({id:o.id,code:o.code,name:o.name,qty:1,price:0,tag:'Kho MH'});
+      $('#cPwmsMat').value='';
+      renderCreateMatChips();
+    },
+    onCreate:()=>null
+  });
+
+  bindCreatableAc($('#cKtvMat'),$('#cKtvMatDd'),{
+    getOptions:()=>[...materialLocalOptions(),...materialMasterOptions().map(m=>({...m,source:'master'}))],
+    format:o=>o.code?`${esc(o.code)} · ${esc(o.name)}`:esc(o.name),
+    onPick:o=>{
+      const local=o.source==='local';
+      if(!S.createKtvMats.some(x=>x.name.toLowerCase()===o.name.toLowerCase())){
+        S.createKtvMats.push({id:o.id,code:o.code||'',name:o.name,qty:1,price:0,tag:'KTV/ngoài kho',local});
+      }
+      $('#cKtvMat').value='';
+      renderCreateMatChips();
+    },
+    onCreate:name=>{
+      const item={id:'lm'+Date.now(),code:'',name};
+      LOCAL.materials=LOCAL.materials||[];
+      LOCAL.materials.unshift(item);
+      saveLocalLookups(LOCAL);
+      toast('Đã lưu vật tư mới · chỉ nội bộ TMS (không sync PWMS)');
+      return{...item,source:'local'};
+    }
+  });
+}
+
+function syncCreateType(){
+  const periodic=$('#cType')?.value==='PERIODIC';
+  if($('#cCatalogWrap'))$('#cCatalogWrap').style.display=periodic?'block':'none';
+  const hint=$('#cCatHint');
+  if(!hint)return;
+  if(!periodic){hint.classList.add('hidden');hint.innerHTML='';return}
+  const cat=MOBILE_CATALOG.find(c=>String(c.id)===$('#cCatalog')?.value);
+  if(!cat){hint.classList.add('hidden');return}
+  hint.classList.remove('hidden');
+  const badge=cat.forceReplaceNext
+    ?'<span class="badge b-bad">Phải thay thế</span>'
+    :'<span class="badge b-ok">Bảo dưỡng tiếp</span>';
+  const evalB=cat.evalBad==='REPLACE'
+    ?'<span class="badge b-bad">Đánh giá lỗi → Thay thế</span>'
+    :'<span class="badge b-warn">Đánh giá lỗi → Sửa chữa</span>';
+  const suggest=REPAIRS.find(r=>(r.system||'')===(cat.system||'')||r.name.toLowerCase().includes(cat.name.split(' ')[0].toLowerCase()));
+  hint.innerHTML=badge+' '+evalB
+    +'<div class="mt-1"><span class="badge b-ns">'+esc(cat.system)+'</span> · Chu kỳ: '+esc(cat.cycle||'')+'</div>'
+    +'<div class="mt-1">'+esc(cat.hint)+'</div>'
+    +(suggest?`<div class="mt-1 text-emerald-700">Gợi ý hạng mục: <button type="button" class="text-blue-600 font-semibold bg-transparent border-0 p-0" id="btnSuggestContent">${esc(suggest.name)}</button></div>`:'')
+    +'<div class="mt-1 text-slate-500">Vật tư kho / ghi tay chọn bên dưới khi lập phiếu — nhập mới chỉ lưu nội bộ.</div>';
+  $('#btnSuggestContent')?.addEventListener('click',()=>{
+    addCreateWorkItem({...suggest,source:'master'});
+  });
+  if(!S.createContentTouched){
+    S.createWorkItems=[];
+    addCreateWorkItem({
+      name:cat.name+(cat.forceReplaceNext?' (thay thế)':' (bảo dưỡng tiếp)'),
+      system:cat.system,
+      source:'catalog',
+    });
+    S.createContentTouched=false;
+  }
+}
+$('#cType')?.addEventListener('change',syncCreateType);
+$('#cCatalog')?.addEventListener('change',syncCreateType);
+
+$('#btnCreateSave')?.addEventListener('click',()=>{
+  const v=veh(S.vehicleId);
+  const type=$('#cType').value;
+  const cat=type==='PERIODIC'?MOBILE_CATALOG.find(c=>String(c.id)===$('#cCatalog').value):null;
+  const pending=($('#cContent').value||'').trim();
+  if(pending){
+    const found=contentOptions().find(o=>o.name.toLowerCase()===pending.toLowerCase());
+    if(found)addCreateWorkItem(found);
+    else{
+      const item={id:'lc'+Date.now(),name:pending,system:'Khác'};
+      LOCAL.contents.unshift(item);saveLocalLookups(LOCAL);
+      addCreateWorkItem({...item,source:'local'});
+    }
+    $('#cContent').value='';
+  }
+  if(!(S.createWorkItems||[]).length){
+    toast('Thêm ít nhất 1 hạng mục công việc');return;
+  }
+  const garage=($('#cGarage').value||'').trim()||v.garage||'Bảo dưỡng nội bộ';
+  if(garage&&!garageOptions().some(g=>g.toLowerCase()===garage.toLowerCase())){
+    LOCAL.garages.unshift({id:'lg'+Date.now(),name:garage});
+    saveLocalLookups(LOCAL);
+  }
+  const mats=[
+    ...(S.createPwmsMats||[]).map(m=>({name:m.name,code:m.code,qty:m.qty||1,price:m.price||0,tag:'Kho MH'})),
+    ...(S.createKtvMats||[]).map(m=>({name:m.name,code:m.code||'',qty:m.qty||1,price:m.price||0,tag:'KTV/ngoài kho'})),
+  ];
+  const id='o'+Date.now().toString(36);
+  const workItems=S.createWorkItems.map(w=>({content:w.content,system:w.system||'—',local:!!w.local}));
+  const content=workItems.map(w=>w.content).join(' · ');
+  const system=workItems[0]?.system||cat?.system||'—';
+  ORDERS.unshift({
+    id,vehicleId:v.id,code:'RO-2026-'+String(Math.floor(Math.random()*9000)+1000),type,
+    occ:ordersOf(v.id).filter(o=>o.type===type).length+1,
+    date:$('#cDate')?.value||'2026-09-30',km:Number($('#cKm')?.value)||v.km,
+    garage,source:$('#cSource')?.value||'KTV tạo',
+    status:'NOT_STARTED',approval:'DRAFT',content,cost:0,
+    system,mh:mats.some(x=>x.tag==='Kho MH')?'NONE':'NA',
+    base:{status:'NONE',code:null,baseStatus:null},mats,workItems,
+    log:[{at:'Vừa xong',text:'Tạo nháp · '+workItems.length+' hạng mục'+(cat?' · '+cat.code:'')}]
+  });
+  toast('Đã tạo phiếu · '+workItems.length+' hạng mục · '+v.plate);
+  S.vehicleTab=type==='PERIODIC'?'maintenance':'repair';
+  S.createPwmsMats=[];S.createKtvMats=[];S.createWorkItems=[];S.createContentTouched=false;
+  show('vehicle');
+});
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.ac-wrap'))hideAllAc();
+});
+
+initCreateAutocomplete();
+renderList();
+</script>
+</body>
+</html>

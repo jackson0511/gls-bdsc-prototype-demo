@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GLS · Demo prototype bảo dưỡng / sửa chữa</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #e2e8f0;
+      --brand: #0b6e4f;
+      --brand-dark: #0f513f;
+      --surface: #fff;
+      --bg: #f1f5f9;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 420px at 10% -10%, #cfeee3 0%, transparent 55%),
+        radial-gradient(700px 360px at 100% 0%, #e2e8f0 0%, transparent 45%),
+        var(--bg);
+      line-height: 1.5;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 48px 20px 64px; }
+    .brand {
+      font-size: 13px; font-weight: 700; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--brand); margin: 0 0 8px;
+    }
+    h1 { margin: 0 0 10px; font-size: clamp(1.6rem, 4vw, 2rem); line-height: 1.2; }
+    .lead { margin: 0 0 28px; color: var(--muted); max-width: 52ch; }
+    .cards { display: grid; gap: 14px; }
+    @media (min-width: 640px) { .cards { grid-template-columns: 1fr 1fr; } }
+    a.card {
+      display: block; text-decoration: none; color: inherit;
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: 12px; padding: 20px 18px;
+      box-shadow: 0 1px 2px rgba(15,23,42,.05);
+      transition: border-color .15s, transform .15s;
+    }
+    a.card:hover { border-color: var(--brand); transform: translateY(-1px); }
+    a.card strong { display: block; font-size: 1.05rem; margin-bottom: 6px; color: var(--brand-dark); }
+    a.card span { font-size: 14px; color: var(--muted); }
+    .note {
+      margin-top: 28px; padding: 14px 16px; font-size: 13px; color: #334155;
+      background: #fff; border-left: 4px solid var(--brand); border-radius: 0 8px 8px 0;
+    }
+    .note ul { margin: 8px 0 0; padding-left: 18px; }
+    footer { margin-top: 36px; font-size: 12px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <p class="brand">GLS · Quản lý xe</p>
+    <h1>Demo prototype bảo dưỡng / sửa chữa</h1>
+    <p class="lead">
+      Bản tĩnh để khách hàng xem luồng giao diện. Dữ liệu mẫu chạy trên trình duyệt — không phải hệ thống vận hành thật.
+    </p>
+
+    <div class="cards">
+      <a class="card" href="console.html">
+        <strong>Console web</strong>
+        <span>Quản lý phiếu, kế hoạch, nhắc, đánh giá, barem, danh mục — màn desktop.</span>
+      </a>
+      <a class="card" href="mobile.html">
+        <strong>Mobile kỹ thuật viên</strong>
+        <span>Xe làm trung tâm · đánh giá · tạo phiếu wizard trên điện thoại.</span>
+      </a>
+    </div>
+
+    <div class="note">
+      <strong>Lưu ý khi demo</strong>
+      <ul>
+        <li>Cần kết nối internet (Tailwind / font tải từ CDN).</li>
+        <li>Thao tác lưu trên máy bạn (localStorage) — mỗi trình duyệt một bản dữ liệu.</li>
+        <li>Nút «Làm mới dữ liệu» trên console đưa seed về mặc định.</li>
+      </ul>
+    </div>
+
+    <footer>Prototype GLS · BD/SC · GitHub Pages</footer>
+  </div>
+</body>
+</html>
