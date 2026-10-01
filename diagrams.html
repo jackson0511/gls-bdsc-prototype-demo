@@ -3,26 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GLS · Sơ đồ BD/SC — Nghiệp vụ &amp; Dữ liệu</title>
+  <title>GLS · Sơ đồ BD/SC đầy đủ — Nghiệp vụ &amp; Dữ liệu</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
     :root {
-      --ink: #0f172a;
-      --muted: #475569;
-      --line: #e2e8f0;
-      --brand: #0b6e4f;
-      --brand-dark: #0f513f;
-      --amber: #b45309;
-      --sky: #0369a1;
-      --violet: #6d28d9;
-      --surface: #fff;
-      --bg: #f1f5f9;
+      --ink: #0f172a; --muted: #475569; --line: #e2e8f0;
+      --brand: #0b6e4f; --brand-dark: #0f513f; --sky: #0369a1;
+      --surface: #fff; --bg: #f1f5f9;
     }
     * { box-sizing: border-box; }
     body {
-      margin: 0;
-      font-family: "Segoe UI", system-ui, sans-serif;
-      color: var(--ink);
+      margin: 0; font-family: "Segoe UI", system-ui, sans-serif; color: var(--ink);
       background:
         radial-gradient(900px 420px at 8% -8%, #cfeee3 0%, transparent 55%),
         radial-gradient(700px 360px at 100% 0%, #dbeafe 0%, transparent 45%),
@@ -32,37 +23,48 @@
     a { color: var(--brand); }
     .top {
       position: sticky; top: 0; z-index: 20;
-      backdrop-filter: blur(10px);
-      background: rgba(255,255,255,.88);
+      backdrop-filter: blur(10px); background: rgba(255,255,255,.9);
       border-bottom: 1px solid var(--line);
     }
     .top-inner {
-      max-width: 1080px; margin: 0 auto; padding: 12px 20px;
+      max-width: 1120px; margin: 0 auto; padding: 12px 20px;
       display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
     }
-    .top .brand { font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--brand); margin-right: auto; }
-    .top nav { display: flex; flex-wrap: wrap; gap: 8px; }
+    .top .brand {
+      font-size: 12px; font-weight: 700; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--brand); margin-right: auto;
+    }
+    .top nav { display: flex; flex-wrap: wrap; gap: 6px; }
     .top a.nav {
-      text-decoration: none; font-size: 13px; font-weight: 600;
-      padding: 6px 10px; border-radius: 8px; color: var(--ink);
+      text-decoration: none; font-size: 12px; font-weight: 600;
+      padding: 5px 9px; border-radius: 8px; color: var(--ink);
       border: 1px solid transparent;
     }
     .top a.nav:hover { background: #f8fafc; border-color: var(--line); }
-    .wrap { max-width: 1080px; margin: 0 auto; padding: 28px 20px 72px; }
-    h1 { margin: 0 0 8px; font-size: clamp(1.55rem, 3.5vw, 2rem); line-height: 1.2; }
-    .lead { margin: 0 0 24px; color: var(--muted); max-width: 70ch; }
-    .toc {
-      display: grid; gap: 12px; margin-bottom: 36px;
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 20px 72px; }
+    h1 { margin: 0 0 8px; font-size: clamp(1.5rem, 3.2vw, 1.95rem); line-height: 1.2; }
+    .lead { margin: 0 0 20px; color: var(--muted); max-width: 78ch; font-size: 15px; }
+    .phases {
+      display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      margin-bottom: 28px;
     }
+    .phases a {
+      text-decoration: none; color: inherit; background: #fff;
+      border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
+      font-size: 12px;
+    }
+    .phases a:hover { border-color: var(--brand); }
+    .phases strong { display: block; font-size: 13px; margin-bottom: 2px; }
+    .phases span { color: var(--muted); }
+    .toc { display: grid; gap: 12px; margin-bottom: 32px; }
     @media (min-width: 720px) { .toc { grid-template-columns: 1fr 1fr; } }
-    .toc a {
+    .toc > a {
       display: block; text-decoration: none; color: inherit;
       background: var(--surface); border: 1px solid var(--line);
       border-radius: 12px; padding: 16px 18px;
-      box-shadow: 0 1px 2px rgba(15,23,42,.04);
     }
-    .toc a:hover { border-color: var(--brand); }
-    .toc .tag {
+    .toc > a:hover { border-color: var(--brand); }
+    .tag {
       display: inline-block; font-size: 11px; font-weight: 700;
       letter-spacing: .03em; text-transform: uppercase;
       padding: 3px 8px; border-radius: 999px; margin-bottom: 8px;
@@ -72,49 +74,45 @@
     .toc strong { display: block; margin-bottom: 4px; }
     .toc span { font-size: 14px; color: var(--muted); }
     section.panel {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 22px 20px 28px;
-      margin-bottom: 28px;
-      box-shadow: 0 1px 2px rgba(15,23,42,.04);
+      background: var(--surface); border: 1px solid var(--line);
+      border-radius: 16px; padding: 22px 20px 28px; margin-bottom: 28px;
     }
     section.panel h2 {
-      margin: 0 0 6px; font-size: 1.25rem;
+      margin: 0 0 6px; font-size: 1.2rem;
       display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
     }
-    section.panel .sub {
-      margin: 0 0 18px; color: var(--muted); font-size: 14px;
+    section.panel .sub { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
+    h3.block {
+      margin: 22px 0 10px; font-size: 15px; color: var(--brand-dark);
+      padding-bottom: 6px; border-bottom: 1px solid var(--line);
     }
+    h3.block:first-of-type { margin-top: 4px; }
     .diagram {
-      overflow-x: auto;
-      background: #f8fafc;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 16px 12px;
-      margin-bottom: 20px;
+      overflow-x: auto; background: #f8fafc; border: 1px solid var(--line);
+      border-radius: 12px; padding: 14px 10px; margin-bottom: 14px;
     }
     .mermaid { display: flex; justify-content: center; }
-    .explain h3 {
-      margin: 18px 0 8px; font-size: 15px; color: var(--brand-dark);
-    }
-    .explain h3:first-child { margin-top: 0; }
     .explain p, .explain li { font-size: 14px; color: #334155; }
     .explain ul, .explain ol { margin: 6px 0 0; padding-left: 1.2rem; }
     .explain li { margin: 4px 0; }
-    .grid-2 { display: grid; gap: 12px; }
-    @media (min-width: 800px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+    .grid-2, .grid-3 { display: grid; gap: 12px; margin-top: 12px; }
+    @media (min-width: 800px) {
+      .grid-2 { grid-template-columns: 1fr 1fr; }
+      .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    }
     .box {
       border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
       background: #f8fafc; font-size: 13px;
     }
     .box.amber { border-color: #fcd34d; background: #fffbeb; }
     .box.sky { border-color: #7dd3fc; background: #f0f9ff; }
+    .box.green { border-color: #6ee7b7; background: #ecfdf5; }
     .box.violet { border-color: #c4b5fd; background: #f5f3ff; }
+    .box.slate { border-color: #cbd5e1; background: #f8fafc; }
     .box strong { display: block; margin-bottom: 4px; }
     .legend {
       display: flex; flex-wrap: wrap; gap: 10px 16px;
-      font-size: 12px; color: var(--muted); margin: 0 0 12px;
+      font-size: 12px; color: var(--muted); margin: 0 0 10px;
     }
     .legend i {
       display: inline-block; width: 10px; height: 10px; border-radius: 2px;
@@ -125,8 +123,12 @@
       display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between;
     }
     code {
-      font-family: ui-monospace, Consolas, monospace;
-      font-size: 12px; background: #e2e8f0; padding: 1px 5px; border-radius: 4px;
+      font-family: ui-monospace, Consolas, monospace; font-size: 12px;
+      background: #e2e8f0; padding: 1px 5px; border-radius: 4px;
+    }
+    .note-call {
+      margin: 12px 0 0; padding: 12px 14px; border-radius: 10px;
+      border-left: 4px solid var(--brand); background: #f0fdf4; font-size: 13px;
     }
   </style>
 </head>
@@ -135,250 +137,387 @@
     <div class="top-inner">
       <div class="brand">GLS · BD/SC prototype</div>
       <nav>
-        <a class="nav" href="index.html">← Trang demo</a>
+        <a class="nav" href="index.html">← Demo</a>
         <a class="nav" href="console.html">Console</a>
-        <a class="nav" href="mobile.html">Mobile</a>
-        <a class="nav" href="#ops">Sơ đồ nghiệp vụ</a>
-        <a class="nav" href="#it">Sơ đồ dữ liệu</a>
+        <a class="nav" href="#ops">Nghiệp vụ</a>
+        <a class="nav" href="#it">Dữ liệu IT</a>
+        <a class="nav" href="#ops-master">① Master</a>
+        <a class="nav" href="#ops-system">② Hệ thống</a>
+        <a class="nav" href="#ops-plan">③ Kế hoạch</a>
+        <a class="nav" href="#ops-order">④ Phiếu</a>
       </nav>
     </div>
   </div>
 
   <div class="wrap">
-    <h1>Hai sơ đồ theo prototype BD/SC</h1>
+    <h1>Sơ đồ BD/SC đầy đủ theo prototype</h1>
     <p class="lead">
-      Tóm tắt luồng đã thể hiện trên console / mobile demos: phiếu bảo dưỡng–sửa chữa,
-      hai cụm vật tư (dự kiến vs mua hàng), mốc thời gian tự động, và tích hợp BASE / PWMS.
+      Không chỉ phiếu thực tế: bắt đầu từ <strong>master</strong> (QL xe + PWMS),
+      <strong>hệ thống tham gia</strong> (đồng bộ, nhắc, đánh giá),
+      <strong>lập kế hoạch</strong>, rồi mới tới <strong>phiếu BD/SC</strong> và đối chiếu.
     </p>
+
+    <div class="phases">
+      <a href="#ops-master"><strong>① Master</strong><span>Danh mục · barem · tiêu chí · PWMS</span></a>
+      <a href="#ops-system"><strong>② Hệ thống</strong><span>Sync · nhắc · đánh giá</span></a>
+      <a href="#ops-plan"><strong>③ Kế hoạch</strong><span>Mẫu · sinh KH · từ ĐG</span></a>
+      <a href="#ops-order"><strong>④ Phiếu thực tế</strong><span>BD/SC · 2 cụm VT · MH/BASE</span></a>
+      <a href="#ops-report"><strong>⑤ Đối chiếu</strong><span>Plan vs Actual</span></a>
+    </div>
 
     <div class="toc">
       <a href="#ops">
-        <span class="tag ops">Đối tượng: Quản lý xe / Kỹ thuật</span>
-        <strong>1. Sơ đồ hoạt động nghiệp vụ</strong>
-        <span>Ai làm gì · khi nào gửi BASE / mua hàng · khi nào đồng bộ · 4 mốc giờ tự động.</span>
+        <span class="tag ops">Quản lý xe / Kỹ thuật</span>
+        <strong>1. Sơ đồ hoạt động end-to-end</strong>
+        <span>5 giai · ai làm gì · hệ thống làm gì · khi nào ra kế hoạch / phiếu.</span>
       </a>
       <a href="#it">
-        <span class="tag it">Đối tượng: Đội IT / tích hợp</span>
+        <span class="tag it">Đội IT / tích hợp</span>
         <strong>2. Sơ đồ dữ liệu &amp; hệ thống</strong>
-        <span>Entity trên phiếu · cụm <code>materials</code> / <code>purchaseMaterials</code> · nguồn sự thật PWMS / BASE.</span>
+        <span>Master · Plan · Order · PWMS · BASE · quan hệ entity.</span>
       </a>
     </div>
 
-    <!-- ========== OPS ========== -->
+    <!-- ===================== OPS ===================== -->
     <section class="panel" id="ops">
-      <h2><span class="tag ops">Nghiệp vụ</span> Sơ đồ hoạt động — Quản lý xe / Quản lý kỹ thuật</h2>
-      <p class="sub">Đọc từ trên xuống. Ô vàng = thao tác trên Quản lý xe; ô xanh dương = hệ thống ngoài (BASE / PWMS mua hàng).</p>
+      <h2><span class="tag ops">Nghiệp vụ</span> Hoạt động end-to-end</h2>
+      <p class="sub">Đọc theo thứ tự ①→⑤. Ô vàng = người dùng QL xe/KTV; xanh dương = PWMS/hệ thống ngoài; xanh lá = kết quả lưu trên QLX.</p>
+
       <div class="legend">
         <span><i style="background:#fef3c7"></i>Thao tác QL xe / KTV</span>
-        <span><i style="background:#dbeafe"></i>BASE / Mua hàng (PWMS)</span>
-        <span><i style="background:#d1fae5"></i>Kết thúc / hoàn tất</span>
-      </div>
-      <div class="diagram">
-        <pre class="mermaid">
-flowchart TD
-  A([Tạo phiếu BD/SC<br/>web hoặc mobile]) --> B[Nhập hạng mục công việc<br/>+ vật tư DỰ KIẾN]
-  B --> B1{Chọn VT từ kho?}
-  B1 -->|Đủ tồn| B2[Hình thức: Xuất kho]
-  B1 -->|Hết / thiếu / không mã| B3[Hình thức: Sửa ngoài]
-  B1 -->|Nhập tay| B4[Hình thức: KTV ghi]
-  B2 --> C[Nộp duyệt]
-  B3 --> C
-  B4 --> C
-  C --> D{Quản lý duyệt?}
-  D -->|Từ chối| E[Sửa phiếu → Nộp lại]
-  E --> C
-  D -->|Duyệt| F[Đồng bộ BASE<br/>và/hoặc Gửi phiếu sang MH]
-  F --> G[Ghi mốc: đề nghị cấp VT<br/>lần gửi sớm nhất]
-  G --> H[Bắt đầu thực hiện<br/>→ mốc Thời gian bắt đầu]
-  H --> I[MH xử lý trên PWMS<br/>theo mã phiếu]
-  I --> J[Đồng bộ mua hàng<br/>kéo cụm dữ liệu MH]
-  J --> K[Ghi mốc: có đủ VT<br/>= ngày cấp sau cùng]
-  K --> L[Hoàn thành phiếu<br/>→ mốc hoàn thiện SC]
-  L --> M([Lịch sử theo xe / báo cáo])
-
-  style A fill:#d1fae5,stroke:#059669
-  style M fill:#d1fae5,stroke:#059669
-  style F fill:#dbeafe,stroke:#0284c8
-  style I fill:#dbeafe,stroke:#0284c8
-  style J fill:#dbeafe,stroke:#0284c8
-  style B fill:#fef3c7,stroke:#d97706
-  style H fill:#fef3c7,stroke:#d97706
-  style L fill:#fef3c7,stroke:#d97706
-        </pre>
+        <span><i style="background:#dbeafe"></i>PWMS / hệ thống ngoài</span>
+        <span><i style="background:#ede9fe"></i>BASE TMS</span>
+        <span><i style="background:#d1fae5"></i>Kết quả trên Quản lý xe</span>
       </div>
 
-      <div class="explain">
-        <h3>Giải thích ngắn cho quản lý / kỹ thuật</h3>
-        <ol>
-          <li><strong>Cụm dự kiến</strong> là những gì kỹ thuật nhập trên phiếu (hạng mục + vật tư, giá tạm, hình thức xuất kho / sửa ngoài / KTV ghi). Đây là đề nghị gửi đi, không phải chứng từ cuối.</li>
-          <li><strong>Duyệt</strong> xong mới gửi sang BASE và/hoặc mua hàng. Lần gửi sớm nhất giữa hai bên = <em>Thời gian đề nghị cấp vật tư</em> (hệ thống tự ghi, không nhập tay).</li>
-          <li><strong>Bắt đầu thực hiện</strong> tự ghi <em>Thời gian bắt đầu</em>. <strong>Hoàn thành phiếu</strong> tự ghi <em>Thời gian hoàn thiện SC</em>.</li>
-          <li>Sau khi mua hàng xuất kho hoặc mua ngoài theo <strong>mã phiếu</strong>, QL xe bấm <strong>Đồng bộ mua hàng</strong> → xuất hiện <strong>cụm mua hàng</strong> riêng (giá / NCC / chứng từ / ngày cấp). Cụm dự kiến giữ nguyên để đối chiếu.</li>
-          <li><em>Thời gian có đủ vật tư</em> = ngày giờ cấp <strong>sau cùng</strong> trên các dòng chứng từ XK / MH đã đồng bộ.</li>
-        </ol>
-
-        <div class="grid-2" style="margin-top:14px">
-          <div class="box amber">
-            <strong>Cụm dự kiến (KTV)</strong>
-            Nhập / sửa khi phiếu còn nháp hoặc bị từ chối. Bao gồm hạng mục công việc và vật tư với hình thức dự kiến.
-          </div>
-          <div class="box sky">
-            <strong>Cụm mua hàng (sau ĐB)</strong>
-            Chỉ có khi đã đồng bộ theo mã phiếu. Dùng ưu tiên cho chi phí chuẩn / báo cáo; không xoá cụm dự kiến.
-          </div>
-        </div>
-
-        <h3>4 mốc thời gian (tự động)</h3>
-        <ul>
-          <li>Thời gian bắt đầu ← bấm «Bắt đầu thực hiện»</li>
-          <li>Thời gian đề nghị cấp VT ← gửi BASE hoặc gửi mua hàng (lần sớm nhất)</li>
-          <li>Thời gian có đủ VT ← max ngày cấp từ phiếu XK / dữ liệu MH PWMS</li>
-          <li>Thời gian hoàn thiện SC ← bấm «Hoàn thành phiếu»</li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- ========== IT ========== -->
-    <section class="panel" id="it">
-      <h2><span class="tag it">IT / tích hợp</span> Sơ đồ dữ liệu &amp; hệ thống</h2>
-      <p class="sub">Nguồn sự thật theo miền: phiếu &amp; duyệt vận hành trên Quản lý xe; Product / xuất kho / mua ngoài trên PWMS; duyệt nghiệp vụ BASE trên TMS BASE.</p>
-      <div class="legend">
-        <span><i style="background:#ecfdf5"></i>Quản lý xe (SoT phiếu)</span>
-        <span><i style="background:#eff6ff"></i>PWMS</span>
-        <span><i style="background:#f5f3ff"></i>BASE TMS</span>
-      </div>
+      <h3 class="block" id="ops-overview">Tổng quan 5 lớp</h3>
       <div class="diagram">
         <pre class="mermaid">
 flowchart LR
-  subgraph QLX["Quản lý xe — SoT phiếu BD/SC"]
-    Ord[MaintenanceOrder<br/>mã phiếu · trạng thái · timeline]
-    WI[WorkItems<br/>hạng mục dự kiến]
-    MatPlan[materials<br/>cụm dự kiến]
-    MatBuy[purchaseMaterials<br/>cụm MH snapshot]
-    Map[pwmsVehicleMaps<br/>tmsVehicleId ↔ pwmsObjectId]
-    Ord --> WI
-    Ord --> MatPlan
-    Ord --> MatBuy
-    Ord --> Map
-  end
+  M[① Master<br/>QLX + PWMS] --> S[② Hệ thống tham gia<br/>Sync · Nhắc · Đánh giá]
+  S --> P[③ Kế hoạch BD/SC<br/>Mẫu · Sinh KH tháng]
+  P --> O[④ Phiếu thực tế<br/>PERIODIC / INCIDENTAL]
+  O --> R[⑤ Đối chiếu<br/>KH vs TT · chi phí]
 
-  subgraph BASE["BASE TMS"]
-    BSync[baseSync<br/>code · baseStatus]
-  end
-
-  subgraph PWMS["PWMS / AppSheet"]
-    Prod[Product · tồn · giá tham chiếu]
-    Issue[Phiếu xuất kho / mua ngoài<br/>theo mã phiếu BD/SC]
-    Obj[Object ID xe]
-  end
-
-  Map -. ánh xạ .-> Obj
-  Ord -->|Đồng bộ BASE| BSync
-  Ord -->|Gửi phiếu MH| Issue
-  MatPlan -. đề nghị VT .-> Issue
-  Issue -->|Đồng bộ MH on-demand| MatBuy
-  Prod -. lookup tồn/giá tạm .-> MatPlan
-
-  style Ord fill:#d1fae5,stroke:#059669
-  style WI fill:#fef3c7,stroke:#d97706
-  style MatPlan fill:#fef3c7,stroke:#d97706
-  style MatBuy fill:#dbeafe,stroke:#0284c8
-  style Prod fill:#dbeafe,stroke:#0284c8
-  style Issue fill:#dbeafe,stroke:#0284c8
-  style Obj fill:#dbeafe,stroke:#0284c8
-  style BSync fill:#ede9fe,stroke:#7c3aed
+  style M fill:#fef3c7,stroke:#d97706
+  style S fill:#dbeafe,stroke:#0284c8
+  style P fill:#d1fae5,stroke:#059669
+  style O fill:#d1fae5,stroke:#059669
+  style R fill:#e2e8f0,stroke:#64748b
         </pre>
       </div>
 
+      <!-- 1 MASTER -->
+      <h3 class="block" id="ops-master">① Tạo / cấu hình master</h3>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TB
+  subgraph QLX["Master trên Quản lý xe"]
+    VS[Hệ thống xe]
+    ST[Loại dịch vụ]
+    BH[Barem giờ công<br/>theo kỳ hiệu lực]
+    CAT[Danh mục bảo dưỡng<br/>mốc km/tháng · OR · lặp]
+    CR[Tiêu chí đánh giá<br/>nhóm + hạng mục checklist]
+    SET[Cài đặt nhắc đánh giá<br/>tuần / tháng]
+  end
+
+  subgraph PWMS["Master trên PWMS — SoT"]
+    PROD[Product / vật tư · tồn · giá]
+    SERI[Serial lốp / ắc nếu có]
+    OBJ[Object ID xe]
+  end
+
+  subgraph MAP["Cầu nối"]
+    VM[Ánh xạ xe TMS ↔ PWMS<br/>tmsVehicleId · pwmsObjectId]
+  end
+
+  VS --> CAT
+  ST --> BH
+  BH --> CAT
+  CR --> SET
+  OBJ --> VM
+  PROD -.lookup.-> CAT
+        </pre>
+      </div>
+      <div class="explain grid-2">
+        <div class="box amber">
+          <strong>Ai làm · QL xe / admin kỹ thuật</strong>
+          Tạo hệ thống xe, loại DV, barem theo kỳ, danh mục BD (mốc chu kỳ, bắt buộc thay, gắn tiêu chí ĐG), tiêu chí checklist, cài nhắc ĐG.
+        </div>
+        <div class="box sky">
+          <strong>Ai làm · Mua hàng / PWMS</strong>
+          Giữ master Product, tồn, serial, Object ID xe. QLX chỉ ánh xạ xe và tra cứu — không giữ SoT kho/serial.
+        </div>
+      </div>
+      <div class="note-call">
+        <strong>Lưu ý:</strong> Danh mục bảo dưỡng là “định mức chu kỳ” (vd. dầu/lọc cứ 10.000 km, hoặc 3 tháng). State theo từng xe (<code>catState</code>: lastKm / nextKm / nextDate) dùng cho nhắc và gợi ý kế hoạch.
+      </div>
+
+      <!-- 2 SYSTEM -->
+      <h3 class="block" id="ops-system">② Hệ thống tham gia (sau khi có master)</h3>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+  SYNC[Đồng bộ danh mục PWMS<br/>Product · hệ thống · nội dung SC]
+  MAP[Đồng bộ / duyệt ánh xạ xe<br/>TMS ↔ Object ID]
+  REM[Nhắc bảo dưỡng<br/>theo danh mục + odo/ngày]
+  ASM[Đánh giá phương tiện định kỳ<br/>checklist tiêu chí]
+  WARN[Cảnh báo khóa kỳ / quá hạn ĐG<br/>như Fleet]
+
+  SYNC --> LOOKUP[Lookup VT / giá tạm / tồn<br/>khi lập KH &amp; phiếu]
+  MAP --> SEND[Cho phép gửi phiếu sang MH<br/>theo Object ID]
+  REM --> SUG[Gợi ý xe + hạng mục đến hạn]
+  ASM --> FAIL[ĐG lỗi / cần khắc phục]
+  FAIL --> PLAN_DG[Tạo dòng kế hoạch / phiếu SC<br/>từ đánh giá]
+  WARN --> ASM
+  SUG --> PLAN
+  PLAN_DG --> PLAN[Kế hoạch BD/SC]
+        </pre>
+      </div>
+      <div class="explain">
+        <ul>
+          <li><strong>Đồng bộ PWMS</strong> (on-demand / cron): làm mới Product, tồn, giá tham chiếu, nội dung SC — phục vụ autocomplete.</li>
+          <li><strong>Ánh xạ xe</strong>: bắt buộc trước khi «Gửi phiếu sang mua hàng» (Object ID bất biến).</li>
+          <li><strong>Nhắc BD</strong>: đọc mốc danh mục + trạng thái theo xe → danh sách đến hạn.</li>
+          <li><strong>Đánh giá định kỳ</strong>: theo tiêu chí master + lịch nhắc; kết quả xấu có thể sinh kế hoạch / phiếu SC (không nhất thiết qua mẫu KH).</li>
+        </ul>
+      </div>
+
+      <!-- 3 PLAN -->
+      <h3 class="block" id="ops-plan">③ Lập kế hoạch bảo dưỡng / sửa chữa</h3>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+  TPL[Tạo mẫu kế hoạch<br/>theo loại xe · hãng · đời · kỳ]
+  TPL --> ITEMS[Chọn danh mục BD vào mẫu<br/>SL · đơn giá dự toán]
+  ITEMS --> GEN[Sinh kế hoạch tháng<br/>áp mẫu lên danh sách xe khớp]
+  REM2[Từ nhắc đến hạn] --> GEN2[Thêm / duyệt dòng KH]
+  ASM2[Từ đánh giá lỗi] --> GEN3[Dòng KH nguồn PERIODIC_ASSESSMENT]
+  GEN --> KH[MaintenancePlan<br/>NEW → SCHEDULED → …]
+  GEN2 --> KH
+  GEN3 --> KH
+  KH --> DUYET[Kỹ thuật duyệt / chỉnh KH]
+  DUYET --> READY[KH sẵn sàng tạo phiếu thực tế]
+        </pre>
+      </div>
+      <div class="explain grid-3">
+        <div class="box green">
+          <strong>Đường A — Mẫu kế hoạch</strong>
+          Tạo <em>mẫu</em> theo phạm vi xe (type/brand/model/year) + kỳ → gắn nhiều danh mục BD → «Lấy xe giống mẫu» / sinh KH hàng loạt.
+        </div>
+        <div class="box amber">
+          <strong>Đường B — Nhắc chu kỳ</strong>
+          Hệ thống liệt kê xe–danh mục đến hạn → người dùng đưa vào kế hoạch tháng hoặc tạo phiếu BD trực tiếp.
+        </div>
+        <div class="box violet">
+          <strong>Đường C — Đánh giá</strong>
+          ĐG định kỳ FAIL / cần thay VT → tạo dòng kế hoạch hoặc phiếu SC (source = đánh giá), không bắt buộc đi qua mẫu.
+        </div>
+      </div>
+      <div class="note-call">
+        Kế hoạch = <strong>dự toán</strong> (xe, hạng mục, SL, ĐG, VAT, vendor). Chưa phải chứng từ xuất kho. Giá trên KH thường là giá tham chiếu PWMS.
+      </div>
+
+      <!-- 4 ORDER -->
+      <h3 class="block" id="ops-order">④ Phiếu thực tế BD / SC</h3>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+  SRC1[Từ kế hoạch PERIODIC] --> ORD[Tạo phiếu BD/SC]
+  SRC2[Từ sự cố INCIDENTAL] --> ORD
+  SRC3[Từ đánh giá / mobile KTV] --> ORD
+  ORD --> PLAN_C[Cụm DỰ KIẾN<br/>hạng mục + VT XK/SN/KTV]
+  PLAN_C --> SUB[Nộp duyệt → Duyệt]
+  SUB --> BASE[Đồng bộ BASE]
+  SUB --> MH[Gửi phiếu sang mua hàng]
+  BASE --> T1[mốc đề nghị cấp VT]
+  MH --> T1
+  T1 --> START[Bắt đầu thực hiện<br/>mốc startedAt]
+  START --> PW[MH xử lý trên PWMS<br/>theo mã phiếu]
+  PW --> SYNC[Đồng bộ mua hàng<br/>→ cụm PURCHASE]
+  SYNC --> T2[mốc có đủ VT]
+  T2 --> DONE[Hoàn thành<br/>mốc repairCompletedAt]
+        </pre>
+      </div>
+      <div class="explain grid-2">
+        <div class="box amber">
+          <strong>Cụm dự kiến</strong>
+          KTV nhập hạng mục + vật tư (xuất kho nếu đủ tồn / sửa ngoài nếu thiếu / KTV ghi tay). Giữ nguyên khi đồng bộ MH.
+        </div>
+        <div class="box sky">
+          <strong>Cụm mua hàng</strong>
+          Sau «Đồng bộ MH»: giá / NCC / chứng từ / ngày cấp theo mã phiếu. Chi phí chuẩn ưu tiên cụm này.
+        </div>
+      </div>
+
+      <!-- 5 REPORT -->
+      <h3 class="block" id="ops-report">⑤ Đối chiếu &amp; lịch sử</h3>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart LR
+  KH[Kế hoạch tháng] --> CMP[Plan vs Actual]
+  ORD[Phiếu hoàn thành<br/>+ cụm MH] --> CMP
+  CMP --> R1[SL / chi phí / tiến độ]
+  ORD --> HIST[Lịch sử theo xe<br/>theo danh mục BD]
+  HIST --> NEXT[Gợi ý lần BD tiếp<br/>cập nhật catState]
+        </pre>
+      </div>
+      <div class="explain">
+        <p>Sau hoàn thành phiếu PERIODIC: cập nhật <code>lastKm / lastDate / occurrence</code> trên danh mục–xe → tính mốc tiếp (OR giữa các rule, có <code>repeat</code> vô hạn).</p>
+      </div>
+    </section>
+
+    <!-- ===================== IT ===================== -->
+    <section class="panel" id="it">
+      <h2><span class="tag it">IT / tích hợp</span> Dữ liệu &amp; hệ thống</h2>
+      <p class="sub">SoT theo miền: master kho/serial = PWMS; vận hành kỹ thuật &amp; phiếu = Quản lý xe; duyệt BASE = BASE TMS.</p>
+
+      <h3 class="block">Kiến trúc phân lớp</h3>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TB
+  subgraph MASTER_QLX["Master QLX"]
+    Cat[Catalog + rules + catState]
+    Crit[EvalCriteria]
+    Barem[BaremHours + ServiceType]
+    VSys[VehicleSystem]
+  end
+
+  subgraph MASTER_PWMS["Master PWMS"]
+    Product[Product / Stock / Price]
+    Serial[Product_SERI]
+    PObj[Vehicle Object ID]
+  end
+
+  subgraph BRIDGE["Cầu nối"]
+    VMap[pwmsVehicleMaps]
+    SyncMeta[pwmsSyncMeta / valueHistory]
+  end
+
+  subgraph PLAN_L["Lớp kế hoạch"]
+    Tpl[PlanTemplate + items]
+    Plan[MaintenancePlan]
+  end
+
+  subgraph EXEC["Lớp thực tế"]
+    Ord[MaintenanceOrder]
+    WI[WorkItems]
+    MatP[materials dự kiến]
+    MatB[purchaseMaterials]
+    TL[timeline 4 mốc]
+  end
+
+  subgraph EXT["Hệ thống ngoài"]
+    BASE[BASE sync]
+    MH[PWMS issue / external buy]
+  end
+
+  Cat --> Tpl
+  Cat --> Plan
+  Crit --> Asm[PeriodicAssessment]
+  Asm --> Plan
+  Asm --> Ord
+  Tpl --> Plan
+  Plan --> Ord
+  Product --> MatP
+  Product --> Plan
+  VMap --> Ord
+  PObj --> VMap
+  Ord --> WI
+  Ord --> MatP
+  Ord --> MatB
+  Ord --> TL
+  Ord --> BASE
+  Ord --> MH
+  MH --> MatB
+        </pre>
+      </div>
+
+      <h3 class="block">Quan hệ entity (rút gọn)</h3>
       <div class="diagram">
         <pre class="mermaid">
 erDiagram
-  MAINTENANCE_ORDER ||--o{ WORK_ITEM : has
-  MAINTENANCE_ORDER ||--o{ MATERIAL_PLANNED : "cụm dự kiến"
-  MAINTENANCE_ORDER ||--o{ MATERIAL_PURCHASE : "cụm MH"
-  MAINTENANCE_ORDER ||--o| BASE_SYNC : syncs
-  MAINTENANCE_ORDER ||--o| PURCHASE_SEND : sends
-  MAINTENANCE_ORDER ||--o| PURCHASE_SYNC : syncs
-  VEHICLE ||--o{ MAINTENANCE_ORDER : "TMS vehicle"
+  VEHICLE ||--o{ CAT_STATE : tracks
+  CATALOG ||--o{ CAT_STATE : defines
+  CATALOG ||--o{ PLAN_TEMPLATE_ITEM : used_in
+  PLAN_TEMPLATE ||--o{ PLAN_TEMPLATE_ITEM : has
+  PLAN_TEMPLATE ||--o{ MAINTENANCE_PLAN : generates
+  CATALOG ||--o{ MAINTENANCE_PLAN : optional
+  MAINTENANCE_PLAN ||--o| MAINTENANCE_ORDER : realizes
+  VEHICLE ||--o{ MAINTENANCE_ORDER : has
   VEHICLE ||--o| PWMS_VEHICLE_MAP : maps
-  MATERIAL_PLANNED ||--o| MATERIAL_PURCHASE : "plannedMaterialId"
+  MAINTENANCE_ORDER ||--o{ WORK_ITEM : has
+  MAINTENANCE_ORDER ||--o{ MATERIAL_PLANNED : planned
+  MAINTENANCE_ORDER ||--o{ MATERIAL_PURCHASE : from_MH
+  EVAL_CRITERIA ||--o{ PERIODIC_ASSESSMENT : checklist
+  PERIODIC_ASSESSMENT ||--o{ MAINTENANCE_PLAN : may_create
+  PERIODIC_ASSESSMENT ||--o{ MAINTENANCE_ORDER : may_create
 
-  MAINTENANCE_ORDER {
-    string id
+  CATALOG {
+    int id
     string code
+    json rules "km|month OR repeat"
+  }
+  MAINTENANCE_PLAN {
+    string id
+    string period
+    int vehicleId
+    int catalogId
+    string source "PLAN|ASSESSMENT|..."
+  }
+  MAINTENANCE_ORDER {
+    string code
+    string type "PERIODIC|INCIDENTAL"
     string approvalStatus
-    string status
     datetime startedAt
     datetime materialRequestedAt
     datetime materialReadyAt
     datetime repairCompletedAt
   }
   MATERIAL_PLANNED {
-    string id
     string source "PWMS|EXTERNAL|TECHNICIAN"
-    string code
-    number qty
-    number price "giá tạm"
+    number price
   }
   MATERIAL_PURCHASE {
-    string id
-    string plannedMaterialId
+    string purchaseOrderRef
     string purchaseDocCode
     datetime issuedAt
-    number price "giá MH"
-    string purchaseOrderRef "mã phiếu"
   }
         </pre>
       </div>
 
-      <div class="explain">
-        <h3>Giải thích cho đội IT</h3>
-        <div class="grid-2">
-          <div class="box amber">
-            <strong>materials (dự kiến)</strong>
-            Do KTV / QL xe ghi khi lập phiếu. <code>source</code>: PWMS (xuất kho nếu đủ tồn), EXTERNAL (sửa ngoài), TECHNICIAN (ghi tay). Sync MH <em>không</em> overwrite cụm này.
-          </div>
-          <div class="box sky">
-            <strong>purchaseMaterials (cụm MH)</strong>
-            Tạo / refresh khi «Đồng bộ mua hàng». Khóa theo <code>purchaseOrderRef = mã phiếu</code>. Có <code>issuedAt</code>, chứng từ XK / mua ngoài. Chi phí chuẩn ưu tiên cụm này khi <code>purchaseSync.status = SYNCED</code>.
-          </div>
+      <div class="explain grid-2">
+        <div class="box green">
+          <strong>Luồng dữ liệu kế hoạch</strong>
+          <code>Catalog.rules</code> + <code>catState</code> → nhắc / gợi ý.
+          <code>PlanTemplate</code> (scope xe) → generate <code>MaintenancePlan[]</code>.
+          Đánh giá FAIL → plan/order với <code>source=PERIODIC_ASSESSMENT</code>.
         </div>
-
-        <h3>Tích hợp &amp; SoT</h3>
-        <ul>
-          <li><strong>PWMS</strong>: master Product, tồn, serial (khi có), Object ID xe, chứng từ xuất / mua ngoài. QL xe chỉ <em>đọc / snapshot</em> khi sync; không lấy PWMS làm SoT phiếu kỹ thuật.</li>
-          <li><strong>BASE</strong>: SoT trạng thái duyệt nghiệp vụ BASE. Field trên phiếu: <code>baseSync.{status,code,baseStatus,lastSyncedAt}</code>.</li>
-          <li><strong>Ánh xạ xe</strong>: <code>pwmsVehicleMaps</code> — <code>tmsVehicleId</code> ↔ <code>pwmsObjectId</code> (Object ID bất biến; biển số có thể lệch).</li>
-          <li><strong>Gửi MH</strong>: payload theo mã phiếu + Object ID; MH nhập lại trên PWMS.</li>
-          <li><strong>Đồng bộ MH</strong>: on-demand (prototype); production có thể thêm cron reconcile theo <code>orderCode</code>.</li>
-        </ul>
-
-        <h3>Timeline fields (event-driven)</h3>
-        <ul>
-          <li><code>startedAt</code> ← action START</li>
-          <li><code>materialRequestedAt</code> ← min(first BASE sync, first purchase send)</li>
-          <li><code>materialReadyAt</code> ← max(<code>purchaseMaterials[].issuedAt</code>)</li>
-          <li><code>repairCompletedAt</code> ← action COMPLETE</li>
-        </ul>
-
-        <h3>Quy tắc hình thức VT (khi chọn danh mục kho)</h3>
-        <ul>
-          <li>Có mã + tồn ≥ SL → <code>source=PWMS</code> (Xuất kho)</li>
-          <li>Không mã / tồn 0 / tồn &lt; SL → <code>source=EXTERNAL</code> (Sửa ngoài, giữ mã gợi ý)</li>
-          <li>Nhập tay → <code>source=TECHNICIAN</code></li>
-        </ul>
-
-        <div class="box violet" style="margin-top:14px">
-          <strong>Prototype demo</strong>
-          Xem phiếu <code>DEMO-VT-MIX-01</code> trên console: đủ 2 cụm + 4 mốc giờ.
-          File liên quan: <code>console.html</code> (logic), tài liệu plan <code>06</code> / <code>13</code> trong repo docs.
+        <div class="box sky">
+          <strong>Luồng dữ liệu thực tế</strong>
+          Order giữ 2 cụm VT. Gửi MH theo <code>code</code> + <code>pwmsObjectId</code>.
+          Sync MH → <code>purchaseMaterials</code> (snapshot). BASE sync độc lập SoT duyệt.
         </div>
+      </div>
+
+      <h3 class="block">API / tích hợp (hướng triển khai)</h3>
+      <ul>
+        <li><strong>PWMS đọc:</strong> Product search, tồn, giá tham chiếu, serial, Object danh sách xe.</li>
+        <li><strong>PWMS ghi (qua tích hợp):</strong> yêu cầu xuất / nhận phiếu BD/SC theo mã; QLX không ghi đè master Product.</li>
+        <li><strong>BASE:</strong> push/pull trạng thái duyệt phiếu SC.</li>
+        <li><strong>Nội bộ QLX:</strong> CRUD master kỹ thuật, template, plan, order, assessment, reminder engine.</li>
+      </ul>
+
+      <div class="box violet" style="margin-top:14px">
+        <strong>Prototype để đối chiếu</strong>
+        Console menu: Danh mục · Tiêu chí · Barem · Vật tư PWMS · Ánh xạ xe · Nhắc · Đánh giá · Kế hoạch (mẫu/danh sách) · Phiếu.
+        Demo phiếu đủ 2 cụm: <code>DEMO-VT-MIX-01</code>.
       </div>
     </section>
 
     <footer>
-      <span>GLS · Sơ đồ BD/SC theo prototype · GitHub Pages</span>
-      <span><a href="index.html">Trang chủ demo</a> · <a href="console.html">Mở console</a></span>
+      <span>GLS · Sơ đồ BD/SC đầy đủ · GitHub Pages</span>
+      <span><a href="index.html">Trang demo</a> · <a href="console.html">Console</a></span>
     </footer>
   </div>
 
@@ -387,10 +526,10 @@ erDiagram
       startOnLoad: true,
       theme: 'base',
       securityLevel: 'loose',
-      flowchart: { curve: 'basis', htmlLabels: true },
+      flowchart: { curve: 'basis', htmlLabels: true, nodeSpacing: 28, rankSpacing: 36 },
       themeVariables: {
         fontFamily: 'Segoe UI, system-ui, sans-serif',
-        fontSize: '14px',
+        fontSize: '13px',
         primaryColor: '#ecfdf5',
         primaryTextColor: '#0f172a',
         primaryBorderColor: '#059669',
