@@ -7488,7 +7488,7 @@ function ensureOrderApproval(o) {
   if (!Array.isArray(o.workItems)) o.workItems = [];
   if (!Array.isArray(o.materials)) o.materials = [];
   if (!Array.isArray(o.images)) o.images = [];
-  o.workItems.forEach((w, i) => { if (!w.id) w.id = 'wi-' + (o.id || 'o') + '-' + i; });
+  o.workItems.forEach((w, i) => { if (!w.id) w.id = 'wi-' + (o.id || 'o') + '-' + i; ensureWorkItemFields(w); });
   o.materials.forEach((m, i) => { if (!m.id) m.id = 'mt-' + (o.id || 'o') + '-' + i; });
   o.images.forEach((img, i) => { if (!img.id) img.id = 'img-' + (o.id || 'o') + '-' + i; });
   if (!Array.isArray(o.purchaseMaterials)) o.purchaseMaterials = [];
@@ -7499,6 +7499,30 @@ function ensureOrderApproval(o) {
 function canEditOrderDetail(o) {
   ensureOrderApproval(o);
   return o.approvalStatus === 'DRAFT' || o.approvalStatus === 'REJECTED';
+}
+function ensureWorkItemFields(w) {
+  if (!w) return w;
+  if (w.completedAt) w.status = 'DONE';
+  else {
+    if (w.completedAt === undefined) w.completedAt = null;
+    w.status = 'PENDING';
+  }
+  return w;
+}
+function allWorkItemsDone(o) {
+  ensureOrderApproval(o);
+  const items = o.workItems || [];
+  return items.length > 0 && items.every(w => w.completedAt);
+}
+function baremDeltaText(actual, standard) {
+  if (standard == null || actual == null || actual === '') return '—';
+  const d = Number(actual) - Number(standard);
+  if (Math.abs(d) < 0.05) return 'đúng barem';
+  return (d > 0 ? '+' : '') + d.toFixed(1) + 'h';
+}
+function canCompleteWorkItems(o) {
+  ensureOrderApproval(o);
+  return o.approvalStatus === 'APPROVED' && (o.status === 'NOT_STARTED' || o.status === 'IN_PROGRESS');
 }
 /** Cụm dự kiến = KTV nhập (hạng mục + vật tư). Cụm MH = purchaseMaterials sau đồng bộ theo mã phiếu. */
 function plannedMaterials(o) { return o.materials || []; }
@@ -7884,7 +7908,7 @@ function buildOrderTimeline(o) {
     if (o.status === 'NOT_STARTED') {
       pushF('START', 'Bắt đầu thực hiện trên xưởng');
       if (hasPwms) pushF('SYNC', 'Lấy giá / phiếu xuất từ mua hàng');
-      pushF('COMPLETE', 'Khóa phiếu sau khi xong việc');
+      pushF('COMPLETE', 'Khóa phiếu khi đủ hạng mục HT');
     } else if (o.status === 'IN_PROGRESS') {
       if (hasPwms && syncSt !== 'SYNCED') {
         if (syncSt === 'SYNCING') {
@@ -7893,7 +7917,7 @@ function buildOrderTimeline(o) {
           pushF('SYNC', 'Bấm «Đồng bộ mua hàng» để lấy giá / phiếu xuất');
         }
       }
-      pushF('COMPLETE', 'Hoàn thành khi xong việc');
+      pushF('COMPLETE', 'Hoàn thành từng hạng mục (đủ thì phiếu tự HT)');
     }
     // COMPLETED → không còn bước tương lai
   }
@@ -8647,6 +8671,8 @@ function pageOrder() {
   const showPendingDiff = (ap === 'REJECTED' || ap === 'DRAFT') && pendingDiff.length > 0;
   const lastReject = [...(o.approvalLog || [])].reverse().find(x => x.action === 'REJECT');
   const timeline = buildOrderTimeline(o);
+  const canCompleteWi = canCompleteWorkItems(o);
+  const showWiActionCol = canEditOrderDetail(o) || canCompleteWi;
 
   const actionBtns = [];
   if (ap === 'DRAFT') {
@@ -8678,7 +8704,6 @@ function pageOrder() {
         actionBtns.push(`<button data-sync-purchase="${o.id}" class="btn btn-outline !border-sky-400 !bg-sky-50 text-sky-900">${ps.status === 'SYNCED' ? 'Đồng bộ lại mua hàng' : 'Đồng bộ mua hàng'}</button>`);
       }
     }
-    actionBtns.push(`<button data-complete-order="${o.id}" class="btn btn-emerald">Hoàn thành phiếu</button>`);
   } else if (ap === 'APPROVED' && o.status === 'COMPLETED') {
     if (canSendPurchase(o) && psend.status !== 'SENDING') {
       actionBtns.push(`<button data-send-purchase="${o.id}" class="btn btn-outline !border-violet-400 !bg-violet-50 text-violet-900">${psend.status === 'SENT' ? 'Gửi lại phiếu mua hàng' : 'Gửi phiếu sang mua hàng'}</button>`);
@@ -8698,7 +8723,7 @@ function pageOrder() {
   }
 
   const cycleHint = {
-    DRAFT: 'Chu kỳ: Nháp → Nộp duyệt → Chờ duyệt → Duyệt → Thực hiện → Đồng bộ mua hàng → Hoàn thành',
+    DRAFT: 'Chu kỳ: Nháp → Nộp duyệt → Chờ duyệt → Duyệt → Thực hiện → Đồng bộ mua hàng → Hoàn thành từng hạng mục (đủ thì phiếu tự HT)',
     PENDING_APPROVAL: 'Đang chờ duyệt · sau duyệt mới thực hiện và đồng bộ mua hàng',
     REJECTED: 'Đã từ chối · sửa cũ→mới → Nộp lại → Duyệt → …',
     APPROVED: o.status === 'COMPLETED'
@@ -8843,7 +8868,7 @@ function pageOrder() {
               <div>
                 <dt class="text-xs text-slate-500">Thời gian hoàn thiện SC</dt>
                 <dd class="font-medium tabular-nums ${o.repairCompletedAt ? 'text-slate-900' : 'text-slate-400'}">${fmtStampVi(o.repairCompletedAt)}</dd>
-                <p class="mt-0.5 text-[10px] text-slate-500">Khi bấm «Hoàn thành phiếu»</p>
+                <p class="mt-0.5 text-[10px] text-slate-500">Khi đủ hạng mục hoàn thành</p>
               </div>
             </dl>
           </div>
@@ -8921,22 +8946,40 @@ function pageOrder() {
                   <th class="th text-left">Loại DV</th>
                   <th class="th text-left">Nội dung</th>
                   <th class="th text-left">Người thực hiện</th>
+                  <th class="th text-center">Trạng thái</th>
                   <th class="th text-right">Giờ barem</th>
                   <th class="th text-right">Giờ TT</th>
-                  ${canEditOrderDetail(o) ? '<th class="th text-center">Thao tác</th>' : ''}
+                  ${showWiActionCol ? '<th class="th text-center">Thao tác</th>' : ''}
                 </tr></thead>
-                <tbody>${(o.workItems||[]).map((w, idx) => `<tr class="row-h">
+                <tbody>${(o.workItems||[]).map((w, idx) => {
+                  ensureWorkItemFields(w);
+                  const wiDone = !!w.completedAt;
+                  const wiStatus = wiDone
+                    ? '<span class="badge bg-emerald-50 text-emerald-800">Đã HT</span>'
+                    : '<span class="badge bg-slate-100 text-slate-600">Chưa HT</span>';
+                  const hoursCell = wiDone && w.hours != null
+                    ? `<span class="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800">TT ${Number(w.hours).toFixed(1)} / barem ${w.standardHours != null ? Number(w.standardHours).toFixed(1) : '—'}</span>`
+                    : (w.hours != null ? Number(w.hours).toFixed(1) : '—');
+                  let wiActions = '';
+                  if (canEditOrderDetail(o)) {
+                    wiActions = `<button type="button" data-edit-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs mr-1">Sửa</button>
+                    <button type="button" data-del-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs text-rose-700 !border-rose-300">Xóa</button>`;
+                  } else if (canCompleteWi) {
+                    wiActions = wiDone
+                      ? `<span class="text-emerald-600 font-semibold">✓</span> <span class="text-[10px] text-slate-500">${fmtStampVi(w.completedAt)}</span>`
+                      : `<button type="button" data-complete-work-item="${o.id}:${idx}" class="btn btn-emerald btn-xs">Hoàn thành</button>`;
+                  }
+                  return `<tr class="row-h">
                   <td class="td">${esc(w.system)}</td>
                   <td class="td">${esc(w.service || '—')}</td>
                   <td class="td">${esc(w.content)}</td>
                   <td class="td">${esc(w.performer)}</td>
+                  <td class="td text-center">${wiStatus}</td>
                   <td class="td text-right tabular-nums text-slate-500">${w.standardHours != null ? Number(w.standardHours).toFixed(1) : '—'}</td>
-                  <td class="td text-right tabular-nums font-medium">${w.hours != null ? Number(w.hours).toFixed(1) : '—'}</td>
-                  ${canEditOrderDetail(o) ? `<td class="td text-center whitespace-nowrap">
-                    <button type="button" data-edit-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs mr-1">Sửa</button>
-                    <button type="button" data-del-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs text-rose-700 !border-rose-300">Xóa</button>
-                  </td>` : ''}
-                </tr>`).join('') || `<tr><td colspan="${canEditOrderDetail(o) ? 7 : 6}" class="px-5 py-6 text-center text-slate-400">${canEditOrderDetail(o) ? 'Chưa có hạng mục — bấm «+ Hạng mục»' : 'Chưa có hạng mục'}</td></tr>`}</tbody>
+                  <td class="td text-right tabular-nums font-medium">${hoursCell}</td>
+                  ${showWiActionCol ? `<td class="td text-center whitespace-nowrap">${wiActions}</td>` : ''}
+                </tr>`;
+                }).join('') || `<tr><td colspan="${showWiActionCol ? 8 : 7}" class="px-5 py-6 text-center text-slate-400">${canEditOrderDetail(o) ? 'Chưa có hạng mục — bấm «+ Hạng mục»' : 'Chưa có hạng mục'}</td></tr>`}</tbody>
               </table>
             </div>
           </div>
@@ -12539,15 +12582,25 @@ function openCriteriaItemModal(gid, itemId) {
   };
 }
 
+function finalizeOrderIfAllWorkItemsDone(id) {
+  const o = DB.orders.find(x => x.id === id);
+  if (!o || !allWorkItemsDone(o)) return false;
+  return completeOrder(id);
+}
 function completeOrder(id) {
   const o = DB.orders.find(x => x.id === id);
-  if (!o) return;
+  if (!o) return false;
   ensureOrderApproval(o);
+  if (o.status === 'COMPLETED') return false;
   if (o.approvalStatus !== 'APPROVED') {
     toast('Chỉ hoàn thành khi phiếu đã được duyệt');
-    return;
+    return false;
   }
-  if (o.status === 'NOT_STARTED') o.status = 'IN_PROGRESS';
+  if (!allWorkItemsDone(o)) return false;
+  if (o.status === 'NOT_STARTED') {
+    o.status = 'IN_PROGRESS';
+    if (!o.startedAt) o.startedAt = nowStamp();
+  }
   o.status = 'COMPLETED';
   const at = nowStamp();
   o.repairCompletedAt = at;
@@ -12556,7 +12609,7 @@ function completeOrder(id) {
   }
   if (!o.approvalLog) o.approvalLog = [];
   freezeOrderMaterialSnapshots(o, 'COMPLETE');
-  o.approvalLog.push({ at, action: 'COMPLETE', by: 'Nguyễn Văn Kỹ thuật', note: 'Hoàn thành thực tế · ' + fmtStampVi(at) + ' · chi phí ' + money(o.cost) + ' · khóa snapshot VT' });
+  o.approvalLog.push({ at, action: 'COMPLETE', by: 'Nguyễn Văn Kỹ thuật', note: 'Hoàn thành thực tế · ' + fmtStampVi(at) + ' · chi phí ' + money(o.cost) + ' · khóa snapshot VT · đủ ' + (o.workItems || []).length + ' hạng mục' });
   if (o.type === 'PERIODIC' && o.catalogId) {
     const st = getCatState(o.vehicleId, o.catalogId);
     const c = catById(o.catalogId);
@@ -12566,6 +12619,84 @@ function completeOrder(id) {
     toast(`Hoàn thành · kỳ tiếp: ${next.nextKm != null ? kmFmt(next.nextKm)+' km' : next.nextDate || '—'}`);
   } else toast('Đã hoàn thành phiếu');
   render();
+  return true;
+}
+
+function completeWorkItem(orderId, idx, hours) {
+  const o = DB.orders.find(x => x.id === orderId);
+  if (!o || !canCompleteWorkItems(o)) return;
+  ensureOrderApproval(o);
+  const w = o.workItems[idx];
+  if (!w || w.completedAt) return;
+  const barem = w.standardHours != null ? w.standardHours
+    : (w.systemId && w.content ? resolveBaremHours(w.systemId, w.content) : null);
+  const act = hours != null && hours !== '' ? Number(hours) : barem;
+  if (act == null || Number.isNaN(act)) { toast('Nhập giờ thực tế'); return; }
+  const at = nowStamp();
+  w.standardHours = barem;
+  w.hours = act;
+  w.completedAt = at;
+  w.status = 'DONE';
+  const delta = baremDeltaText(act, barem);
+  if (o.status === 'NOT_STARTED') {
+    o.status = 'IN_PROGRESS';
+    if (!o.startedAt) {
+      o.startedAt = at;
+      o.approvalLog.push({ at, action: 'START', by: 'Nguyễn Văn Kỹ thuật', note: 'Bắt đầu thực hiện (tự động khi hoàn thành hạng mục đầu) · ' + fmtStampVi(at) });
+    }
+  }
+  o.approvalLog.push({
+    at, action: 'WI_COMPLETE', by: 'Nguyễn Văn Kỹ thuật',
+    note: `HT hạng mục: ${w.content} · TT ${act.toFixed(1)}h · barem ${barem != null ? barem.toFixed(1) : '—'}h · ${delta}`,
+  });
+  closeModal();
+  if (!finalizeOrderIfAllWorkItemsDone(orderId)) {
+    toast(`Đã hoàn thành hạng mục · ${delta}`);
+    render();
+  }
+}
+
+function openCompleteWorkItemModal(orderId, idx) {
+  const o = DB.orders.find(x => x.id === orderId);
+  if (!o || !canCompleteWorkItems(o)) return;
+  ensureOrderApproval(o);
+  const w = o.workItems[idx];
+  if (!w || w.completedAt) return;
+  const barem = w.standardHours != null ? w.standardHours
+    : (w.systemId && w.content ? resolveBaremHours(w.systemId, w.content) : null);
+  const defaultAct = w.hours != null ? w.hours : barem;
+  openModal(`
+    <div class="border-b border-slate-200 px-5 py-4">
+      <h2 class="text-lg font-bold">Hoàn thành hạng mục</h2>
+      <p class="text-sm text-slate-500">${esc(o.code)} · ${esc(w.content)}</p>
+    </div>
+    <form id="completeWiForm" class="space-y-3 px-5 py-4">
+      <label class="block text-sm font-medium text-slate-700">Giờ barem (định mức)
+        <input type="text" readonly class="!bg-slate-50 text-slate-700" value="${barem != null ? Number(barem).toFixed(1) + ' h' : '—'}" />
+      </label>
+      <label class="block text-sm font-medium text-slate-700">Giờ thực tế
+        <input name="hours" id="wiCompleteHours" type="number" step="0.1" min="0" value="${defaultAct != null ? defaultAct : ''}" required />
+      </label>
+      <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+        <span class="text-slate-500">So với barem:</span>
+        <strong id="wiCompleteDelta" class="ml-1 text-slate-900">${baremDeltaText(defaultAct, barem)}</strong>
+      </div>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" data-close class="btn btn-outline">Hủy</button>
+        <button class="btn btn-emerald">Xác nhận hoàn thành</button>
+      </div>
+    </form>`, 'max-w-md');
+  $('[data-close]').onclick = closeModal;
+  const syncDelta = () => {
+    const el = $('#wiCompleteDelta');
+    if (el) el.textContent = baremDeltaText($('#wiCompleteHours')?.value, barem);
+  };
+  $('#wiCompleteHours')?.addEventListener('input', syncDelta);
+  $('#completeWiForm').onsubmit = (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    completeWorkItem(orderId, idx, fd.get('hours'));
+  };
 }
 
 function submitOrderForApproval(id, isResubmit) {
@@ -13653,7 +13784,11 @@ function bind() {
     view = { ...view, name: 'vehicle', vehicleId: Number(b.dataset.gotoPlanVehicle), vehicleTab: 'plan', from: 'assessment', filters: defaultFilters(), page: 1 };
     render();
   });
-  $$('[data-complete-order]').forEach(b => b.onclick = (e) => { e.stopPropagation(); completeOrder(b.dataset.completeOrder); });
+  $$('[data-complete-work-item]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    const [oid, idx] = b.dataset.completeWorkItem.split(':');
+    openCompleteWorkItemModal(oid, Number(idx));
+  });
   $$('[data-submit-order]').forEach(b => b.onclick = () => submitOrderForApproval(b.dataset.submitOrder, false));
   $$('[data-resubmit-order]').forEach(b => b.onclick = () => submitOrderForApproval(b.dataset.resubmitOrder, true));
   $$('[data-approve-order]').forEach(b => b.onclick = () => approveOrder(b.dataset.approveOrder));

@@ -591,10 +591,71 @@ function costForOrderMobile(o){
   if(o.mh==='SYNCED'&&purchaseMats(o).length)return purchaseMats(o);
   return plannedMats(o);
 }
+function ensureWorkItemFields(w){
+  if(!w)return w;
+  if(w.completedAt)w.status='DONE';
+  else{if(w.completedAt===undefined)w.completedAt=null;w.status='PENDING'}
+  return w;
+}
+function allWorkItemsDone(o){
+  ensureOrderWorkItems(o);
+  const items=o.workItems||[];
+  return items.length>0&&items.every(w=>w.completedAt);
+}
+function baremDeltaText(actual,standard){
+  if(standard==null||actual==null||actual==='')return '—';
+  const d=Number(actual)-Number(standard);
+  if(Math.abs(d)<0.05)return 'đúng barem';
+  return(d>0?'+':'')+d.toFixed(1)+'h';
+}
+function canCompleteWorkItems(o){
+  return o.approval==='APPROVED'&&(o.status==='NOT_STARTED'||o.status==='IN_PROGRESS');
+}
+function finalizeOrderIfAllWorkItemsDone(o){
+  if(!allWorkItemsDone(o))return false;
+  if(o.status==='COMPLETED')return false;
+  const at=nowStampMobile();
+  if(o.status==='NOT_STARTED'){
+    o.status='IN_PROGRESS';
+    if(!o.startedAt)o.startedAt=at;
+  }
+  o.status='COMPLETED';
+  o.repairCompletedAt=at;
+  pushLog(o,'COMPLETE','Tự động HT phiếu · đủ '+(o.workItems||[]).length+' hạng mục · khóa thực tế');
+  toast('Đã hoàn thành phiếu');
+  return true;
+}
+function completeWorkItemMobile(o,idx,hours){
+  if(!canCompleteWorkItems(o))return;
+  ensureOrderWorkItems(o);
+  const w=o.workItems[idx];
+  if(!w||w.completedAt)return;
+  const barem=w.standardHours!=null?w.standardHours:baremHoursForContent(w.content);
+  const act=hours!=null&&hours!==''?Number(hours):barem;
+  if(act==null||Number.isNaN(act)){toast('Nhập giờ thực tế');return}
+  const at=nowStampMobile();
+  w.standardHours=barem;
+  w.hours=act;
+  w.completedAt=at;
+  w.status='DONE';
+  const delta=baremDeltaText(act,barem);
+  if(o.status==='NOT_STARTED'){
+    o.status='IN_PROGRESS';
+    if(!o.startedAt){
+      o.startedAt=at;
+      pushLog(o,'START','Bắt đầu thực hiện (tự động khi HT hạng mục đầu)');
+    }
+  }
+  pushLog(o,'WI_COMPLETE','HT hạng mục #'+(idx+1)+' · '+w.content+' · TT '+act.toFixed(1)+'h · barem '+(barem!=null?barem.toFixed(1):'—')+'h · '+delta);
+  closeOrderSheet();
+  if(!finalizeOrderIfAllWorkItemsDone(o))toast('Đã HT hạng mục · '+delta);
+  renderOrder();
+}
 function ensureOrderWorkItems(o){
   if(!Array.isArray(o.workItems)||!o.workItems.length){
     o.workItems=[{content:o.content||'—',system:o.system||'—'}];
   }
+  (o.workItems||[]).forEach(ensureWorkItemFields);
   if(!Array.isArray(o.mats))o.mats=[];
   return o;
 }
@@ -653,7 +714,7 @@ function cycleHintMobile(o){
   const ap=o.approval||'DRAFT';
   const mh=o.mh||'NONE';
   return({
-    DRAFT:'Chu kỳ: Nháp → Nộp duyệt → Chờ duyệt → Duyệt → Thực hiện → Đồng bộ MH → Hoàn thành',
+    DRAFT:'Chu kỳ: Nháp → Nộp duyệt → Chờ duyệt → Duyệt → Thực hiện → Đồng bộ MH → Hoàn thành từng hạng mục (đủ thì phiếu tự HT)',
     PENDING_APPROVAL:'Đang chờ duyệt · sau duyệt mới thực hiện và đồng bộ mua hàng',
     REJECTED:'Đã từ chối · sửa → Nộp lại → Duyệt → …',
     APPROVED:o.status==='COMPLETED'
@@ -715,7 +776,6 @@ function buildOrderActions(o){
       if(o.mh==='SYNCING')acts.push(`<button class="btn btn-outline btn-touch" disabled>Đang đồng bộ MH…</button>`);
       else acts.push(`<button type="button" class="btn btn-sky btn-touch" id="btnSyncMh">${o.mh==='SYNCED'?'Đồng bộ lại mua hàng':'Đồng bộ mua hàng'}</button>`);
     }
-    acts.push(`<button type="button" class="btn btn-emerald btn-touch" id="btnComplete">Hoàn thành phiếu</button>`);
   }else if(ap==='APPROVED'&&o.status==='COMPLETED'){
     if(canSendPurchaseMobile(o)&&psend.status!=='SENDING'){
       acts.push(`<button type="button" class="btn btn-outline btn-touch" id="btnSendPurchase">${psend.status==='SENT'?'Gửi lại phiếu MH':'Gửi phiếu sang mua hàng'}</button>`);
@@ -749,7 +809,7 @@ function openOrderSheet(html){
   bg.setAttribute('aria-hidden','false');
 }
 function logActionLabel(a){
-  return({CREATE:'Tạo nháp',SUBMIT:'Nộp duyệt',RESUBMIT:'Nộp lại',APPROVE:'Duyệt',REJECT:'Từ chối',EDIT:'Sửa phiếu',COMPLETE:'Hoàn thành',START:'Bắt đầu thực hiện',SYNC:'Đồng bộ MH',SEND_PURCHASE:'Gửi sang MH',SYNC_BASE:'Đồng bộ BASE'})[a]||a;
+  return({CREATE:'Tạo nháp',SUBMIT:'Nộp duyệt',RESUBMIT:'Nộp lại',APPROVE:'Duyệt',REJECT:'Từ chối',EDIT:'Sửa phiếu',COMPLETE:'Hoàn thành',WI_COMPLETE:'HT hạng mục',START:'Bắt đầu thực hiện',SYNC:'Đồng bộ MH',SEND_PURCHASE:'Gửi sang MH',SYNC_BASE:'Đồng bộ BASE'})[a]||a;
 }
 
 function renderOrderProgressTab(o){
@@ -763,7 +823,7 @@ function renderOrderProgressTab(o){
         <div class="tl-box"><div class="k">Bắt đầu thực hiện</div><div class="v">${fmtStampVi(o.startedAt)}</div><div class="h">Khi bấm «Bắt đầu»</div></div>
         <div class="tl-box"><div class="k">Đề nghị cấp VT</div><div class="v">${fmtStampVi(o.materialRequestedAt)}</div><div class="h">Gửi BASE / MH sớm nhất</div></div>
         <div class="tl-box"><div class="k">Có đủ vật tư</div><div class="v">${fmtStampVi(o.materialReadyAt)}</div><div class="h">Sau đồng bộ MH</div></div>
-        <div class="tl-box"><div class="k">Hoàn thiện SC</div><div class="v">${fmtStampVi(o.repairCompletedAt)}</div><div class="h">Khi «Hoàn thành phiếu»</div></div>
+        <div class="tl-box"><div class="k">Hoàn thiện SC</div><div class="v">${fmtStampVi(o.repairCompletedAt)}</div><div class="h">Khi đủ hạng mục hoàn thành</div></div>
       </div>
       <p class="text-[11px] text-slate-500 mt-3 m-0">${esc(hint)}</p>
     </div>
@@ -807,20 +867,39 @@ function renderOrder(){
     ?`<div class="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[12px] text-amber-950">Phiếu ${o.approval==='REJECTED'?'bị từ chối':'nháp'} — có thể sửa thông tin, hạng mục và vật tư.</div>`
     :`<div class="mt-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">Chỉ sửa khi <strong>Nháp</strong> hoặc <strong>Từ chối</strong>.</div>`;
 
-  const wiHtml=(o.workItems||[]).map((w,i)=>`<article class="card10 p-3">
+  const canCompleteWi=canCompleteWorkItems(o);
+  const wiHtml=(o.workItems||[]).map((w,i)=>{
+    ensureWorkItemFields(w);
+    const wiDone=!!w.completedAt;
+    const statusBadge=wiDone
+      ?'<span class="badge bg-emerald-50 text-emerald-800">Đã HT</span>'
+      :'<span class="badge bg-slate-100 text-slate-600">Chưa HT</span>';
+    const hoursLine=wiDone&&w.hours!=null
+      ?`<p class="text-[11px] text-emerald-800 m-0 mt-0.5 font-medium">TT ${Number(w.hours).toFixed(1)} / barem ${w.standardHours!=null?Number(w.standardHours).toFixed(1):'—'}</p>`
+      :(w.hours!=null?`<p class="text-[11px] text-slate-500 m-0 mt-0.5">${Number(w.hours).toFixed(1)} giờ TT${w.standardHours!=null&&w.standardHours!==w.hours?' (barem '+Number(w.standardHours).toFixed(1)+')':''}</p>`:'');
+    let rightCol='';
+    if(editable){
+      rightCol=`<div class="flex flex-col gap-1 shrink-0">
+        <button type="button" class="text-blue-600 text-xs font-semibold" data-edit-wi="${i}">Sửa</button>
+        <button type="button" class="text-rose-600 text-xs font-semibold" data-rm-wi="${i}">Xóa</button>
+      </div>`;
+    }else if(canCompleteWi){
+      rightCol=wiDone
+        ?`<div class="shrink-0 text-right"><span class="text-emerald-600 font-bold">✓</span><p class="text-[10px] text-slate-500 m-0 mt-0.5">${fmtStampVi(w.completedAt)}</p></div>`
+        :`<button type="button" class="btn btn-emerald btn-sm !h-8 !min-h-8 !text-xs shrink-0" data-complete-wi="${i}">Hoàn thành hạng mục</button>`;
+    }
+    return `<article class="card10 p-3">
     <div class="flex justify-between gap-2 items-start">
       <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-1 mb-0.5">${statusBadge}</div>
         <p class="text-[13px] font-bold m-0">${esc(w.system||o.system||'—')}</p>
         <p class="text-sm text-slate-800 mt-1 m-0">${esc(w.content)}</p>
         ${w.service?`<p class="text-[11px] text-slate-500 m-0 mt-0.5">${esc(w.service)}${w.performer?' · '+esc(w.performer):''}</p>`:''}
-        ${w.hours!=null?`<p class="text-[11px] text-slate-500 m-0 mt-0.5">${Number(w.hours).toFixed(1)} giờ TT${w.standardHours!=null&&w.standardHours!==w.hours?' (barem '+Number(w.standardHours).toFixed(1)+')':''}</p>`:''}
+        ${hoursLine}
       </div>
-      ${editable?`<div class="flex flex-col gap-1 shrink-0">
-        <button type="button" class="text-blue-600 text-xs font-semibold" data-edit-wi="${i}">Sửa</button>
-        <button type="button" class="text-rose-600 text-xs font-semibold" data-rm-wi="${i}">Xóa</button>
-      </div>`:''}
+      ${rightCol}
     </div>
-  </article>`).join('')||`<p class="text-sm text-slate-400 px-1">Chưa có hạng mục</p>`;
+  </article>`}).join('')||`<p class="text-sm text-slate-400 px-1">Chưa có hạng mục</p>`;
 
   const matsHtml=plannedMats(o).length
     ? plannedMats(o).map((m,i)=>`<div class="mat-row">
@@ -947,13 +1026,7 @@ function bindOrderDetailActions(o){
     pushLog(o,'START','Bắt đầu thực hiện trên xưởng');
     toast('Đã bắt đầu');renderOrder();
   });
-  $('#btnComplete')?.addEventListener('click',()=>{
-    const at=nowStampMobile();
-    o.status='COMPLETED';
-    o.repairCompletedAt=at;
-    pushLog(o,'COMPLETE','Hoàn thành phiếu · khóa thực tế');
-    toast('Đã hoàn thành');renderOrder();
-  });
+  $$('[data-complete-wi]').forEach(b=>b.addEventListener('click',()=>openCompleteWorkItemSheet(o,+b.dataset.completeWi)));
   $('#btnSendPurchase')?.addEventListener('click',()=>{
     if(o.purchaseSend?.status==='SENDING')return;
     o.purchaseSend.status='SENDING';
@@ -1093,6 +1166,35 @@ function renderWiSheetForm(sysId,svcId,content,actHours,performer,useCustom,cust
       <label class="field"><span>Giờ thực tế</span><input id="wiHours" type="number" step="0.1" min="0" value="${act}" /></label>
     </div>
     <label class="field"><span>Người thực hiện</span><input id="wiPerformer" type="text" value="${esc(performer||MOBILE_DEFAULT_PERFORMER)}" /></label>`;
+}
+
+function openCompleteWorkItemSheet(o,idx){
+  if(!canCompleteWorkItems(o))return;
+  ensureOrderWorkItems(o);
+  const w=o.workItems[idx];
+  if(!w||w.completedAt)return;
+  const barem=w.standardHours!=null?w.standardHours:baremHoursForContent(w.content);
+  const defaultAct=w.hours!=null?w.hours:barem;
+  const syncDelta=()=>{
+    const el=$('#wiCompleteDelta');
+    if(el)el.textContent=baremDeltaText($('#wiCompleteHours')?.value,barem);
+  };
+  openOrderSheet(`
+    <h2>Hoàn thành hạng mục</h2>
+    <p class="sub">${esc(o.code)} · ${esc(w.content)}</p>
+    <label class="field"><span>Giờ barem (định mức)</span><input type="text" readonly class="!bg-slate-50" value="${barem!=null?Number(barem).toFixed(1)+' h':'—'}" /></label>
+    <label class="field"><span>Giờ thực tế</span><input id="wiCompleteHours" type="number" step="0.1" min="0" value="${defaultAct!=null?defaultAct:''}" /></label>
+    <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm mb-2">
+      <span class="text-slate-500">So với barem:</span> <strong id="wiCompleteDelta">${baremDeltaText(defaultAct,barem)}</strong>
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <button type="button" class="btn btn-outline btn-touch" id="wiCompleteCancel">Hủy</button>
+      <button type="button" class="btn btn-emerald btn-touch" id="wiCompleteConfirm">Xác nhận</button>
+    </div>`);
+  $('#wiCompleteCancel').onclick=closeOrderSheet;
+  $('#orderSheetBg').onclick=e=>{if(e.target===$('#orderSheetBg'))closeOrderSheet()};
+  $('#wiCompleteHours')?.addEventListener('input',syncDelta);
+  $('#wiCompleteConfirm').onclick=()=>completeWorkItemMobile(o,idx,$('#wiCompleteHours')?.value);
 }
 
 function openWorkItemSheet(o,idx){
