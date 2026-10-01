@@ -2,383 +2,402 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GLS · Quy trình nghiệp vụ BD/SC</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>GLS · Quy trình bảo dưỡng &amp; sửa chữa xe</title>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
   <style>
     :root {
-      --ink: #0f172a; --muted: #475569; --line: #e2e8f0;
-      --brand: #0b6e4f; --brand-dark: #0f513f; --sky: #0369a1;
-      --surface: #fff; --bg: #f1f5f9;
+      --ink: #0f172a;
+      --muted: #475569;
+      --line: #e2e8f0;
+      --brand: #0b6e4f;
+      --brand-dark: #0f513f;
+      --surface: #fff;
+      --bg: #f1f5f9;
+      --pad: clamp(12px, 4vw, 20px);
     }
     * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
     body {
-      margin: 0; font-family: "Segoe UI", system-ui, sans-serif; color: var(--ink);
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      color: var(--ink);
       background:
-        radial-gradient(900px 420px at 8% -8%, #cfeee3 0%, transparent 55%),
-        radial-gradient(700px 360px at 100% 0%, #dbeafe 0%, transparent 45%),
+        radial-gradient(700px 320px at 10% -5%, #cfeee3 0%, transparent 55%),
         var(--bg);
       line-height: 1.55;
     }
     a { color: var(--brand); }
     .top {
-      position: sticky; top: 0; z-index: 20;
-      backdrop-filter: blur(10px); background: rgba(255,255,255,.9);
+      position: sticky; top: 0; z-index: 30;
+      background: rgba(255,255,255,.94);
       border-bottom: 1px solid var(--line);
+      padding: 10px var(--pad);
+      padding-top: max(10px, env(safe-area-inset-top));
     }
-    .top-inner {
-      max-width: 1120px; margin: 0 auto; padding: 12px 20px;
-      display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center;
+    .top-row {
+      max-width: 720px; margin: 0 auto;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
     }
-    .top .brand {
-      font-size: 12px; font-weight: 700; letter-spacing: .04em;
+    .brand {
+      font-size: 11px; font-weight: 700; letter-spacing: .04em;
       text-transform: uppercase; color: var(--brand); margin-right: auto;
     }
-    .top nav { display: flex; flex-wrap: wrap; gap: 6px; }
-    .top a.nav {
-      text-decoration: none; font-size: 12px; font-weight: 600;
-      padding: 5px 9px; border-radius: 8px; color: var(--ink);
-      border: 1px solid transparent;
+    .top-links { display: flex; flex-wrap: wrap; gap: 6px; }
+    .top-links a {
+      text-decoration: none; font-size: 13px; font-weight: 600;
+      padding: 8px 12px; border-radius: 999px; min-height: 40px;
+      display: inline-flex; align-items: center;
+      border: 1px solid var(--line); background: #fff; color: var(--ink);
     }
-    .top a.nav:hover { background: #f8fafc; border-color: var(--line); }
-    .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 20px 72px; }
-    h1 { margin: 0 0 8px; font-size: clamp(1.5rem, 3.2vw, 1.95rem); line-height: 1.2; }
-    .lead { margin: 0 0 20px; color: var(--muted); max-width: 78ch; font-size: 15px; }
-    .phases {
-      display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      margin-bottom: 28px;
+    .top-links a.now { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
+    .wrap {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 20px var(--pad) calc(56px + env(safe-area-inset-bottom));
     }
-    .phases a {
-      text-decoration: none; color: inherit; background: #fff;
-      border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px;
-      font-size: 12px;
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.35rem, 5.5vw, 1.75rem);
+      line-height: 1.25;
     }
-    .phases a:hover { border-color: var(--brand); }
-    .phases strong { display: block; font-size: 13px; margin-bottom: 2px; }
-    .phases span { color: var(--muted); }
-    .toc { display: grid; gap: 12px; margin-bottom: 32px; }
-    @media (min-width: 720px) { .toc { grid-template-columns: 1fr 1fr; } }
-    .toc > a {
-      display: block; text-decoration: none; color: inherit;
-      background: var(--surface); border: 1px solid var(--line);
-      border-radius: 12px; padding: 16px 18px;
+    .lead {
+      margin: 0 0 18px;
+      color: var(--muted);
+      font-size: clamp(14px, 3.8vw, 16px);
     }
-    .toc > a:hover { border-color: var(--brand); }
-    .tag {
-      display: inline-block; font-size: 11px; font-weight: 700;
-      letter-spacing: .03em; text-transform: uppercase;
-      padding: 3px 8px; border-radius: 999px; margin-bottom: 8px;
+    .chips {
+      display: flex; gap: 8px; overflow-x: auto;
+      padding-bottom: 6px; margin: 0 0 22px;
+      -webkit-overflow-scrolling: touch;
+      scroll-snap-type: x proximity;
     }
-    .tag.ops { background: #ecfdf5; color: var(--brand-dark); }
-    .tag.it { background: #eff6ff; color: var(--sky); }
-    .toc strong { display: block; margin-bottom: 4px; }
-    .toc span { font-size: 14px; color: var(--muted); }
-    section.panel {
-      background: var(--surface); border: 1px solid var(--line);
-      border-radius: 16px; padding: 22px 20px 28px; margin-bottom: 28px;
+    .chips a {
+      flex: 0 0 auto; scroll-snap-align: start;
+      text-decoration: none; color: inherit;
+      background: #fff; border: 1px solid var(--line);
+      border-radius: 12px; padding: 10px 14px; min-height: 44px;
+      font-size: 13px; white-space: nowrap;
     }
-    section.panel h2 {
-      margin: 0 0 6px; font-size: 1.2rem;
-      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    .chips a strong { color: var(--brand-dark); }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: clamp(14px, 4vw, 22px);
+      margin-bottom: 18px;
     }
-    section.panel .sub { margin: 0 0 16px; color: var(--muted); font-size: 14px; }
-    h3.block {
-      margin: 22px 0 10px; font-size: 15px; color: var(--brand-dark);
-      padding-bottom: 6px; border-bottom: 1px solid var(--line);
+    .panel h2 {
+      margin: 0 0 6px;
+      font-size: clamp(1.05rem, 4vw, 1.2rem);
     }
-    h3.block:first-of-type { margin-top: 4px; }
+    .sub { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+    h3.step {
+      margin: 20px 0 8px;
+      font-size: clamp(15px, 4vw, 16px);
+      color: var(--brand-dark);
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--line);
+    }
+    h3.step:first-of-type { margin-top: 4px; }
     .diagram {
-      overflow-x: auto; background: #f8fafc; border: 1px solid var(--line);
-      border-radius: 12px; padding: 14px 10px; margin-bottom: 14px;
+      position: relative;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 8px 8px;
+      margin-bottom: 12px;
     }
-    .mermaid { display: flex; justify-content: center; }
-    .explain p, .explain li { font-size: 14px; color: #334155; }
-    .explain ul, .explain ol { margin: 6px 0 0; padding-left: 1.2rem; }
-    .explain li { margin: 4px 0; }
-    .grid-2, .grid-3 { display: grid; gap: 12px; margin-top: 12px; }
-    @media (min-width: 800px) {
-      .grid-2 { grid-template-columns: 1fr 1fr; }
-      .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .diagram::after {
+      content: "Vuốt ngang nếu sơ đồ rộng hơn màn hình";
+      display: block;
+      font-size: 11px;
+      color: #94a3b8;
+      text-align: center;
+      padding: 4px 0 2px;
     }
-    .box {
-      border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
-      background: #f8fafc; font-size: 13px;
+    @media (min-width: 640px) {
+      .diagram::after { content: none; }
     }
-    .box.amber { border-color: #fcd34d; background: #fffbeb; }
-    .box.sky { border-color: #7dd3fc; background: #f0f9ff; }
-    .box.green { border-color: #6ee7b7; background: #ecfdf5; }
-    .box.violet { border-color: #c4b5fd; background: #f5f3ff; }
-    .box.slate { border-color: #cbd5e1; background: #f8fafc; }
-    .box strong { display: block; margin-bottom: 4px; }
+    .mermaid { display: flex; justify-content: center; min-width: min(100%, 520px); }
+    .mermaid svg { max-width: none; height: auto; }
     .legend {
-      display: flex; flex-wrap: wrap; gap: 10px 16px;
-      font-size: 12px; color: var(--muted); margin: 0 0 10px;
+      display: flex; flex-wrap: wrap; gap: 8px 14px;
+      font-size: 12px; color: var(--muted); margin: 0 0 12px;
     }
     .legend i {
       display: inline-block; width: 10px; height: 10px; border-radius: 2px;
-      margin-right: 6px; vertical-align: middle;
+      margin-right: 5px; vertical-align: middle;
     }
+    .cards { display: grid; gap: 10px; margin-top: 10px; }
+    @media (min-width: 560px) {
+      .cards.two { grid-template-columns: 1fr 1fr; }
+      .cards.three { grid-template-columns: 1fr 1fr 1fr; }
+    }
+    .box {
+      border: 1px solid var(--line); border-radius: 12px;
+      padding: 12px 14px; background: #f8fafc; font-size: 14px;
+    }
+    .box.y { border-color: #fcd34d; background: #fffbeb; }
+    .box.b { border-color: #7dd3fc; background: #f0f9ff; }
+    .box.g { border-color: #6ee7b7; background: #ecfdf5; }
+    .box.p { border-color: #c4b5fd; background: #f5f3ff; }
+    .box strong { display: block; margin-bottom: 4px; font-size: 14px; }
+    .tip {
+      margin: 12px 0 0; padding: 12px 14px; border-radius: 12px;
+      border-left: 4px solid var(--brand); background: #f0fdf4; font-size: 14px;
+    }
+    ul.plain { margin: 8px 0 0; padding-left: 1.15rem; font-size: 14px; color: #334155; }
+    ul.plain li { margin: 6px 0; }
+    .times {
+      margin: 10px 0 0; padding: 0; list-style: none;
+      display: grid; gap: 8px;
+    }
+    .times li {
+      background: #f8fafc; border: 1px solid var(--line);
+      border-radius: 12px; padding: 10px 12px; font-size: 14px;
+    }
+    .times b { display: block; color: var(--brand-dark); margin-bottom: 2px; }
     footer {
       margin-top: 8px; font-size: 12px; color: var(--muted);
-      display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between;
+      display: flex; flex-direction: column; gap: 8px;
     }
-    code {
-      font-family: ui-monospace, Consolas, monospace; font-size: 12px;
-      background: #e2e8f0; padding: 1px 5px; border-radius: 4px;
+    @media (min-width: 560px) {
+      footer { flex-direction: row; justify-content: space-between; align-items: center; }
     }
-    .note-call {
-      margin: 12px 0 0; padding: 12px 14px; border-radius: 10px;
-      border-left: 4px solid var(--brand); background: #f0fdf4; font-size: 13px;
-    }
-  
-    .top a.nav.active { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
-    .top.it-theme a.nav.active { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
-    .switch {
-      display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 22px;
-    }
-    .switch a {
+    .foot-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+    .foot-nav a {
       text-decoration: none; font-size: 13px; font-weight: 600;
-      padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line);
-      background: #fff; color: var(--ink);
+      padding: 10px 14px; border-radius: 999px; border: 1px solid var(--line);
+      background: #fff; color: var(--ink); min-height: 44px;
+      display: inline-flex; align-items: center;
     }
-    .switch a.on-ops { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
-    .switch a.on-it { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
-</style>
+  </style>
 </head>
 <body>
-  <div class="top ">
-    <div class="top-inner">
-      <div class="brand">GLS · BD/SC prototype</div>
-      <nav>
-        <a class="nav" href="index.html">← Demo</a>
-        <a class="nav" href="console.html">Console</a>
-        <a class="nav active" href="diagram-ops.html">Quy trình nghiệp vụ</a>
-        <a class="nav " href="diagram-it.html">IT · tích hợp</a>
-      </nav>
+  <header class="top">
+    <div class="top-row">
+      <div class="brand">GLS · Quản lý xe</div>
+      <div class="top-links">
+        <a href="index.html">Trang chủ demo</a>
+        <a class="now" href="diagram-ops.html">Quy trình</a>
+      </div>
     </div>
-  </div>
+  </header>
 
-  <div class="wrap">
-        <div class="switch">
-      <a class="on-ops" href="diagram-ops.html">Đang xem: Quy trình nghiệp vụ</a>
-      <a href="diagram-it.html">Chuyển sang: IT · tích hợp dữ liệu →</a>
-    </div>
-    <h1>Quy trình nghiệp vụ BD/SC</h1>
+  <main class="wrap">
+    <h1>Quy trình bảo dưỡng &amp; sửa chữa xe</h1>
     <p class="lead">
-      Dành cho <strong>Quản lý xe / Quản lý kỹ thuật</strong>: master → hệ thống nhắc &amp; đánh giá → lập kế hoạch → phiếu thực tế → đối chiếu.
-      Không gồm chi tiết entity/API (xem trang IT).
+      Trang này dành cho quản lý xe và kỹ thuật — giải thích <strong>làm việc thế nào</strong>,
+      từ khai báo ban đầu đến kế hoạch, làm phiếu và đối chiếu chi phí.
+      Không dùng thuật ngữ kỹ thuật / lập trình.
     </p>
-    <div class="phases">
-      <a href="#ops-master"><strong>① Master</strong><span>Danh mục · barem · tiêu chí · PWMS</span></a>
-      <a href="#ops-system"><strong>② Hệ thống</strong><span>Sync · nhắc · đánh giá</span></a>
-      <a href="#ops-plan"><strong>③ Kế hoạch</strong><span>Mẫu · sinh KH · từ ĐG</span></a>
-      <a href="#ops-order"><strong>④ Phiếu thực tế</strong><span>BD/SC · 2 cụm VT · MH/BASE</span></a>
-      <a href="#ops-report"><strong>⑤ Đối chiếu</strong><span>Plan vs Actual</span></a>
-    </div>
 
-    <!-- ===================== OPS ===================== -->
-    <section class="panel" id="ops">
-      <h2><span class="tag ops">Nghiệp vụ</span> Hoạt động end-to-end (5 lớp)</h2>
-      <p class="sub">Đọc theo thứ tự ①→⑤. Ô vàng = người dùng QL xe/KTV; xanh dương = PWMS/hệ thống ngoài; xanh lá = kết quả lưu trên QLX.</p>
+    <nav class="chips" aria-label="Các bước">
+      <a href="#b1"><strong>1.</strong> Khai báo ban đầu</a>
+      <a href="#b2"><strong>2.</strong> Hệ thống hỗ trợ</a>
+      <a href="#b3"><strong>3.</strong> Lập kế hoạch</a>
+      <a href="#b4"><strong>4.</strong> Làm phiếu</a>
+      <a href="#b5"><strong>5.</strong> Đối chiếu</a>
+    </nav>
 
+    <section class="panel">
+      <h2>Nhìn nhanh toàn bộ quy trình</h2>
+      <p class="sub">Đọc từ trên xuống: làm xong bước trên mới sang bước dưới.</p>
       <div class="legend">
-        <span><i style="background:#fef3c7"></i>Thao tác QL xe / KTV</span>
-        <span><i style="background:#dbeafe"></i>PWMS / hệ thống ngoài</span>
-        <span><i style="background:#ede9fe"></i>BASE TMS</span>
+        <span><i style="background:#fef3c7"></i>Người dùng thao tác</span>
+        <span><i style="background:#dbeafe"></i>Bộ phận / phần mềm khác hỗ trợ</span>
         <span><i style="background:#d1fae5"></i>Kết quả trên Quản lý xe</span>
       </div>
-
-      <h3 class="block" id="ops-overview">Tổng quan 5 lớp</h3>
-      <div class="diagram">
-        <pre class="mermaid">
-flowchart LR
-  M[① Master<br/>QLX + PWMS] --> S[② Hệ thống tham gia<br/>Sync · Nhắc · Đánh giá]
-  S --> P[③ Kế hoạch BD/SC<br/>Mẫu · Sinh KH tháng]
-  P --> O[④ Phiếu thực tế<br/>PERIODIC / INCIDENTAL]
-  O --> R[⑤ Đối chiếu<br/>KH vs TT · chi phí]
-
-  style M fill:#fef3c7,stroke:#d97706
-  style S fill:#dbeafe,stroke:#0284c8
-  style P fill:#d1fae5,stroke:#059669
-  style O fill:#d1fae5,stroke:#059669
-  style R fill:#e2e8f0,stroke:#64748b
-        </pre>
-      </div>
-
-      <!-- 1 MASTER -->
-      <h3 class="block" id="ops-master">① Tạo / cấu hình master</h3>
-      <div class="diagram">
-        <pre class="mermaid">
-flowchart TB
-  subgraph QLX["Master trên Quản lý xe"]
-    VS[Hệ thống xe]
-    ST[Loại dịch vụ]
-    BH[Barem giờ công<br/>theo kỳ hiệu lực]
-    CAT[Danh mục bảo dưỡng<br/>mốc km/tháng · OR · lặp]
-    CR[Tiêu chí đánh giá<br/>nhóm + hạng mục checklist]
-    SET[Cài đặt nhắc đánh giá<br/>tuần / tháng]
-  end
-
-  subgraph PWMS["Master trên PWMS — SoT"]
-    PROD[Product / vật tư · tồn · giá]
-    SERI[Serial lốp / ắc nếu có]
-    OBJ[Object ID xe]
-  end
-
-  subgraph MAP["Cầu nối"]
-    VM[Ánh xạ xe TMS ↔ PWMS<br/>tmsVehicleId · pwmsObjectId]
-  end
-
-  VS --> CAT
-  ST --> BH
-  BH --> CAT
-  CR --> SET
-  OBJ --> VM
-  PROD -.lookup.-> CAT
-        </pre>
-      </div>
-      <div class="explain grid-2">
-        <div class="box amber">
-          <strong>Ai làm · QL xe / admin kỹ thuật</strong>
-          Tạo hệ thống xe, loại DV, barem theo kỳ, danh mục BD (mốc chu kỳ, bắt buộc thay, gắn tiêu chí ĐG), tiêu chí checklist, cài nhắc ĐG.
-        </div>
-        <div class="box sky">
-          <strong>Ai làm · Mua hàng / PWMS</strong>
-          Giữ master Product, tồn, serial, Object ID xe. QLX chỉ ánh xạ xe và tra cứu — không giữ SoT kho/serial.
-        </div>
-      </div>
-      <div class="note-call">
-        <strong>Lưu ý:</strong> Danh mục bảo dưỡng là “định mức chu kỳ” (vd. dầu/lọc cứ 10.000 km, hoặc 3 tháng). State theo từng xe (<code>catState</code>: lastKm / nextKm / nextDate) dùng cho nhắc và gợi ý kế hoạch.
-      </div>
-
-      <!-- 2 SYSTEM -->
-      <h3 class="block" id="ops-system">② Hệ thống tham gia (sau khi có master)</h3>
       <div class="diagram">
         <pre class="mermaid">
 flowchart TD
-  SYNC[Đồng bộ danh mục PWMS<br/>Product · hệ thống · nội dung SC]
-  MAP[Đồng bộ / duyệt ánh xạ xe<br/>TMS ↔ Object ID]
-  REM[Nhắc bảo dưỡng<br/>theo danh mục + odo/ngày]
-  ASM[Đánh giá phương tiện định kỳ<br/>checklist tiêu chí]
-  WARN[Cảnh báo khóa kỳ / quá hạn ĐG<br/>như Fleet]
+  A[1. Khai báo danh mục<br/>và quy tắc bảo dưỡng] --> B[2. Hệ thống nhắc việc<br/>và hỗ trợ đánh giá xe]
+  B --> C[3. Lập kế hoạch<br/>tháng / theo xe]
+  C --> D[4. Tạo phiếu làm thật<br/>bảo dưỡng hoặc sửa chữa]
+  D --> E[5. So sánh kế hoạch<br/>với thực tế · xem lịch sử]
 
-  SYNC --> LOOKUP[Lookup VT / giá tạm / tồn<br/>khi lập KH &amp; phiếu]
-  MAP --> SEND[Cho phép gửi phiếu sang MH<br/>theo Object ID]
-  REM --> SUG[Gợi ý xe + hạng mục đến hạn]
-  ASM --> FAIL[ĐG lỗi / cần khắc phục]
-  FAIL --> PLAN_DG[Tạo dòng kế hoạch / phiếu SC<br/>từ đánh giá]
-  WARN --> ASM
-  SUG --> PLAN
-  PLAN_DG --> PLAN[Kế hoạch BD/SC]
+  style A fill:#fef3c7,stroke:#d97706
+  style B fill:#dbeafe,stroke:#0284c8
+  style C fill:#d1fae5,stroke:#059669
+  style D fill:#d1fae5,stroke:#059669
+  style E fill:#e2e8f0,stroke:#64748b
         </pre>
-      </div>
-      <div class="explain">
-        <ul>
-          <li><strong>Đồng bộ PWMS</strong> (on-demand / cron): làm mới Product, tồn, giá tham chiếu, nội dung SC — phục vụ autocomplete.</li>
-          <li><strong>Ánh xạ xe</strong>: bắt buộc trước khi «Gửi phiếu sang mua hàng» (Object ID bất biến).</li>
-          <li><strong>Nhắc BD</strong>: đọc mốc danh mục + trạng thái theo xe → danh sách đến hạn.</li>
-          <li><strong>Đánh giá định kỳ</strong>: theo tiêu chí master + lịch nhắc; kết quả xấu có thể sinh kế hoạch / phiếu SC (không nhất thiết qua mẫu KH).</li>
-        </ul>
-      </div>
-
-      <!-- 3 PLAN -->
-      <h3 class="block" id="ops-plan">③ Lập kế hoạch bảo dưỡng / sửa chữa</h3>
-      <div class="diagram">
-        <pre class="mermaid">
-flowchart TD
-  TPL[Tạo mẫu kế hoạch<br/>theo loại xe · hãng · đời · kỳ]
-  TPL --> ITEMS[Chọn danh mục BD vào mẫu<br/>SL · đơn giá dự toán]
-  ITEMS --> GEN[Sinh kế hoạch tháng<br/>áp mẫu lên danh sách xe khớp]
-  REM2[Từ nhắc đến hạn] --> GEN2[Thêm / duyệt dòng KH]
-  ASM2[Từ đánh giá lỗi] --> GEN3[Dòng KH nguồn PERIODIC_ASSESSMENT]
-  GEN --> KH[MaintenancePlan<br/>NEW → SCHEDULED → …]
-  GEN2 --> KH
-  GEN3 --> KH
-  KH --> DUYET[Kỹ thuật duyệt / chỉnh KH]
-  DUYET --> READY[KH sẵn sàng tạo phiếu thực tế]
-        </pre>
-      </div>
-      <div class="explain grid-3">
-        <div class="box green">
-          <strong>Đường A — Mẫu kế hoạch</strong>
-          Tạo <em>mẫu</em> theo phạm vi xe (type/brand/model/year) + kỳ → gắn nhiều danh mục BD → «Lấy xe giống mẫu» / sinh KH hàng loạt.
-        </div>
-        <div class="box amber">
-          <strong>Đường B — Nhắc chu kỳ</strong>
-          Hệ thống liệt kê xe–danh mục đến hạn → người dùng đưa vào kế hoạch tháng hoặc tạo phiếu BD trực tiếp.
-        </div>
-        <div class="box violet">
-          <strong>Đường C — Đánh giá</strong>
-          ĐG định kỳ FAIL / cần thay VT → tạo dòng kế hoạch hoặc phiếu SC (source = đánh giá), không bắt buộc đi qua mẫu.
-        </div>
-      </div>
-      <div class="note-call">
-        Kế hoạch = <strong>dự toán</strong> (xe, hạng mục, SL, ĐG, VAT, vendor). Chưa phải chứng từ xuất kho. Giá trên KH thường là giá tham chiếu PWMS.
-      </div>
-
-      <!-- 4 ORDER -->
-      <h3 class="block" id="ops-order">④ Phiếu thực tế BD / SC</h3>
-      <div class="diagram">
-        <pre class="mermaid">
-flowchart TD
-  SRC1[Từ kế hoạch PERIODIC] --> ORD[Tạo phiếu BD/SC]
-  SRC2[Từ sự cố INCIDENTAL] --> ORD
-  SRC3[Từ đánh giá / mobile KTV] --> ORD
-  ORD --> PLAN_C[Cụm DỰ KIẾN<br/>hạng mục + VT XK/SN/KTV]
-  PLAN_C --> SUB[Nộp duyệt → Duyệt]
-  SUB --> BASE[Đồng bộ BASE]
-  SUB --> MH[Gửi phiếu sang mua hàng]
-  BASE --> T1[mốc đề nghị cấp VT]
-  MH --> T1
-  T1 --> START[Bắt đầu thực hiện<br/>mốc startedAt]
-  START --> PW[MH xử lý trên PWMS<br/>theo mã phiếu]
-  PW --> SYNC[Đồng bộ mua hàng<br/>→ cụm PURCHASE]
-  SYNC --> T2[mốc có đủ VT]
-  T2 --> DONE[Hoàn thành<br/>mốc repairCompletedAt]
-        </pre>
-      </div>
-      <div class="explain grid-2">
-        <div class="box amber">
-          <strong>Cụm dự kiến</strong>
-          KTV nhập hạng mục + vật tư (xuất kho nếu đủ tồn / sửa ngoài nếu thiếu / KTV ghi tay). Giữ nguyên khi đồng bộ MH.
-        </div>
-        <div class="box sky">
-          <strong>Cụm mua hàng</strong>
-          Sau «Đồng bộ MH»: giá / NCC / chứng từ / ngày cấp theo mã phiếu. Chi phí chuẩn ưu tiên cụm này.
-        </div>
-      </div>
-
-      <!-- 5 REPORT -->
-      <h3 class="block" id="ops-report">⑤ Đối chiếu &amp; lịch sử</h3>
-      <div class="diagram">
-        <pre class="mermaid">
-flowchart LR
-  KH[Kế hoạch tháng] --> CMP[Plan vs Actual]
-  ORD[Phiếu hoàn thành<br/>+ cụm MH] --> CMP
-  CMP --> R1[SL / chi phí / tiến độ]
-  ORD --> HIST[Lịch sử theo xe<br/>theo danh mục BD]
-  HIST --> NEXT[Gợi ý lần BD tiếp<br/>cập nhật catState]
-        </pre>
-      </div>
-      <div class="explain">
-        <p>Sau hoàn thành phiếu PERIODIC: cập nhật <code>lastKm / lastDate / occurrence</code> trên danh mục–xe → tính mốc tiếp (OR giữa các rule, có <code>repeat</code> vô hạn).</p>
       </div>
     </section>
+
+    <section class="panel" id="b1">
+      <h3 class="step">Bước 1 — Khai báo ban đầu</h3>
+      <p class="sub">Chuẩn bị “sổ quy tắc” trước khi lập kế hoạch hay làm phiếu.</p>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+  A[Phân hệ thống trên xe<br/>vd. máy · gầm · điện] --> B[Loại dịch vụ<br/>và giờ công chuẩn]
+  B --> C[Danh mục bảo dưỡng<br/>mốc km hoặc tháng]
+  D[Bảng câu hỏi<br/>đánh giá xe định kỳ] --> E[Lịch nhắc đánh giá<br/>theo tuần / tháng]
+  F[Danh mục vật tư<br/>và kho bên mua hàng] --> G[Ghép xe trên Quản lý xe<br/>với mã xe bên kho]
+  C --> H[Sẵn sàng lập kế hoạch]
+  E --> H
+  G --> H
+        </pre>
+      </div>
+      <div class="cards two">
+        <div class="box y">
+          <strong>Bên Quản lý xe / kỹ thuật làm</strong>
+          Khai báo hệ thống xe, giờ công chuẩn, danh mục bảo dưỡng (ví dụ thay dầu mỗi 10.000 km hoặc mỗi 3 tháng), bộ câu hỏi đánh giá, lịch nhắc đánh giá.
+        </div>
+        <div class="box b">
+          <strong>Bên mua hàng / kho làm</strong>
+          Giữ danh sách vật tư, số tồn, giá tham khảo, mã định danh xe bên kho. Quản lý xe chỉ <em>ghép xe</em> và tra cứu khi cần — không thay thế sổ kho.
+        </div>
+      </div>
+      <div class="tip">
+        <strong>Ví dụ dễ hiểu:</strong> Danh mục “Thay dầu / lọc” = quy tắc chu kỳ.
+        Mỗi xe có “lần gần nhất” và “lần tới” (theo km hoặc ngày) để hệ thống biết khi nào cần nhắc.
+      </div>
+    </section>
+
+    <section class="panel" id="b2">
+      <h3 class="step">Bước 2 — Hệ thống hỗ trợ sau khi đã khai báo</h3>
+      <p class="sub">Không phải lúc nào cũng nhập tay: phần mềm giúp cập nhật vật tư, nhắc việc, và theo dõi đánh giá xe.</p>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+  A[Cập nhật danh sách vật tư<br/>tồn kho · giá tham khảo] --> D[Khi lập kế hoạch / phiếu<br/>có gợi ý vật tư]
+  B[Ghép xe với kho xong] --> E[Được phép gửi phiếu<br/>sang mua hàng]
+  C[Nhắc bảo dưỡng đến hạn] --> F[Gợi ý xe + hạng mục]
+  G[Đánh giá xe định kỳ] --> H{Xe đạt không?}
+  H -->|Cần khắc phục| I[Đưa vào kế hoạch<br/>hoặc tạo phiếu sửa]
+  H -->|Đạt| J[Ghi nhận · chờ kỳ sau]
+  F --> K[Kế hoạch bảo dưỡng]
+  I --> K
+        </pre>
+      </div>
+      <ul class="plain">
+        <li><strong>Cập nhật vật tư từ kho:</strong> để khi chọn vật tư thấy tồn và giá tham khảo mới.</li>
+        <li><strong>Ghép xe với kho:</strong> cần làm trước khi gửi phiếu sang mua hàng (tránh nhầm xe).</li>
+        <li><strong>Nhắc bảo dưỡng:</strong> dựa trên danh mục + số km / ngày của từng xe.</li>
+        <li><strong>Đánh giá định kỳ:</strong> theo bộ câu hỏi đã khai báo; nếu không đạt có thể tạo kế hoạch hoặc phiếu sửa chữa.</li>
+      </ul>
+    </section>
+
+    <section class="panel" id="b3">
+      <h3 class="step">Bước 3 — Lập kế hoạch</h3>
+      <p class="sub">Kế hoạch là bản <strong>dự toán</strong> (xe nào · làm gì · khoảng chi phí). Chưa phải phiếu xuất kho.</p>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+  A[Tạo mẫu kế hoạch<br/>theo loại xe · hãng · đời] --> B[Chọn hạng mục bảo dưỡng<br/>số lượng · giá dự toán]
+  B --> C[Áp mẫu cho nhiều xe<br/>cùng loại]
+  D[Hoặc lấy từ danh sách<br/>xe đến hạn nhắc] --> F[Kế hoạch tháng]
+  E[Hoặc từ đánh giá xe<br/>không đạt] --> F
+  C --> F
+  F --> G[Kỹ thuật xem lại · chỉnh]
+  G --> H[Sẵn sàng tạo phiếu làm thật]
+        </pre>
+      </div>
+      <div class="cards three">
+        <div class="box g">
+          <strong>Cách 1 — Theo mẫu</strong>
+          Làm một mẫu cho nhóm xe giống nhau, rồi áp sang nhiều xe trong kỳ (tháng).
+        </div>
+        <div class="box y">
+          <strong>Cách 2 — Theo nhắc việc</strong>
+          Hệ thống liệt kê xe / hạng mục đến hạn → đưa vào kế hoạch hoặc làm phiếu luôn.
+        </div>
+        <div class="box p">
+          <strong>Cách 3 — Theo đánh giá</strong>
+          Xe đánh giá không đạt → thêm vào kế hoạch hoặc tạo phiếu sửa chữa.
+        </div>
+      </div>
+      <div class="tip">
+        Giá trên kế hoạch thường là <strong>giá tham khảo</strong> từ kho. Chi phí thật sẽ lấy sau khi mua hàng xử lý và đồng bộ lại phiếu.
+      </div>
+    </section>
+
+    <section class="panel" id="b4">
+      <h3 class="step">Bước 4 — Tạo phiếu làm thật (bảo dưỡng / sửa chữa)</h3>
+      <p class="sub">Phiếu có thể tạo từ kế hoạch, từ sự cố phát sinh, hoặc từ đánh giá / điện thoại kỹ thuật viên.</p>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+  A[Tạo phiếu] --> B[Kỹ thuật ghi phần dự kiến<br/>hạng mục + vật tư]
+  B --> C[Nộp duyệt · quản lý duyệt]
+  C --> D[Gửi sang hệ thống duyệt BASE<br/>và / hoặc gửi mua hàng]
+  D --> E[Bắt đầu làm việc trên xưởng]
+  E --> F[Mua hàng xuất kho<br/>hoặc mua ngoài theo mã phiếu]
+  F --> G[Đồng bộ lại từ mua hàng<br/>thành phần dữ liệu thật]
+  G --> H[Hoàn thành phiếu]
+        </pre>
+      </div>
+      <div class="cards two">
+        <div class="box y">
+          <strong>Phần dự kiến (kỹ thuật ghi)</strong>
+          Hạng mục công việc và vật tư đề nghị.
+          Có vật tư trong kho đủ số lượng → <em>xuất kho</em>;
+          hết / thiếu / không có mã → <em>sửa ngoài</em>;
+          mua tại chỗ ghi tay → <em>kỹ thuật ghi</em>.
+          Phần này <strong>không bị xóa</strong> khi đồng bộ mua hàng.
+        </div>
+        <div class="box b">
+          <strong>Phần mua hàng (sau đồng bộ)</strong>
+          Giá thật, nhà cung cấp, chứng từ, ngày cấp vật tư — gắn đúng <strong>mã phiếu</strong>.
+          Dùng để tính chi phí chuẩn và đối chiếu với phần dự kiến.
+        </div>
+      </div>
+      <h3 class="step" style="border:none;padding:0;margin:16px 0 8px;font-size:15px">Bốn mốc giờ — hệ thống tự ghi, không nhập tay</h3>
+      <ul class="times">
+        <li><b>Thời gian bắt đầu</b>Khi bấm «Bắt đầu thực hiện»</li>
+        <li><b>Thời gian đề nghị cấp vật tư</b>Lần gửi sớm nhất sang BASE hoặc sang mua hàng</li>
+        <li><b>Thời gian có đủ vật tư</b>Ngày cấp vật tư <em>sau cùng</em> trên chứng từ mua hàng / xuất kho</li>
+        <li><b>Thời gian hoàn thiện sửa chữa</b>Khi bấm «Hoàn thành phiếu»</li>
+      </ul>
+    </section>
+
+    <section class="panel" id="b5">
+      <h3 class="step">Bước 5 — Đối chiếu &amp; xem lại lịch sử</h3>
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart TD
+  A[Kế hoạch đã lập] --> C[So sánh<br/>số lượng · chi phí · tiến độ]
+  B[Phiếu đã hoàn thành<br/>có phần mua hàng] --> C
+  B --> D[Lịch sử theo từng xe<br/>và theo loại bảo dưỡng]
+  D --> E[Biết lần bảo dưỡng tiếp theo<br/>cập nhật mốc trên xe]
+        </pre>
+      </div>
+      <p class="sub" style="margin-top:8px">
+        Sau khi hoàn thành phiếu bảo dưỡng định kỳ, hệ thống cập nhật “lần gần nhất” trên xe
+        và tính “lần tới” theo quy tắc danh mục (ví dụ cứ thêm 10.000 km, hoặc đủ 3 tháng — lấy mốc nào đến sớm hơn).
+      </p>
+    </section>
+
     <footer>
-      <span>GLS · Quy trình nghiệp vụ · GitHub Pages</span>
-      <span><a href="index.html">Trang demo</a> · <a href="console.html">Console</a></span>
+      <span>GLS · Quy trình bảo dưỡng / sửa chữa · dành cho quản lý &amp; kỹ thuật</span>
+      <div class="foot-nav">
+        <a href="index.html">Về trang demo</a>
+        <a href="console.html">Mở màn hình thử</a>
+      </div>
     </footer>
-  </div>
+  </main>
 
   <script>
+    const isNarrow = window.matchMedia('(max-width: 640px)').matches;
     mermaid.initialize({
       startOnLoad: true,
       theme: 'base',
       securityLevel: 'loose',
-      flowchart: { curve: 'basis', htmlLabels: true, nodeSpacing: 28, rankSpacing: 36 },
+      flowchart: {
+        curve: 'basis',
+        htmlLabels: true,
+        nodeSpacing: isNarrow ? 18 : 28,
+        rankSpacing: isNarrow ? 28 : 36,
+        padding: 8,
+      },
       themeVariables: {
         fontFamily: 'Segoe UI, system-ui, sans-serif',
-        fontSize: '13px',
+        fontSize: isNarrow ? '12px' : '13px',
         primaryColor: '#ecfdf5',
         primaryTextColor: '#0f172a',
         primaryBorderColor: '#059669',
