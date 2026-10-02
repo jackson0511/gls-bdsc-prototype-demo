@@ -6529,6 +6529,7 @@ function defaultFilters() {
     dateFrom: '',
     dateTo: '',
     tbKind: 'ALL',
+    vcShow: 'ASSIGNED',
     rhMonth: '',
     rhTech: 'ALL',
     rhStatus: 'ALL',
@@ -7235,8 +7236,8 @@ let DB = load();
 (DB.planTemplates || []).forEach(t => normalizePlanTemplate(t));
 ensurePwmsVehicleMaps();
 let view = {
-  name: 'history', histTab: 'vehicles', vehicleId: null, vehicleTab: 'plan',
-  plansTab: 'templates', templateId: null,
+  name: 'history', histTab: 'vehicles', vehicleId: null, vehicleTab: 'catalog',
+  plansTab: 'lines', templateId: null,
   expandedPlanGroups: {},
   orderId: null, catalogId: null, criteriaGroupId: null, from: null,
   page: 1, pageSize: 10,
@@ -8137,6 +8138,7 @@ function render() {
   (DB.catalog || []).forEach(normalizeCatalog);
   (DB.baremHours || []).forEach(normalizeBaremRow);
   if (typeof ensureRepairHoursSeed === 'function') ensureRepairHoursSeed();
+  if (typeof ensureVehicleCatalogAssign === 'function') ensureVehicleCatalogAssign();
   enrichAllMaterials(false);
   ensurePwmsValueHistory();
   ensurePwmsVehicleMaps();
@@ -8405,15 +8407,121 @@ function pageHistory() {
   );
 }
 
+
+/* ===== Gắn danh mục BD theo xe + cảnh báo lốp/ắc ===== */
+function ensureVehicleCatalogAssign() {
+  if (!DB.vehicleCatalogIds) DB.vehicleCatalogIds = {};
+  // Seed: xe nào đã có catState thì coi như đã gắn các catalog đó; còn lại gắn 3–5 catalog đầu
+  (DB.vehicles || []).forEach(v => {
+    const key = String(v.id);
+    if (DB.vehicleCatalogIds[key] && DB.vehicleCatalogIds[key].length) return;
+    const fromState = Object.keys(DB.catState || {})
+      .filter(k => k.startsWith(v.id + ':'))
+      .map(k => Number(k.split(':')[1]))
+      .filter(Boolean);
+    if (fromState.length) DB.vehicleCatalogIds[key] = [...new Set(fromState)];
+    else DB.vehicleCatalogIds[key] = (DB.catalog || []).slice(0, 4).map(c => c.id);
+  });
+}
+function vehicleAssignedCatalogIds(vid) {
+  ensureVehicleCatalogAssign();
+  return DB.vehicleCatalogIds[String(vid)] || [];
+}
+function isCatalogAssignedToVehicle(vid, cid) {
+  return vehicleAssignedCatalogIds(vid).map(Number).includes(Number(cid));
+}
+function setCatalogAssigned(vid, cid, on) {
+  ensureVehicleCatalogAssign();
+  const key = String(vid);
+  const set = new Set((DB.vehicleCatalogIds[key] || []).map(Number));
+  if (on) set.add(Number(cid));
+  else set.delete(Number(cid));
+  DB.vehicleCatalogIds[key] = [...set];
+  save();
+}
+function catalogsForVehicle(vid, { onlyAssigned = true } = {}) {
+  const ids = new Set(vehicleAssignedCatalogIds(vid).map(Number));
+  if (!onlyAssigned) return DB.catalog || [];
+  return (DB.catalog || []).filter(c => ids.has(Number(c.id)));
+}
+function tireBatteryAlertsForVehicle(v) {
+  ensureRepairHoursSeed && typeof ensureRepairHoursSeed === 'function';
+  if (typeof enrichAllMaterials === 'function') enrichAllMaterials(false);
+  const mats = (DB.materials || []).filter(m => {
+    const blob = `${m.name || ''} ${m.code || ''}`.toLowerCase();
+    return /lốp|lop|tire|ắc|acquy|battery/.test(blob);
+  });
+  const alerts = [];
+  mats.forEach(m => {
+    const maxKm = Number(m.maxKm || m.lifeKm || 80000);
+    const maxMonth = Number(m.maxMonth || m.lifeMonth || 24);
+    const usedKm = Number(m.usedKm != null ? m.usedKm : Math.round(maxKm * 0.3));
+    const usedMonth = Number(m.usedMonth != null ? m.usedMonth : 6);
+    const kmRatio = usedKm / maxKm;
+    const moRatio = usedMonth / maxMonth;
+    let level = null;
+    if (kmRatio >= 1 || moRatio >= 1) level = 'overdue';
+    else if (kmRatio >= 0.9 || moRatio >= 0.9) level = 'dueSoon';
+    if (!level) return;
+    // Gắn demo theo hash biển số — một phần xe «có» lốp/ắc đến hạn
+    const h = hashStr((v?.plate || '') + (m.code || ''));
+    if (h % 3 !== 0) return;
+    alerts.push({
+      kind: /ắc|acquy|battery/i.test(m.name || '') ? 'BATTERY' : 'TIRE',
+      code: m.code,
+      name: m.name,
+      serial: m.serial || m.seri || '—',
+      level,
+      usedKm, maxKm, usedMonth, maxMonth,
+    });
+  });
+  return alerts;
+}
+function tireAlertBannerHtml(alerts, opts) {
+  if (!alerts || !alerts.length) return '';
+  const overdue = alerts.filter(a => a.level === 'overdue').length;
+  const soon = alerts.filter(a => a.level === 'dueSoon').length;
+  return `<div class="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-950 leading-relaxed">
+    <strong>Cảnh báo vỏ lốp / ắc quy:</strong>
+    ${overdue ? ` <span class="text-rose-700 font-semibold">${overdue} quá hạn</span>` : ''}
+    ${soon ? ` <span class="font-semibold">${soon} sắp đến hạn</span>` : ''}
+    · định mức kép km + tháng (nguồn PWMS).
+    ${opts?.showLink !== false ? ` <button type="button" data-nav="tireBattery" class="text-blue-700 underline">Mở Vỏ lốp / ắc quy</button>` : ''}
+    ${opts?.extra || ''}
+  </div>`;
+}
+function pushCatalogsToPlan(rows) {
+  // rows: [{vehicleId, catalogId, note?}]
+  const period = new Date().toISOString().slice(0, 7);
+  let n = 0;
+  rows.forEach(r => {
+    const v = vehicleById(r.vehicleId);
+    const c = catById(r.catalogId);
+    if (!v || !c) return;
+    const id = Math.max(0, ...DB.plans.map(p => p.id || 0)) + 1 + n;
+    DB.plans.push({
+      id, code: 'KH-AUTO-' + String(id).padStart(4, '0'),
+      vehicleId: Number(r.vehicleId), catalogId: Number(r.catalogId), period,
+      qty: 1, uom: 'Lần', unitPrice: c.refPrice || 0, vat: 8, vendor: c.supplier || '',
+      system: c.system || '', status: 'PLANNED', source: r.source || 'REMINDER',
+      service: c.name, note: r.note || 'Từ nhắc / danh mục bảo dưỡng',
+    });
+    n++;
+  });
+  if (n) { save(); toast('Đã tạo ' + n + ' dòng kế hoạch · kỳ ' + period); view.name = 'plans'; view.plansTab = 'lines'; render(); }
+  else toast('Chưa chọn dòng hợp lệ');
+}
+
+
 /* ----- VEHICLE DETAIL ----- */
 function pageVehicle() {
   const v = vehicleById(view.vehicleId);
   if (!v) return pageShell('Không tìm thấy', '', '', '<button data-nav-back class="btn btn-outline">← Quay lại</button>');
   const tabs = [
+    { id: 'catalog', label: 'Danh mục bảo dưỡng' },
     { id: 'plan', label: 'Kế hoạch' },
     { id: 'maintenance', label: 'Bảo dưỡng' },
     { id: 'repair', label: 'Sửa chữa' },
-    { id: 'catalog', label: 'Danh mục bảo dưỡng' },
   ];
   return `
   <div class="min-h-full space-y-4 px-6 py-6">
@@ -8630,20 +8738,33 @@ function renderOrderQuickTable(list, { empty = 'Không có dữ liệu', showVeh
 
 function renderVehicleCatalog(v) {
   const f = F();
-  const cats = DB.catalog.filter(c => {
+  ensureVehicleCatalogAssign();
+  const showAll = f.vcShow === 'ALL';
+  const assignedIds = new Set(vehicleAssignedCatalogIds(v.id).map(Number));
+  const pool = showAll ? (DB.catalog || []) : catalogsForVehicle(v.id, { onlyAssigned: true });
+  const cats = pool.filter(c => {
     if (!matchSearch([c.code, c.name, c.system].join(' '), f.search)) return false;
     if (f.system !== 'ALL' && c.system !== f.system) return false;
     return true;
   });
+  const tireAlerts = tireBatteryAlertsForVehicle(v);
   return `
-  <p class="mb-3 text-sm text-slate-600">Theo dõi từng danh mục trên xe: mốc tiếp theo (km/ngày) và <strong>lịch sử rút gọn</strong>. Bấm <em>Xem lịch sử</em> để mở danh sách đầy đủ.</p>
+  <p class="mb-3 text-sm text-slate-600">Gắn <strong>danh mục bảo dưỡng</strong> vào xe này (hoặc áp hàng loạt). Chỉ danh mục đã gắn mới theo dõi mốc / nhắc hạn / tạo kế hoạch từ xe.</p>
+  ${tireAlertBannerHtml(tireAlerts)}
+  <div class="mb-3 flex flex-wrap gap-2">
+    <button type="button" id="btnAssignCatalogs" class="btn btn-outline btn-sm">+ Gắn / bỏ gắn danh mục</button>
+    <button type="button" id="btnBulkAssignCatalogs" class="btn btn-outline btn-sm">Áp danh mục hàng loạt cho nhiều xe</button>
+    <button type="button" id="btnCreatePlanFromVehicleCats" class="btn btn-primary btn-sm">Tạo kế hoạch từ danh mục đã chọn</button>
+  </div>
   ${filterBarShell([
     filterSearch('flt-search', 'Mã / tên danh mục…', f.search),
     filterSelect('flt-system', 'Hệ thống', f.system, [['ALL','Tất cả'], ...systems().map(s => [s, s])]),
-  ].join(''), `${cats.length} / ${DB.catalog.length} danh mục`)}
+    filterSelect('flt-vcShow', 'Hiển thị', f.vcShow || 'ASSIGNED', [['ASSIGNED','Đã gắn xe'],['ALL','Tất cả danh mục master']]),
+  ].join(''), `${cats.length} danh mục · đã gắn ${assignedIds.size}`)}
   <div class="space-y-3">
     ${cats.map(c => {
       const st = getCatState(v.id, c.id);
+      const assigned = assignedIds.has(Number(c.id));
       const computed = computeNextFromRules(c, st, v.km, v.hours || 0);
       const dueKm = st.nextKm ?? computed.nextKm;
       const dueHours = st.nextHours ?? computed.nextHours;
@@ -8654,17 +8775,21 @@ function renderVehicleCatalog(v) {
       if (kmLeft != null && kmLeft <= 0) dueCls = 'font-semibold text-rose-700';
       const hist = catalogHistory(v.id, c.id);
       const preview = hist.slice(0, 3);
-      return `<div class="card p-4">
+      return `<div class="card p-4 ${assigned ? '' : 'opacity-70 border-dashed'}">
         <div class="flex flex-wrap gap-2">
+          <label class="mt-1"><input type="checkbox" class="vc-plan-row" data-cid="${c.id}" ${assigned ? '' : 'disabled'} /></label>
           <div class="mr-auto">
             <div class="flex flex-wrap items-center gap-2">
               <div class="font-semibold text-slate-900">${c.code} · ${c.name}</div>
+              ${assigned ? '<span class="chip bg-emerald-100 text-emerald-800">Đã gắn</span>' : '<span class="chip bg-slate-100 text-slate-600">Chưa gắn</span>'}
               ${decisionBadge(planDecisionForCatalog(c, (st.occurrence || 0) + 1))}
               ${evalBadBadge(c)}
             </div>
-            <div class="text-xs text-slate-500">${c.system} · Đã BD ${st.occurrence || 0} lần · lần tới: ${esc(planDecisionForCatalog(c, (st.occurrence || 0) + 1).reason)} · ${hist.length} phiếu LS</div>
+            <div class="text-xs text-slate-500">${c.system} · Đã BD ${st.occurrence || 0} lần · ${hist.length} phiếu LS</div>
           </div>
-          <button data-cat-history="${c.id}" class="btn btn-primary btn-sm">Xem lịch sử</button>
+          <button data-toggle-assign-cat="${c.id}" class="btn btn-outline btn-sm">${assigned ? 'Bỏ gắn' : 'Gắn vào xe'}</button>
+          <button data-create-plan-one="${c.id}" class="btn btn-primary btn-sm" ${assigned ? '' : 'disabled'}>Tạo kế hoạch</button>
+          <button data-cat-history="${c.id}" class="btn btn-outline btn-sm">Xem lịch sử</button>
           <button data-edit-due="${c.id}" class="btn btn-outline btn-sm">Sửa mốc tiếp theo</button>
           <button data-apply-rule="${c.id}" class="btn btn-outline btn-sm !border-blue-300 !bg-blue-50 text-blue-800">Áp dụng chu kỳ định mức</button>
         </div>
@@ -8673,43 +8798,17 @@ function renderVehicleCatalog(v) {
           <div class="rounded-md bg-slate-50 p-3"><div class="text-xs text-slate-500">Mốc tiếp theo</div>
             <div class="${dueCls}">${dueKm != null ? kmFmt(dueKm)+' km' : ''}${dueHours != null ? ((dueKm!=null?' · ':'')+kmFmt(dueHours)+' giờ') : ''}${(dueKm!=null||dueHours!=null) && dueDate ? ' · ' : ''}${dueDate || (dueKm==null&&dueHours==null?'—':'')}</div>
             ${kmLeft != null ? `<div class="mt-1 text-xs">Còn ${kmFmt(kmLeft)} km</div>` : ''}
-            ${dueHours != null && v.hours != null ? `<div class="mt-1 text-xs">Giờ máy hiện tại ${kmFmt(v.hours)} · mốc ${kmFmt(dueHours)} giờ</div>` : ''}
           </div>
           <div class="rounded-md bg-slate-50 p-3"><div class="text-xs text-slate-500">Chu kỳ định mức</div>
-            <ul class="mt-1 list-disc pl-4 text-xs text-slate-700">${c.rules.map(r => `<li>#${r.seq} ${esc(r.label)}: ${ruleTypeLabel(r.type)} = ${r.value}${r.forceReplace?' · <span class="text-rose-700">bắt buộc thay</span>':''}${r.repeat?' · <span class="text-sky-700">lặp ∞</span>':''}</li>`).join('')}</ul>
+            <ul class="mt-1 list-disc pl-4 text-xs text-slate-700">${(c.rules||[]).map(r => `<li>#${r.seq} ${esc(r.label)}: ${ruleTypeLabel(r.type)} = ${r.value}</li>`).join('')}</ul>
           </div>
         </div>
-        <div class="mt-3">
-          <div class="mb-2 flex items-center justify-between">
-            <div class="text-xs font-medium text-slate-500">Lịch sử gần đây (xem nhanh)</div>
-            ${hist.length > 3 ? `<button data-cat-history="${c.id}" class="btn btn-outline btn-xs">+${hist.length - 3} lần nữa →</button>` : ''}
-          </div>
-          ${preview.length ? `
-          <div class="overflow-hidden rounded-md border border-slate-200">
-            <table class="min-w-full text-xs">
-              <thead class="bg-slate-50 text-slate-500"><tr>
-                <th class="px-3 py-2 text-left">Ngày</th><th class="px-3 py-2 text-left">Mã</th>
-                <th class="px-3 py-2 text-right">Odo</th><th class="px-3 py-2 text-left">VT</th>
-                <th class="px-3 py-2 text-right">Chi phí</th><th class="px-3 py-2 text-center">TT</th><th class="px-3 py-2"></th>
-              </tr></thead>
-              <tbody>
-                ${preview.map(h => `<tr class="row-h cursor-pointer" data-row-order="${h.id}">
-                  <td class="px-3 py-2">${h.date}</td>
-                  <td class="px-3 py-2 font-medium text-blue-600">${h.code}</td>
-                  <td class="px-3 py-2 text-right tabular-nums">${kmFmt(h.km)}</td>
-                  <td class="px-3 py-2 text-slate-600">${matSummary(h)}</td>
-                  <td class="px-3 py-2 text-right tabular-nums">${money(h.cost)}</td>
-                  <td class="px-3 py-2 text-center">${execBadge(h.status)}</td>
-                  <td class="px-3 py-2 text-right" onclick="event.stopPropagation()"><button data-open-order="${h.id}" class="text-blue-600 hover:underline">Chi tiết</button></td>
-                </tr>`).join('')}
-              </tbody>
-            </table>
-          </div>` : '<div class="rounded-md border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-400">Chưa có lịch sử · khi hoàn thành phiếu BD sẽ hiện tại đây</div>'}
-        </div>
+        ${preview.length ? `<div class="mt-3 text-xs text-slate-500">LS gần đây: ${preview.map(h => h.code).join(', ')}</div>` : ''}
       </div>`;
-    }).join('') || `<div class="card p-10 text-center text-slate-500">Không có danh mục khớp bộ lọc</div>`}
+    }).join('') || `<div class="card p-8 text-center text-slate-500">Chưa gắn danh mục nào. Bấm «Gắn / bỏ gắn danh mục» hoặc xem «Tất cả danh mục master».</div>`}
   </div>`;
 }
+
 
 function pageCatHistory() {
   const v = vehicleById(view.vehicleId);
@@ -9498,11 +9597,11 @@ function applyTemplateToVehicles(tpl, vehicleIds, period, periodStart, periodEnd
 
 function pagePlans() {
   const f = F();
-  const tab = view.plansTab || 'templates';
+  const tab = view.plansTab || 'lines';
   const tabs = `
   <div class="mb-4 flex gap-6 border-b border-slate-200">
-    <button data-plans-tab="templates" class="tab-underline border-b-2 px-1 pb-3 text-sm font-medium ${tab==='templates'?'active':'border-transparent text-slate-600'}">Mẫu kế hoạch</button>
     <button data-plans-tab="lines" class="tab-underline border-b-2 px-1 pb-3 text-sm font-medium ${tab==='lines'?'active':'border-transparent text-slate-600'}">Kế hoạch theo xe</button>
+    <button data-plans-tab="templates" class="tab-underline border-b-2 px-1 pb-3 text-sm font-medium ${tab==='templates'?'active':'border-transparent text-slate-600'}">Mẫu kế hoạch</button>
   </div>`;
 
   if (tab === 'templates') {
@@ -10447,8 +10546,10 @@ function pageTireBattery() {
 /* ----- REMINDER ----- */
 function pageReminder() {
   const f = F();
+  ensureVehicleCatalogAssign();
   const rows = DB.vehicles.map(v => {
-    const dues = DB.catalog.map(c => {
+    const assigned = new Set(vehicleAssignedCatalogIds(v.id).map(Number));
+    const dues = DB.catalog.filter(c => assigned.has(Number(c.id))).map(c => {
       const st = getCatState(v.id, c.id);
       const next = { km: st.nextKm, date: st.nextDate };
       if (next.km == null && next.date == null) {
@@ -10482,9 +10583,37 @@ function pageReminder() {
   return pageShell(
     'Nhắc bảo dưỡng',
     'Định mức + lịch sử + km GPS → tích chọn → đẩy dự toán (có thể sửa kỳ) · kế hoạch không duyệt LĐ',
-    `<button type="button" id="btnPushRemindPlan" class="btn btn-primary btn-sm">Đẩy dòng đã chọn → dự toán</button>`,
+    `<button type="button" id="btnPushRemindPlan" class="btn btn-primary btn-sm">Tạo kế hoạch từ dòng đã chọn</button>`,
     `
-    <div class="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950">Luồng họp: hệ thống liệt kê đến hạn từ <strong>định mức hạng mục</strong> · <strong>lịch sử thay</strong> · <strong>km GPS</strong> → user tích chọn → đẩy vào dự toán tháng.</div>
+    <div class="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950">Luồng: định mức hạng mục · lịch sử thay · km GPS → tích chọn → <strong>Tạo kế hoạch</strong>. Cảnh báo <strong>vỏ lốp / ắc quy</strong> xem khối bên dưới (và màn Vỏ lốp / ắc quy).</div>
+    ${(() => {
+      const allTire = (DB.vehicles || []).flatMap(v => tireBatteryAlertsForVehicle(v).map(a => ({...a, plate: v.plate, vehicleId: v.id})));
+      const overdue = allTire.filter(a => a.level === 'overdue').length;
+      const soon = allTire.filter(a => a.level === 'dueSoon').length;
+      if (!allTire.length) return '';
+      return `<div class="mb-4 card border-amber-200 p-4">
+        <div class="flex flex-wrap items-center gap-2 mb-2">
+          <h3 class="font-semibold text-amber-950">Cảnh báo vỏ lốp / ắc quy</h3>
+          <span class="chip bg-rose-100 text-rose-800">${overdue} quá hạn</span>
+          <span class="chip bg-amber-100 text-amber-900">${soon} sắp đến hạn</span>
+          <button type="button" data-nav="tireBattery" class="btn btn-outline btn-sm ml-auto">Chi tiết lốp / ắc</button>
+          <button type="button" id="btnPushTireFromReminder" class="btn btn-primary btn-sm">Đẩy lốp/ắc đến hạn → kế hoạch</button>
+        </div>
+        <div class="overflow-x-auto max-h-40 overflow-y-auto">
+          <table class="min-w-full text-xs"><thead class="bg-amber-50/80 text-slate-600"><tr>
+            <th class="th text-left">Xe</th><th class="th text-left">Loại</th><th class="th text-left">Mã / Seri</th><th class="th text-left">Đã dùng</th><th class="th text-center">TT</th>
+          </tr></thead><tbody>
+          ${allTire.slice(0, 40).map(a => `<tr class="row-h">
+            <td class="td">${esc(a.plate)}</td>
+            <td class="td">${a.kind === 'BATTERY' ? 'Ắc quy' : 'Vỏ lốp'}</td>
+            <td class="td font-mono">${esc(a.code)} · ${esc(a.serial)}</td>
+            <td class="td">${kmFmt(a.usedKm)}/${kmFmt(a.maxKm)} km · ${a.usedMonth}/${a.maxMonth} th</td>
+            <td class="td text-center">${a.level === 'overdue' ? evalBadge('overdue') : evalBadge('soon')}</td>
+          </tr>`).join('')}
+          </tbody></table>
+        </div>
+      </div>`;
+    })()}
     <div class="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
       ${[
         ['Tổng xe', kpis.total, 'bg-blue-50 text-blue-600'],
@@ -10667,7 +10796,7 @@ function pageAssessment() {
   const pgAsm = paginate(list);
   return pageShell(
     'Đánh giá phương tiện định kỳ',
-    'Giống Fleet: cảnh báo sắp hạn / quá hạn / đã khóa khi nhắc đánh giá đang bật · link phiếu BD/SC',
+    'Cảnh báo ĐG sắp hạn / quá hạn / khóa · cảnh báo vỏ lốp / ắc quy (định mức kép) · tạo phiếu / kế hoạch từ ĐG',
     `<button data-nav-settings-eval class="btn btn-outline">Cài đặt nhắc đánh giá</button>`,
     `
     <div class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -10690,6 +10819,10 @@ function pageAssessment() {
         <p class="mt-1 text-2xl font-bold text-rose-800 tabular-nums">${kpiLocked}</p>
       </button>
     </div>
+    ${(() => {
+      const allTire = (DB.vehicles || []).flatMap(v => tireBatteryAlertsForVehicle(v).map(a => ({...a, plate: v.plate})));
+      return tireAlertBannerHtml(allTire, { extra: allTire.length ? ` · ${allTire.length} dòng đến hạn trên đội xe (demo gắn theo biển số).` : '' });
+    })()}
     <div class="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700 leading-relaxed">
       <strong>Mẫu cảnh báo:</strong> hàng <span class="text-rose-700 font-medium">đỏ</span> = Đã khóa ·
       <span class="text-amber-700 font-medium">vàng</span> = Quá hạn ·
@@ -10779,9 +10912,18 @@ function pageCatalogMaster() {
   const pg = paginate(filtered);
   return pageShell(
     'Danh mục bảo dưỡng',
-    'Mốc chu kỳ (km / giờ vận hành / tháng / năm) · bắt buộc thay · gắn hệ thống xe · tiêu chí đánh giá',
-    `<button id="btnAddCatalog" class="btn btn-primary">+ Danh mục</button>`,
+    'Gắn danh mục vào từng xe (tab Danh mục trên chi tiết xe) hoặc áp hàng loạt. Cảnh báo lốp/ắc theo định mức kép khi vật tư thuộc hệ thống Vỏ lốp / Ắc quy. · Mốc chu kỳ (km / giờ vận hành / tháng / năm) · bắt buộc thay · gắn hệ thống xe · tiêu chí đánh giá',
+    `<button id="btnBulkAssignCatalogs" class="btn btn-outline">Áp danh mục hàng loạt cho xe</button>
+     <button id="btnAddCatalog" class="btn btn-primary">+ Danh mục</button>`,
     `
+    ${(() => {
+      const tireCats = (DB.catalog || []).filter(c => /lốp|lop|ắc|acquy|vỏ/i.test(`${c.name} ${c.system}`));
+      return `<div class="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+        <strong>Cảnh báo lốp / ắc:</strong> ${tireCats.length} danh mục liên quan hệ thống Vỏ lốp / Ắc quy.
+        Sau khi <em>gắn vào xe</em>, mốc đến hạn hiện trên Nhắc bảo dưỡng &amp; chi tiết xe.
+        <button type="button" data-nav="tireBattery" class="text-blue-700 underline ml-1">Mở cảnh báo vật tư PWMS</button>
+      </div>`;
+    })()}
     ${filterBarShell([
       filterSearch('flt-search', 'Mã, tên danh mục…', f.search),
       filterSelect('flt-system', 'Hệ thống', f.system, [['ALL','Tất cả'], ...systems().map(s => [s, s])]),
@@ -12497,7 +12639,7 @@ function openEvalModal(vid) {
     $('[data-close]').onclick = () => { closeModal(); render(); };
     $('#btnGotoPlans')?.addEventListener('click', () => {
       closeModal();
-      view = { ...view, name: 'vehicle', vehicleId: Number(vid), vehicleTab: 'plan', filters: defaultFilters(), page: 1 };
+      view = { ...view, name: 'vehicle', vehicleId: Number(vid), vehicleTab: 'catalog', filters: defaultFilters(), page: 1 };
       render();
       toast('Đã chuyển tới kế hoạch xe · ' + createdPlans.length + ' dòng từ đánh giá');
     });
@@ -12974,7 +13116,7 @@ function openAddPlanModal(vid) {
     if (!tpl) return;
     // still save as template (master) but land on vehicle plans
     closeModal();
-    view = { ...view, name: 'vehicle', vehicleId: tpl.seedVehicleId, vehicleTab: 'plan' };
+    view = { ...view, name: 'vehicle', vehicleId: tpl.seedVehicleId, vehicleTab: 'catalog' };
     render();
     toast('Đã tạo ' + tpl.items.length + ' dòng KH cho xe + lưu mẫu «' + (tpl.customName || tpl.name) + '»');
   };
@@ -14404,6 +14546,7 @@ function bindFilters() {
     'flt-dateFrom': 'dateFrom',
     'flt-dateTo': 'dateTo',
     'flt-tbKind': 'tbKind',
+    'flt-vcShow': 'vcShow',
     'flt-rhMonth': 'rhMonth',
     'flt-rhTech': 'rhTech',
     'flt-rhStatus': 'rhStatus',
@@ -14448,7 +14591,7 @@ function bind() {
     render();
   });
   $$('[data-open-vehicle]').forEach(b => b.onclick = () => {
-    view = { ...view, name: 'vehicle', vehicleId: Number(b.dataset.openVehicle), vehicleTab: 'plan', from: null, filters: defaultFilters(), page: 1 };
+    view = { ...view, name: 'vehicle', vehicleId: Number(b.dataset.openVehicle), vehicleTab: 'catalog', from: null, filters: defaultFilters(), page: 1 };
     render();
   });
   $$('[data-open-vehicle-catalog]').forEach(b => b.onclick = () => {
@@ -14508,7 +14651,7 @@ function bind() {
   $$('[data-eval]').forEach(b => b.onclick = () => openEvalModal(Number(b.dataset.eval)));
   $$('[data-create-order-from-eval]').forEach(b => b.onclick = () => openCreateOrderFromEval(Number(b.dataset.createOrderFromEval)));
   $$('[data-goto-plan-vehicle]').forEach(b => b.onclick = () => {
-    view = { ...view, name: 'vehicle', vehicleId: Number(b.dataset.gotoPlanVehicle), vehicleTab: 'plan', from: 'assessment', filters: defaultFilters(), page: 1 };
+    view = { ...view, name: 'vehicle', vehicleId: Number(b.dataset.gotoPlanVehicle), vehicleTab: 'catalog', from: 'assessment', filters: defaultFilters(), page: 1 };
     render();
   });
   $$('[data-start-work-item]').forEach(b => b.onclick = (e) => {
@@ -14593,7 +14736,7 @@ function bind() {
     render();
   });
   $$('button[data-nav="plans"]').forEach(b => b.onclick = () => {
-    view = { ...view, name: 'plans', plansTab: 'templates', templateId: null, filters: defaultFilters(), page: 1 };
+    view = { ...view, name: 'plans', plansTab: 'lines', templateId: null, filters: defaultFilters(), page: 1 };
     render();
   });
   $$('[data-open-template]').forEach(b => b.onclick = (e) => {
@@ -14878,7 +15021,7 @@ function bind() {
     toast('Đã xóa chu kỳ'); render();
   });
   $$('button[data-nav]').forEach(b => b.onclick = () => {
-    view = { name: b.getAttribute('data-nav'), histTab: 'vehicles', vehicleId: null, vehicleTab: 'plan', plansTab: 'templates', templateId: null, orderId: null, catalogId: null, criteriaGroupId: null, from: null, filters: defaultFilters(), page: 1, pageSize: view.pageSize || 10 };
+    view = { name: b.getAttribute('data-nav'), histTab: 'vehicles', vehicleId: null, vehicleTab: 'catalog', plansTab: 'lines', templateId: null, orderId: null, catalogId: null, criteriaGroupId: null, from: null, filters: defaultFilters(), page: 1, pageSize: view.pageSize || 10 };
     render();
   });
   $$('[data-nav-settings-eval]').forEach(b => b.onclick = () => {
@@ -14965,7 +15108,7 @@ $$('.nav-item[data-nav]').forEach(a => {
   a.addEventListener('click', (e) => {
     e.preventDefault();
     const n = a.getAttribute('data-nav');
-    view = { name: n, histTab: 'vehicles', vehicleId: null, vehicleTab: 'plan', plansTab: 'templates', templateId: null, orderId: null, catalogId: null, criteriaGroupId: null, from: null, filters: defaultFilters(), page: 1, pageSize: view.pageSize || 10 };
+    view = { name: n, histTab: 'vehicles', vehicleId: null, vehicleTab: 'catalog', plansTab: 'lines', templateId: null, orderId: null, catalogId: null, criteriaGroupId: null, from: null, filters: defaultFilters(), page: 1, pageSize: view.pageSize || 10 };
     render();
   });
 });
@@ -14973,7 +15116,7 @@ $('#btnReset').onclick = () => {
   if (confirm('Làm mới toàn bộ dữ liệu mẫu về ban đầu?')) {
     localStorage.removeItem(STORAGE_KEY);
     DB = structuredClone(DEFAULT);
-    view = { name: 'history', histTab: 'vehicles', vehicleId: null, vehicleTab: 'plan', plansTab: 'templates', templateId: null, orderId: null, catalogId: null, criteriaGroupId: null, from: null, filters: defaultFilters(), page: 1, pageSize: 10 };
+    view = { name: 'history', histTab: 'vehicles', vehicleId: null, vehicleTab: 'catalog', plansTab: 'lines', templateId: null, orderId: null, catalogId: null, criteriaGroupId: null, from: null, filters: defaultFilters(), page: 1, pageSize: 10 };
     toast('Đã làm mới dữ liệu mẫu'); render();
   }
 };
@@ -15082,6 +15225,127 @@ render();
     if (t.id === 'btnTwClearDay') { view.filters.twDay = ''; render(); }
   });
 })();
+</script>
+
+
+<script>
+(function(){
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if (!t) return;
+    if (t.id === 'btnCreatePlanFromVehicleCats') {
+      var rows = [...document.querySelectorAll('.vc-plan-row:checked')].map(function(c){
+        return { vehicleId: view.vehicleId, catalogId: Number(c.dataset.cid), source: 'VEHICLE_CATALOG', note: 'Từ danh mục đã gắn trên xe' };
+      });
+      pushCatalogsToPlan(rows);
+      return;
+    }
+    if (t.id === 'btnPushTireFromReminder') {
+      if (typeof document.getElementById('btnPushTirePlan') !== 'undefined') {
+        /* reuse tire page logic inline */
+      }
+      var period = new Date().toISOString().slice(0,7);
+      var mats = (DB.materials||[]).filter(function(m){
+        var blob = ((m.name||'')+' '+(m.code||'')).toLowerCase();
+        return /lốp|lop|tire|ắc|acquy|battery/.test(blob);
+      });
+      var n=0;
+      mats.forEach(function(m,i){
+        var maxKm = Number(m.maxKm||80000), usedKm = Number(m.usedKm!=null?m.usedKm:maxKm*0.95);
+        var maxMonth = Number(m.maxMonth||24), usedMonth = Number(m.usedMonth!=null?m.usedMonth:22);
+        if (usedKm < maxKm*0.9 && usedMonth < maxMonth*0.9) return;
+        var v0 = DB.vehicles[i % DB.vehicles.length];
+        var id = Math.max(0, ...DB.plans.map(function(p){return p.id||0;})) + 1 + n;
+        DB.plans.push({ id:id, code:'KH-LOP-'+String(id).padStart(4,'0'), vehicleId:v0&&v0.id, period:period, qty:1, uom:m.uom||'Cái', unitPrice:m.refPrice||m.price||0, vat:m.vat??8, vendor:m.supplier||'', system:/ắc|ac/i.test(m.name||'')?'Ắc Quy':'Vỏ Lốp', status:'PLANNED', source:'TIRE_BATTERY', service:m.name||m.code, note:'Từ cảnh báo nhắc · seri '+(m.serial||'') });
+        n++;
+      });
+      if(n){ save(); toast('Đã đẩy '+n+' dòng lốp/ắc vào kế hoạch'); view.name='plans'; view.plansTab='lines'; render(); }
+      else toast('Không có dòng lốp/ắc đến hạn');
+      return;
+    }
+    var tog = t.closest && t.closest('[data-toggle-assign-cat]');
+    if (tog) {
+      var cid = Number(tog.getAttribute('data-toggle-assign-cat'));
+      var on = !isCatalogAssignedToVehicle(view.vehicleId, cid);
+      setCatalogAssigned(view.vehicleId, cid, on);
+      toast(on ? 'Đã gắn danh mục vào xe' : 'Đã bỏ gắn');
+      render();
+      return;
+    }
+    var one = t.closest && t.closest('[data-create-plan-one]');
+    if (one) {
+      pushCatalogsToPlan([{ vehicleId: view.vehicleId, catalogId: Number(one.getAttribute('data-create-plan-one')), source: 'VEHICLE_CATALOG' }]);
+      return;
+    }
+    if (t.id === 'btnAssignCatalogs') {
+      openAssignCatalogModal(view.vehicleId);
+      return;
+    }
+    if (t.id === 'btnBulkAssignCatalogs') {
+      openBulkAssignCatalogModal();
+      return;
+    }
+  });
+})();
+
+function openAssignCatalogModal(vid) {
+  ensureVehicleCatalogAssign();
+  var assigned = new Set(vehicleAssignedCatalogIds(vid).map(Number));
+  openModal(`<div class="border-b border-slate-200 px-5 py-4"><h2 class="text-lg font-bold">Gắn danh mục bảo dưỡng vào xe</h2>
+    <p class="text-sm text-slate-500">${esc(vehicleById(vid)?.plate || '')} · tích chọn danh mục áp dụng</p></div>
+    <div class="max-h-80 overflow-y-auto px-5 py-3 space-y-2">
+      ${(DB.catalog||[]).map(c => `<label class="flex items-start gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm">
+        <input type="checkbox" class="assign-cat-cb mt-1" data-cid="${c.id}" ${assigned.has(Number(c.id))?'checked':''} />
+        <span><strong>${esc(c.code)}</strong> · ${esc(c.name)}<br/><span class="text-xs text-slate-500">${esc(c.system)}</span></span>
+      </label>`).join('')}
+    </div>
+    <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+      <button type="button" data-close class="btn btn-outline">Hủy</button>
+      <button type="button" id="btnSaveAssignCats" class="btn btn-primary">Lưu</button>
+    </div>`, 'max-w-lg');
+  document.querySelector('[data-close]').onclick = closeModal;
+  document.getElementById('btnSaveAssignCats').onclick = function(){
+    var ids = [...document.querySelectorAll('.assign-cat-cb:checked')].map(c => Number(c.dataset.cid));
+    DB.vehicleCatalogIds[String(vid)] = ids;
+    save(); closeModal(); toast('Đã cập nhật '+ids.length+' danh mục gắn xe'); render();
+  };
+}
+
+function openBulkAssignCatalogModal() {
+  ensureVehicleCatalogAssign();
+  openModal(`<div class="border-b border-slate-200 px-5 py-4"><h2 class="text-lg font-bold">Áp danh mục bảo dưỡng hàng loạt</h2>
+    <p class="text-sm text-slate-500">Chọn danh mục + nhóm xe (khu vực / tất cả). Gắn thêm (không xóa danh mục đã có).</p></div>
+    <form id="bulkAssignForm" class="space-y-3 px-5 py-4">
+      <label class="block text-sm font-medium">Khu vực xe
+        <select name="area" class="mt-1 w-full rounded border px-2 py-1.5">
+          <option value="ALL">Tất cả khu vực</option>
+          ${areas().map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('')}
+        </select>
+      </label>
+      <div class="max-h-56 overflow-y-auto space-y-1 rounded border border-slate-200 p-2">
+        ${(DB.catalog||[]).map(c => `<label class="flex gap-2 text-sm"><input type="checkbox" name="cid" value="${c.id}" /><span>${esc(c.code)} · ${esc(c.name)}</span></label>`).join('')}
+      </div>
+      <div class="flex justify-end gap-2 pt-2">
+        <button type="button" data-close class="btn btn-outline">Hủy</button>
+        <button class="btn btn-primary">Áp dụng</button>
+      </div>
+    </form>`, 'max-w-lg');
+  document.querySelector('[data-close]').onclick = closeModal;
+  document.getElementById('bulkAssignForm').onsubmit = function(ev){
+    ev.preventDefault();
+    var fd = new FormData(ev.target);
+    var area = fd.get('area');
+    var cids = fd.getAll('cid').map(Number);
+    if (!cids.length) { toast('Chọn ít nhất 1 danh mục'); return; }
+    var vs = (DB.vehicles||[]).filter(v => area==='ALL' || v.area===area);
+    vs.forEach(v => {
+      var set = new Set(vehicleAssignedCatalogIds(v.id).map(Number));
+      cids.forEach(id => set.add(id));
+      DB.vehicleCatalogIds[String(v.id)] = [...set];
+    });
+    save(); closeModal(); toast('Đã gắn '+cids.length+' danh mục cho '+vs.length+' xe'); render();
+  };
+}
 </script>
 
 </body>

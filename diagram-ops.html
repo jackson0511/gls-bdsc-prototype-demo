@@ -274,19 +274,21 @@ flowchart TD
 flowchart TD
   A[Cập nhật danh sách vật tư<br/>tồn kho · giá tham khảo] --> D[Khi lập kế hoạch / phiếu<br/>có gợi ý vật tư]
   B[Ghép xe với kho xong] --> E[Được phép gửi phiếu<br/>sang mua hàng]
-  C[Nhắc bảo dưỡng đến hạn] --> F[Gợi ý xe + hạng mục]
+  C[Nhắc bảo dưỡng đến hạn<br/>+ cảnh báo lốp / ắc] --> F[Tích chọn → tạo kế hoạch]
   G[Đánh giá xe định kỳ] --> H{Xe đạt không?}
   H -->|Cần khắc phục| I[Đưa vào kế hoạch<br/>hoặc tạo phiếu sửa]
   H -->|Đạt| J[Ghi nhận · chờ kỳ sau]
   F --> K[Kế hoạch bảo dưỡng]
   I --> K
+  L[Gắn danh mục BD vào xe<br/>hoặc áp hàng loạt] --> C
         </pre>
       </div>
       <ul class="plain">
         <li><strong>Cập nhật vật tư từ kho:</strong> để khi chọn vật tư thấy tồn và giá tham khảo mới.</li>
         <li><strong>Ghép xe với kho:</strong> cần làm trước khi gửi phiếu sang mua hàng (tránh nhầm xe).</li>
-        <li><strong>Nhắc bảo dưỡng:</strong> dựa trên danh mục + số km / ngày của từng xe.</li>
-        <li><strong>Đánh giá định kỳ:</strong> theo bộ câu hỏi đã khai báo; nếu không đạt có thể tạo kế hoạch hoặc phiếu sửa chữa.</li>
+        <li><strong>Nhắc bảo dưỡng:</strong> chỉ theo danh mục <em>đã gắn</em> vào xe + số km / ngày; kèm cảnh báo vỏ lốp / ắc quy.</li>
+        <li><strong>Đánh giá định kỳ:</strong> theo bộ câu hỏi; hiện thêm cảnh báo lốp/ắc; không đạt → kế hoạch hoặc phiếu.</li>
+        <li><strong>Gắn danh mục vào xe:</strong> trên chi tiết xe (tab Danh mục) hoặc áp hàng loạt theo khu vực.</li>
       </ul>
     </section>
 
@@ -301,12 +303,13 @@ flowchart TD
   C[Số km GPS cập nhật] --> D
   D --> E[Danh sách đến hạn<br/>sắp hạn / quá hạn]
   E --> F[Người dùng tích chọn<br/>xe + hạng mục]
-  F --> G[Đẩy vào dự toán tháng<br/>giữ / đổi kỳ được]
+  F --> G[Kế hoạch theo xe trước<br/>mẫu kế hoạch sau]
   H[Tạo mẫu kế hoạch<br/>theo loại xe] --> I[Áp mẫu nhiều xe]
   J[Đánh giá xe không đạt] --> G
   I --> G
   G --> K[Dòng dự toán có giá · VAT<br/>ĐVT · NCC từ PWMS]
   K --> L[Tạo phiếu làm thật<br/>không duyệt LĐ trên kế hoạch]
+  M[Gắn danh mục BD vào xe] --> D
         </pre>
       </div>
       <div class="cards three">
