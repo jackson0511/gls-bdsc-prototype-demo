@@ -93,13 +93,16 @@
     .row-add>select:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.25)}
     .row-add>.btn{flex:0 0 auto;align-self:stretch;height:auto;min-height:40px;white-space:nowrap}
     .sheet select,.sheet input{max-width:100%;box-sizing:border-box}
-    .ac-dropdown{position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:40;max-height:220px;overflow:auto;background:#fff;border:1px solid #e2e8f0;border-radius:.5rem;box-shadow:0 10px 24px rgba(15,23,42,.12)}
+    .ac-dropdown{position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:40;max-height:min(280px,42vh);overflow:auto;background:#fff;border:1px solid #e2e8f0;border-radius:.5rem;box-shadow:0 10px 24px rgba(15,23,42,.12);-webkit-overflow-scrolling:touch}
     .ac-dropdown.hidden{display:none}
-    .ac-opt{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #f1f5f9;background:#fff;padding:10px 12px;font-size:13px;font-family:inherit;color:#0f172a}
+    .ac-opt{display:block;width:100%;text-align:left;border:0;border-bottom:1px solid #f1f5f9;background:#fff;padding:12px 12px;min-height:48px;font-size:14px;line-height:1.3;font-family:inherit;color:#0f172a}
     .ac-opt:hover,.ac-opt.active{background:#eff6ff;color:#1d4ed8}
     .ac-opt.create{color:#1d4ed8;font-weight:600;border-top:1px solid #e2e8f0}
-    .ac-opt .sub{color:#94a3b8;font-size:11px;font-weight:400}
+    .ac-opt .sub{color:#94a3b8;font-size:11px;font-weight:400;display:block;margin-top:2px}
     .ac-opt .local-tag{display:inline-block;margin-left:4px;font-size:10px;font-weight:600;color:#9a3412;background:#ffedd5;border-radius:999px;padding:0 6px}
+    .qty-step{display:grid;grid-template-columns:44px 1fr 44px;gap:8px;align-items:center}
+    .qty-step button{min-height:44px;height:44px;border-radius:.375rem;border:1px solid #cbd5e1;background:#fff;font-size:20px;font-weight:600;color:#334155;font-family:inherit}
+    .qty-step input{text-align:center;font-size:18px;font-weight:600;min-height:44px}
     .mat-chips{display:flex;flex-wrap:wrap;gap:6px;min-height:4px;margin-top:6px}
     .mat-chips:empty{display:none}
     .field>span .hint{font-weight:400;color:#94a3b8;font-size:11px}
@@ -234,30 +237,31 @@
             <span class="text-sm font-semibold text-slate-800">Hạng mục công việc *</span>
             <span class="text-[11px] text-slate-500" id="cWiCount">0 hạng mục</span>
           </div>
-          <p class="text-[11px] text-slate-500 m-0">Chọn từ danh mục · bấm Thêm</p>
-          <div class="row-add">
-            <select id="cContentSelect"></select>
-            <button type="button" id="btnAddCreateWi" class="btn btn-outline btn-sm">Thêm</button>
+          <p class="text-[11px] text-slate-500 m-0">Gõ tìm → chạm chọn là thêm ngay</p>
+          <div class="ac-wrap">
+            <input id="cContentAc" type="search" autocomplete="off" placeholder="Tìm hạng mục…" />
+            <div class="ac-dropdown hidden" id="cContentDd"></div>
           </div>
           <div id="cWiList" class="space-y-1.5"></div>
         </div>
         <div class="rounded-md border border-emerald-200 bg-emerald-50/50 p-3 mb-3 space-y-2">
           <div class="flex items-start justify-between gap-2">
-            <div class="text-xs font-semibold text-emerald-800">Vật tư từ kho (PWMS) — chọn từ danh mục</div>
+            <div class="text-xs font-semibold text-emerald-800">Vật tư từ kho (PWMS)</div>
             <button type="button" id="btnSyncPwmsMat" class="btn btn-outline btn-sm shrink-0 !border-sky-400 !bg-sky-50 text-sky-900">Đồng bộ</button>
           </div>
-          <div class="text-[11px] text-slate-500" id="pwmsMatSyncHint">Nguồn PWMS · bấm Đồng bộ để làm mới danh mục</div>
-          <div class="row-add">
-            <select id="cPwmsSelect"></select>
-            <button type="button" id="btnAddCreatePwms" class="btn btn-outline btn-sm">Thêm</button>
+          <div class="text-[11px] text-slate-500" id="pwmsMatSyncHint">Gõ mã/tên → chọn là thêm · có giá · VAT · tồn</div>
+          <div class="ac-wrap">
+            <input id="cPwmsAc" type="search" autocomplete="off" placeholder="Tìm vật tư kho…" />
+            <div class="ac-dropdown hidden" id="cPwmsDd"></div>
           </div>
           <div class="mat-chips" id="cPwmsChips"></div>
         </div>
         <div class="rounded-md border border-amber-200 bg-amber-50/50 p-3 space-y-2">
-          <div class="text-xs font-semibold text-amber-800">Vật tư ghi tay / mua ngoài — chọn từ danh sách</div>
-          <div class="row-add">
-            <select id="cKtvSelect"></select>
-            <button type="button" id="btnAddCreateKtv" class="btn btn-outline btn-sm">Thêm</button>
+          <div class="text-xs font-semibold text-amber-800">Vật tư ghi tay / mua ngoài</div>
+          <p class="text-[11px] text-slate-500 m-0">Gõ tìm hoặc tạo mới (chỉ nội bộ)</p>
+          <div class="ac-wrap">
+            <input id="cKtvAc" type="search" autocomplete="off" placeholder="Tìm hoặc nhập tên VT mới…" />
+            <div class="ac-dropdown hidden" id="cKtvDd"></div>
           </div>
           <div class="mat-chips" id="cKtvChips"></div>
         </div>
@@ -1059,7 +1063,7 @@ function renderOrder(){
         <div class="grow">
           <div class="flex flex-wrap gap-1 items-center">${materialSourceLabel(m)}</div>
           <div class="text-sm font-medium text-slate-900 mt-0.5">${esc(m.code?m.code+' · ':'')}${esc(m.name)}</div>
-          <div class="text-[11px] text-slate-500 mt-0.5">${money(m.price)} · ×${m.qty??1}${m.supplier?' · '+esc(m.supplier):''}</div>
+          <div class="text-[11px] text-slate-500 mt-0.5">${money(m.price)} · VAT ${m.vat!=null?m.vat:8}% · ×${m.qty??1}${m.supplier?' · '+esc(m.supplier):''}</div>
         </div>
         ${editable?`<input type="number" min="0.01" step="0.01" class="qty" data-mat-qty="${i}" value="${m.qty??1}" />
         <div class="flex flex-col gap-1 shrink-0 self-center">
@@ -1437,46 +1441,43 @@ function openWorkItemSheet(o,idx){
 }
 function openAddWorkItemSheet(o){openWorkItemSheet(o,-1)}
 
-function renderMatPwmsFields(m,fulfill){
+function renderMatPwmsFields(m){
+  const label=m?.code?`${m.code} · ${m.name||''}`:'';
   return `
     <div id="matPwmsFields" class="space-y-2">
-      <label class="field"><span>Chọn vật tư *</span>
-        <select id="matCatalog">
-          <option value="">— Chọn vật tư kho —</option>
-          ${materialMasterOptions().map(x=>{
-            enrichMat(x,false);
-            return `<option value="${esc(x.id)}" data-code="${esc(x.code)}" data-name="${esc(x.name)}" data-uom="Cái" data-price="${x.refPrice}" data-supplier="${esc(x.supplier||'')}" data-warehouse="${esc(x.warehouse||'')}" data-stock="${x.stockQty??''}" ${m?.code===x.code?'selected':''}>${esc(x.code)} · ${esc(x.name)} · tồn ${x.stockQty??'—'} · ${money(x.refPrice)}</option>`;
-          }).join('')}
-        </select>
+      <label class="field"><span>Chọn vật tư * <span class="hint">autocomplete · chạm chọn</span></span>
+        <div class="ac-wrap">
+          <input type="search" id="matCatalogAc" autocomplete="off" placeholder="Tìm mã / tên vật tư kho…" value="${esc(label)}" />
+          <div class="ac-dropdown hidden" id="matCatalogDd"></div>
+        </div>
       </label>
+      <input type="hidden" id="matPickId" value="${esc(m?.code||'')}" />
       <div class="grid grid-cols-2 gap-2">
         <label class="field"><span>Mã</span><input id="matCode" readonly class="!bg-slate-50" value="${esc(m?.code||'')}" /></label>
         <label class="field"><span>ĐVT</span><input id="matUom" readonly class="!bg-slate-50" value="${esc(m?.uom||'Cái')}" /></label>
       </div>
       <label class="field"><span>Tên</span><input id="matName" readonly class="!bg-slate-50" value="${esc(m?.name||'')}" /></label>
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid grid-cols-3 gap-2">
         <label class="field"><span>Đơn giá</span><input id="matPrice" readonly class="!bg-slate-50" value="${m?.price??''}" /></label>
+        <label class="field"><span>VAT (%)</span><input id="matVat" type="number" min="0" step="0.1" value="${m?.vat??8}" /></label>
         <label class="field"><span>NCC</span><input id="matSupplier" readonly class="!bg-slate-50" value="${esc(m?.supplier||'')}" /></label>
       </div>
       <label class="field"><span>Kho</span><input id="matWarehouse" readonly class="!bg-slate-50" value="${esc(m?.warehouse||'')}" /></label>
-      <p id="matFulfillHint" class="text-[11px] text-slate-600 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">${fulfill?esc(fulfill.reason):'Chọn vật tư → kiểm tra tồn: đủ → Xuất kho; thiếu → Sửa ngoài'}</p>
+      <p id="matFulfillHint" class="text-[11px] text-slate-600 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">Chọn vật tư → kiểm tra tồn: đủ → Xuất kho; thiếu → Sửa ngoài</p>
     </div>`;
 }
 
 function renderMatTechFields(m){
-  const opts=ktvMaterialSelectOptions();
-  const selId=m?.local?opts.find(x=>x.name===m.name)?.id:(m?.code?opts.find(x=>x.code===m.code)?.id:opts.find(x=>x.name===m?.name)?.id)||'';
   return `
     <div id="matTechFields" class="space-y-2">
-      <label class="field"><span>Chọn vật tư</span>
-        <select id="matTechSelect">
-          <option value="">— Chọn từ danh sách —</option>
-          ${opts.map(x=>`<option value="${esc(x.id)}" data-name="${esc(x.name)}" data-code="${esc(x.code||'')}" data-local="${x.source==='local'?1:0}" ${String(x.id)===String(selId)?'selected':''}>${x.code?esc(x.code)+' · ':''}${esc(x.name)}${x.source==='local'?' (nội bộ)':''}</option>`).join('')}
-        </select>
+      <label class="field"><span>Chọn / nhập vật tư <span class="hint">autocomplete · tạo mới chỉ nội bộ</span></span>
+        <div class="ac-wrap">
+          <input type="search" id="matTechAc" autocomplete="off" placeholder="Tìm hoặc nhập tên…" value="${esc(m?.name||'')}" />
+          <div class="ac-dropdown hidden" id="matTechDd"></div>
+        </div>
       </label>
-      <label class="field"><span>Tên (nếu không có trong danh sách)</span>
-        <input id="matTechName" type="text" value="${esc(m?.name&&!selId?m.name:'')}" placeholder="Chỉ khi không có trong danh sách" />
-      </label>
+      <input type="hidden" id="matTechCode" value="${esc(m?.code||'')}" />
+      <input type="hidden" id="matTechLocal" value="${m?.local?1:0}" />
     </div>`;
 }
 
@@ -1485,13 +1486,18 @@ function openMaterialSheet(o,idx){
   const isNew=idx==null||idx<0;
   const m=isNew?null:o.mats[idx];
   const initSource=m?.source==='TECHNICIAN'?'TECHNICIAN':'PWMS';
-  let matState={source:initSource,qty:m?.qty??1};
+  let matState={
+    source:initSource,
+    qty:m?.qty??1,
+    pick:m?.code?{code:m.code,name:m.name,uom:m.uom||'Cái',refPrice:m.price,vat:m.vat??8,supplier:m.supplier||'',warehouse:m.warehouse||'',stockQty:m.stockAtSelect}:null,
+    techLocal:!!m?.local,
+  };
   const getFulfill=()=>{
-    if(matState.source!=='PWMS')return null;
-    return resolveMaterialFulfillment({qty:matState.qty,stockQty:$('#matCatalog')?.selectedOptions?.[0]?.dataset?.stock});
+    if(matState.source!=='PWMS'||!matState.pick)return null;
+    return resolveMaterialFulfillment({qty:matState.qty,stockQty:matState.pick.stockQty});
   };
   openOrderSheet(`
-    <h2>${isNew?'Thêm vật tư dự kiến':'Sửa vật tư'}</h2>
+    <h2>${isNew?'Thêm vật tư dự kiến':'Sửa vật tư dự kiến'}</h2>
     <p class="sub">${esc(o.code)} · chọn kho PWMS hoặc KTV ghi tay</p>
     <label class="field"><span>Cách nhập</span>
       <select id="matSource">
@@ -1499,64 +1505,124 @@ function openMaterialSheet(o,idx){
         <option value="TECHNICIAN" ${initSource==='TECHNICIAN'?'selected':''}>Kỹ thuật viên ghi tay</option>
       </select>
     </label>
-    <div id="matModeWrap">${initSource==='PWMS'?renderMatPwmsFields(m,getFulfill()):renderMatTechFields(m)}</div>
-    <label class="field"><span>Số lượng *</span><input id="matQty" type="number" step="0.01" min="0.01" value="${m?.qty??1}" /></label>
+    <div id="matModeWrap">${initSource==='PWMS'?renderMatPwmsFields(m):renderMatTechFields(m)}</div>
+    <label class="field"><span>Số lượng *</span>
+      <div class="qty-step">
+        <button type="button" id="matQtyMinus" aria-label="Giảm">−</button>
+        <input id="matQty" type="number" step="0.01" min="0.01" value="${m?.qty??1}" />
+        <button type="button" id="matQtyPlus" aria-label="Tăng">+</button>
+      </div>
+    </label>
     <div class="grid grid-cols-2 gap-2 mt-2">
       <button type="button" class="btn btn-outline btn-touch" id="matCancel">Hủy</button>
       <button type="button" class="btn btn-primary btn-touch" id="matSave">${isNew?'Thêm':'Lưu'}</button>
     </div>`);
   $('#matCancel').onclick=closeOrderSheet;
-  $('#orderSheetBg').onclick=e=>{if(e.target===$('#orderSheetBg'))closeOrderSheet()};
+  $('#orderSheetBg').onclick=e=>{
+    if(e.target===$('#orderSheetBg'))closeOrderSheet();
+    else if(!e.target.closest('.ac-wrap'))hideAllAc();
+  };
   const refreshFulfill=()=>{
     const f=getFulfill();
     const el=$('#matFulfillHint');
     if(!el||matState.source!=='PWMS')return;
     if(!f){el.textContent='Chọn vật tư → kiểm tra tồn';return}
+    const vat=$('#matVat')?.value??matState.pick?.vat??8;
     el.innerHTML=f.source==='PWMS'
-      ?`Hình thức: <strong class="text-emerald-700">Xuất kho</strong> · ${esc(f.reason)}`
-      :`Hình thức: <strong class="text-violet-700">Sửa ngoài</strong> · ${esc(f.reason)}`;
+      ?`Hình thức: <strong class="text-emerald-700">Xuất kho</strong> · ${esc(f.reason)} · VAT <strong>${vat}%</strong>`
+      :`Hình thức: <strong class="text-violet-700">Sửa ngoài</strong> · ${esc(f.reason)} · VAT <strong>${vat}%</strong>`;
   };
-  const fillFromCatalog=()=>{
-    const opt=$('#matCatalog')?.selectedOptions?.[0];
-    if(!opt?.value)return;
-    $('#matCode').value=opt.dataset.code||'';
-    $('#matName').value=opt.dataset.name||'';
-    $('#matUom').value=opt.dataset.uom||'Cái';
-    $('#matPrice').value=opt.dataset.price||0;
-    $('#matSupplier').value=opt.dataset.supplier||'';
-    $('#matWarehouse').value=opt.dataset.warehouse||'';
+  const applyPick=x=>{
+    matState.pick=x;
+    $('#matPickId').value=x.code||'';
+    $('#matCode').value=x.code||'';
+    $('#matName').value=x.name||'';
+    $('#matUom').value=x.uom||'Cái';
+    $('#matPrice').value=x.refPrice??0;
+    if($('#matVat'))$('#matVat').value=x.vat??8;
+    $('#matSupplier').value=x.supplier||'';
+    $('#matWarehouse').value=x.warehouse||'';
+    if($('#matCatalogAc'))$('#matCatalogAc').value=`${x.code} · ${x.name}`;
     refreshFulfill();
   };
   const bindMat=()=>{
     $('#matSource')?.addEventListener('change',()=>{
       matState.source=$('#matSource').value;
-      $('#matModeWrap').innerHTML=matState.source==='PWMS'?renderMatPwmsFields(m,null):renderMatTechFields(m);
+      matState.pick=null;
+      $('#matModeWrap').innerHTML=matState.source==='PWMS'?renderMatPwmsFields(null):renderMatTechFields(null);
       bindMat();
     },{once:true});
-    $('#matCatalog')?.addEventListener('change',fillFromCatalog,{once:true});
-    $('#matQty')?.addEventListener('input',()=>{matState.qty=Number($('#matQty').value)||1;refreshFulfill()},{once:true});
-    if($('#matCatalog')?.value)fillFromCatalog();
+    $('#matQty')?.addEventListener('input',()=>{matState.qty=Number($('#matQty').value)||1;refreshFulfill()});
+    $('#matQtyMinus')?.addEventListener('click',()=>{
+      const n=Math.max(0.01,Math.round(((Number($('#matQty').value)||1)-1)*100)/100);
+      $('#matQty').value=n;matState.qty=n;refreshFulfill();
+    });
+    $('#matQtyPlus')?.addEventListener('click',()=>{
+      const n=Math.round(((Number($('#matQty').value)||1)+1)*100)/100;
+      $('#matQty').value=n;matState.qty=n;refreshFulfill();
+    });
+    if($('#matCatalogAc')){
+      delete $('#matCatalogAc').dataset.acBound;
+      bindCreatableAc($('#matCatalogAc'),$('#matCatalogDd'),{
+        getOptions:()=>materialMasterOptions(),
+        allowCreate:false,
+        limit:15,
+        format:x=>`${esc(x.code)} · ${esc(x.name)}<span class="sub">tồn ${x.stockQty??'—'} · ${money(x.refPrice)} · VAT ${x.vat??8}%</span>`,
+        onPick:applyPick,
+        onCreate:()=>null,
+      });
+      if(matState.pick)applyPick(matState.pick);
+    }
+    if($('#matTechAc')){
+      delete $('#matTechAc').dataset.acBound;
+      bindCreatableAc($('#matTechAc'),$('#matTechDd'),{
+        getOptions:()=>ktvMaterialSelectOptions(),
+        allowCreate:true,
+        limit:12,
+        format:x=>`${x.code?esc(x.code)+' · ':''}${esc(x.name)}`,
+        onPick:x=>{
+          $('#matTechAc').value=x.name;
+          $('#matTechCode').value=x.code||'';
+          $('#matTechLocal').value=x.source==='local'?1:0;
+          matState.techLocal=x.source==='local';
+        },
+        onCreate:name=>{
+          LOCAL.materials=LOCAL.materials||[];
+          let item=LOCAL.materials.find(x=>x.name.toLowerCase()===name.toLowerCase());
+          if(!item){
+            item={id:'lm'+Date.now(),name,code:''};
+            LOCAL.materials.unshift(item);
+            saveLocalLookups(LOCAL);
+            toast('Đã lưu VT mới · chỉ nội bộ');
+          }
+          matState.techLocal=true;
+          return{...item,source:'local'};
+        },
+      });
+    }
     $('#matSave').onclick=()=>{
       matState.qty=Number($('#matQty').value)||1;
       o.mats=o.mats||[];
       let row;
       if(matState.source==='PWMS'){
-        const opt=$('#matCatalog')?.selectedOptions?.[0];
-        if(!opt?.value){toast('Chọn vật tư kho');return}
-        const ful=resolveMaterialFulfillment({qty:matState.qty,stockQty:opt.dataset.stock});
+        const pick=matState.pick;
+        if(!pick?.code&&!$('#matCode')?.value){toast('Chọn vật tư kho');$('#matCatalogAc')?.focus();return}
+        const code=$('#matCode').value||pick.code;
+        const cat=materialMasterOptions().find(x=>x.code===code)||pick;
+        const ful=resolveMaterialFulfillment({qty:matState.qty,stockQty:cat?.stockQty});
         row={
           id:m?.id||('mt-'+Date.now()),source:ful.source,
-          code:opt.dataset.code,name:opt.dataset.name,uom:opt.dataset.uom||'Cái',
-          qty:matState.qty,price:Number(opt.dataset.price)||0,
-          supplier:opt.dataset.supplier||'',warehouse:opt.dataset.warehouse||'',
+          code,name:$('#matName').value||cat?.name,uom:$('#matUom').value||'Cái',
+          qty:matState.qty,price:Number($('#matPrice').value)||0,vat:Number($('#matVat').value??8),
+          supplier:$('#matSupplier').value||'',warehouse:$('#matWarehouse').value||'',
+          stockAtSelect:cat?.stockQty,
           tag:ful.source==='PWMS'?'Kho MH · giá tham chiếu':'Sửa ngoài · thiếu tồn',
         };
       }else{
-        const opt=$('#matTechSelect')?.selectedOptions?.[0];
-        let name=(opt?.dataset?.name||$('#matTechName').value||'').trim();
+        let name=($('#matTechAc')?.value||'').trim();
         if(!name){toast('Chọn hoặc nhập tên vật tư');return}
-        const isLocal=opt?.dataset?.local==='1';
-        if(!opt?.value&&!isLocal){
+        const isLocal=$('#matTechLocal')?.value==='1'||matState.techLocal;
+        if(!ktvMaterialSelectOptions().some(x=>x.name.toLowerCase()===name.toLowerCase())){
           LOCAL.materials=LOCAL.materials||[];
           if(!LOCAL.materials.some(x=>x.name.toLowerCase()===name.toLowerCase())){
             LOCAL.materials.unshift({id:'lm'+Date.now(),name,code:''});
@@ -1565,14 +1631,14 @@ function openMaterialSheet(o,idx){
         }
         row={
           id:m?.id||('mt-'+Date.now()),source:'TECHNICIAN',
-          code:opt?.dataset?.code||'',name,qty:matState.qty,price:0,
-          tag:isLocal?'KTV/ngoài kho · nội bộ':'KTV/ngoài kho',local:isLocal||!opt?.value,
+          code:$('#matTechCode')?.value||'',name,qty:matState.qty,price:0,vat:8,
+          tag:isLocal?'KTV/ngoài kho · nội bộ':'KTV/ngoài kho',local:isLocal,
         };
       }
       if(!isNew)o.mats[idx]=row;
       else{
         const exist=row.code&&o.mats.find(x=>x.code===row.code);
-        if(exist){exist.qty=(Number(exist.qty)||1)+matState.qty;toast('Đã tăng SL')}
+        if(exist){exist.qty=(Number(exist.qty)||1)+matState.qty;if(row.vat!=null)exist.vat=row.vat;toast('Đã tăng SL')}
         else{o.mats.push(row);toast('Đã thêm vật tư')}
       }
       if(hasPwmsLines(o)&&o.mh==='NA')o.mh='NONE';
@@ -1879,13 +1945,14 @@ function enrichMat(m,force){
   if(!m)return m;
   const h=hashStr(m.code||m.id||m.name);
   if(force||m.refPrice==null)m.refPrice=80000+(h%180)*25000;
+  if(force||m.vat==null)m.vat=8;
   if(force||!m.supplier)m.supplier=PWMS_SUPPLIERS[h%PWMS_SUPPLIERS.length];
   if(force||!m.warehouse)m.warehouse=PWMS_WH[h%PWMS_WH.length];
   if(force||m.stockQty==null)m.stockQty=(h%40)+1;
   return m;
 }
 function materialMasterOptions(){
-  return MATERIALS.map(m=>{enrichMat(m,false);return{id:m.id,code:m.code,name:m.name,refPrice:m.refPrice,supplier:m.supplier,warehouse:m.warehouse,stockQty:m.stockQty,source:'master'}});
+  return MATERIALS.map(m=>{enrichMat(m,false);return{id:m.id,code:m.code,name:m.name,uom:m.uom||'Cái',refPrice:m.refPrice,vat:m.vat??8,supplier:m.supplier,warehouse:m.warehouse,stockQty:m.stockQty,source:'master'}});
 }
 function materialLocalOptions(){
   return (LOCAL.materials||[]).map(m=>({id:m.id,code:m.code||'',name:m.name,source:'local'}));
@@ -1933,7 +2000,7 @@ function renderCreateWorkItems(){
 function renderCreateMatChips(){
   const pwms=$('#cPwmsChips'),ktv=$('#cKtvChips');
   if(pwms){
-    pwms.innerHTML=(S.createPwmsMats||[]).map((m,i)=>`<span class="chip">${esc(m.code?m.code+' · ':'')}${esc(m.name)} · ${money(m.price||0)}${m.supplier?' · '+esc(m.supplier):''} <button type="button" data-rm-pwms="${i}" aria-label="Xóa">×</button></span>`).join('');
+    pwms.innerHTML=(S.createPwmsMats||[]).map((m,i)=>`<span class="chip">${esc(m.code?m.code+' · ':'')}${esc(m.name)} · ${money(m.price||0)} · VAT ${m.vat??8}%${m.supplier?' · '+esc(m.supplier):''} <button type="button" data-rm-pwms="${i}" aria-label="Xóa">×</button></span>`).join('');
     pwms.querySelectorAll('[data-rm-pwms]').forEach(b=>b.onclick=()=>{S.createPwmsMats.splice(+b.dataset.rmPwms,1);renderCreateMatChips()});
   }
   if(ktv){
@@ -1945,23 +2012,26 @@ function renderCreateMatChips(){
 function bindCreatableAc(input,dd,opts){
   if(!input||!dd||input.dataset.acBound)return;
   input.dataset.acBound='1';
+  const canCreate=()=>{
+    if(typeof opts.allowCreate==='function')return!!opts.allowCreate();
+    return opts.allowCreate!==false;
+  };
+  const limit=opts.limit||12;
   const render=()=>{
     const raw=input.value.trim();
     const q=raw.toLowerCase();
     let list=(opts.getOptions()||[]).filter(o=>{
-      const hay=((o.name||'')+' '+(o.code||'')+' '+(o.system||'')).toLowerCase();
+      const hay=((o.name||'')+' '+(o.code||'')+' '+(o.system||'')+' '+(o.supplier||'')).toLowerCase();
       return!q||hay.includes(q);
-    }).slice(0,10);
+    }).slice(0,limit);
     let html=list.map(o=>{
       const label=opts.format?opts.format(o):esc(o.name);
       const local=o.source==='local'?'<span class="local-tag">nội bộ</span>':'';
       return `<button type="button" class="ac-opt" data-pick="${esc(o.id)}">${label}${local}</button>`;
     }).join('');
-    if(raw){
+    if(raw&&canCreate()){
       const exists=(opts.getOptions()||[]).some(o=>(o.name||'').toLowerCase()===q||(o.code||'').toLowerCase()===q);
-      if(!exists&&opts.allowCreate!==false){
-        html+=`<button type="button" class="ac-opt create" data-create="1">+ Tạo mới (chỉ lưu nội bộ): “${esc(raw)}”</button>`;
-      }
+      if(!exists)html+=`<button type="button" class="ac-opt create" data-create="1">+ Tạo mới (chỉ lưu nội bộ): “${esc(raw)}”</button>`;
     }
     if(!html)html='<div class="px-3 py-2 text-xs text-slate-400">Không có kết quả</div>';
     dd.innerHTML=html;
@@ -1984,22 +2054,13 @@ function bindCreatableAc(input,dd,opts){
 }
 
 function populateCreateSelects(){
-  const wiSel=$('#cContentSelect');
-  if(wiSel){
-    const opts=contentOptions();
-    wiSel.innerHTML='<option value="">— Chọn hạng mục —</option>'+opts.map(o=>`<option value="${esc(o.id)}" data-name="${esc(o.name)}" data-system="${esc(o.system||'Khác')}" data-source="${esc(o.source||'master')}">${esc(o.name)}${o.system?' · '+esc(o.system):''}</option>`).join('');
-  }
-  const pwmsSel=$('#cPwmsSelect');
-  if(pwmsSel){
-    pwmsSel.innerHTML='<option value="">— Chọn vật tư kho —</option>'+materialMasterOptions().map(m=>`<option value="${esc(m.id)}" data-code="${esc(m.code)}" data-name="${esc(m.name)}" data-price="${m.refPrice}" data-supplier="${esc(m.supplier||'')}" data-warehouse="${esc(m.warehouse||'')}">${esc(m.code)} · ${esc(m.name)} · tồn ${m.stockQty??'—'} · ${money(m.refPrice)}</option>`).join('');
-  }
-  const ktvSel=$('#cKtvSelect');
-  if(ktvSel){
-    ktvSel.innerHTML='<option value="">— Chọn vật tư ghi tay —</option>'+ktvMaterialSelectOptions().map(m=>`<option value="${esc(m.id)}" data-name="${esc(m.name)}" data-code="${esc(m.code||'')}" data-local="${m.source==='local'?1:0}">${m.code?esc(m.code)+' · ':''}${esc(m.name)}${m.source==='local'?' (nội bộ)':''}</option>`).join('');
-  }
+  /* tạo phiếu dùng autocomplete — giữ hàm để sync PWMS gọi lại */
+  renderCreateMatChips();
+  renderCreateWorkItems();
 }
 
 function initCreateAutocomplete(){
+  ['cGarage','cContentAc','cPwmsAc','cKtvAc'].forEach(id=>{const el=$('#'+id);if(el)delete el.dataset.acBound});
   bindCreatableAc($('#cGarage'),$('#cGarageDd'),{
     getOptions:()=>garageOptions().map(name=>({id:name,name,source:(LOCAL.garages||[]).some(g=>(g.name||g)===name)?'local':'master'})),
     onPick:o=>{$('#cGarage').value=o.name},
@@ -2013,42 +2074,69 @@ function initCreateAutocomplete(){
       return{id:name,name,source:'local'};
     }
   });
-
+  bindCreatableAc($('#cContentAc'),$('#cContentDd'),{
+    getOptions:contentOptions,
+    allowCreate:true,
+    limit:12,
+    format:x=>`${esc(x.name)}${x.system?`<span class="sub">${esc(x.system)}</span>`:''}`,
+    onPick:x=>{
+      addCreateWorkItem({id:x.id,name:x.name,system:x.system,source:x.source});
+      $('#cContentAc').value='';
+      toast('Đã thêm hạng mục');
+    },
+    onCreate:name=>{
+      const item={id:'lc'+Date.now(),name,system:'Khác'};
+      LOCAL.contents=LOCAL.contents||[];LOCAL.contents.unshift(item);saveLocalLookups(LOCAL);
+      toast('Đã lưu hạng mục mới · nội bộ');
+      return{...item,source:'local'};
+    }
+  });
+  bindCreatableAc($('#cPwmsAc'),$('#cPwmsDd'),{
+    getOptions:()=>materialMasterOptions(),
+    allowCreate:false,
+    limit:15,
+    format:x=>`${esc(x.code)} · ${esc(x.name)}<span class="sub">tồn ${x.stockQty??'—'} · ${money(x.refPrice)} · VAT ${x.vat??8}%</span>`,
+    onPick:x=>{
+      if(!S.createPwmsMats.some(m=>m.id===x.id||m.code===x.code)){
+        S.createPwmsMats.push({
+          id:x.id,code:x.code,name:x.name,qty:1,
+          price:Number(x.refPrice)||0,vat:x.vat??8,
+          supplier:x.supplier||'',warehouse:x.warehouse||'',
+          tag:'Kho MH · giá tham chiếu'
+        });
+        toast('Đã thêm VT kho');
+      }else toast('Vật tư đã có');
+      $('#cPwmsAc').value='';
+      renderCreateMatChips();
+    },
+    onCreate:()=>null,
+  });
+  bindCreatableAc($('#cKtvAc'),$('#cKtvDd'),{
+    getOptions:()=>ktvMaterialSelectOptions(),
+    allowCreate:true,
+    limit:12,
+    format:x=>`${x.code?esc(x.code)+' · ':''}${esc(x.name)}`,
+    onPick:x=>{
+      if(!S.createKtvMats.some(m=>m.name.toLowerCase()===x.name.toLowerCase())){
+        S.createKtvMats.push({id:x.id,code:x.code||'',name:x.name,qty:1,price:0,vat:8,tag:'KTV/ngoài kho',local:x.source==='local'});
+        toast('Đã thêm VT ghi tay');
+      }else toast('Vật tư đã có');
+      $('#cKtvAc').value='';
+      renderCreateMatChips();
+    },
+    onCreate:name=>{
+      LOCAL.materials=LOCAL.materials||[];
+      let item=LOCAL.materials.find(x=>x.name.toLowerCase()===name.toLowerCase());
+      if(!item){
+        item={id:'lm'+Date.now(),name,code:''};
+        LOCAL.materials.unshift(item);saveLocalLookups(LOCAL);
+      }
+      return{...item,source:'local'};
+    }
+  });
 }
 
-$('#btnAddCreateWi')?.addEventListener('click',()=>{
-  const sel=$('#cContentSelect')?.selectedOptions?.[0];
-  if(!sel?.value){toast('Chọn hạng mục');return}
-  addCreateWorkItem({id:sel.value,name:sel.dataset.name,system:sel.dataset.system,source:sel.dataset.source});
-  $('#cContentSelect').value='';
-});
-$('#btnAddCreatePwms')?.addEventListener('click',()=>{
-  const sel=$('#cPwmsSelect')?.selectedOptions?.[0];
-  if(!sel?.value){toast('Chọn vật tư kho');return}
-  const id=sel.value;
-  if(!S.createPwmsMats.some(x=>x.id===id)){
-    S.createPwmsMats.push({
-      id,code:sel.dataset.code,name:sel.dataset.name,qty:1,
-      price:Number(sel.dataset.price)||0,supplier:sel.dataset.supplier||'',warehouse:sel.dataset.warehouse||'',
-      tag:'Kho MH · giá tham chiếu'
-    });
-    toast('Đã thêm vật tư kho');
-  }else toast('Vật tư đã có');
-  $('#cPwmsSelect').value='';
-  renderCreateMatChips();
-});
-$('#btnAddCreateKtv')?.addEventListener('click',()=>{
-  const sel=$('#cKtvSelect')?.selectedOptions?.[0];
-  if(!sel?.value){toast('Chọn vật tư ghi tay');return}
-  const name=sel.dataset.name;
-  if(!S.createKtvMats.some(x=>x.name.toLowerCase()===name.toLowerCase())){
-    S.createKtvMats.push({id:sel.value,code:sel.dataset.code||'',name,qty:1,price:0,tag:'KTV/ngoài kho',local:sel.dataset.local==='1'});
-    toast('Đã thêm vật tư ghi tay');
-  }else toast('Vật tư đã có');
-  $('#cKtvSelect').value='';
-  renderCreateMatChips();
-});
-
+/* legacy select buttons removed — create flow uses autocomplete pick-to-add */
 function syncCreateType(){
   const periodic=$('#cType')?.value==='PERIODIC';
   if($('#cCatalogWrap'))$('#cCatalogWrap').style.display=periodic?'block':'none';
@@ -2102,15 +2190,15 @@ $('#btnSyncPwmsMat')?.addEventListener('click',()=>{
       const cat=MATERIALS.find(x=>x.id===row.id||x.code===row.code);
       if(!cat)return;
       enrichMat(cat,false);
-      row.price=cat.refPrice;row.supplier=cat.supplier;row.warehouse=cat.warehouse;row.stockQty=cat.stockQty;
+      row.price=cat.refPrice;row.vat=cat.vat??8;row.supplier=cat.supplier;row.warehouse=cat.warehouse;row.stockQty=cat.stockQty;
       row.tag='Kho MH · giá tham chiếu';
     });
     renderCreateMatChips();
     populateCreateSelects();
     const at=new Date().toLocaleString('vi-VN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'});
-    if(hint)hint.textContent='Đã đồng bộ lúc '+at+' · giá + NCC + tồn · '+MATERIALS.length+' VT';
+    if(hint)hint.textContent='Đã đồng bộ lúc '+at+' · giá + VAT + NCC + tồn · '+MATERIALS.length+' VT';
     if(btn){btn.disabled=false;btn.textContent='Đồng bộ lại'}
-    toast('Đã đồng bộ danh mục + điền giá/NCC vào form');
+    toast('Đã đồng bộ danh mục + điền giá/VAT/NCC vào form');
   },900);
 });
 
@@ -2127,8 +2215,8 @@ $('#btnCreateSave')?.addEventListener('click',()=>{
     saveLocalLookups(LOCAL);
   }
   const mats=[
-    ...(S.createPwmsMats||[]).map(m=>({name:m.name,code:m.code,qty:m.qty||1,price:m.price||0,supplier:m.supplier||'',warehouse:m.warehouse||'',tag:m.tag||'Kho MH',snapshotAt:new Date().toLocaleString('vi-VN'),snapshotFrozen:false})),
-    ...(S.createKtvMats||[]).map(m=>({name:m.name,code:m.code||'',qty:m.qty||1,price:m.price||0,tag:'KTV/ngoài kho',snapshotAt:new Date().toLocaleString('vi-VN'),snapshotFrozen:false})),
+    ...(S.createPwmsMats||[]).map(m=>({name:m.name,code:m.code,qty:m.qty||1,price:m.price||0,vat:m.vat??8,supplier:m.supplier||'',warehouse:m.warehouse||'',source:'PWMS',tag:m.tag||'Kho MH',snapshotAt:new Date().toLocaleString('vi-VN'),snapshotFrozen:false})),
+    ...(S.createKtvMats||[]).map(m=>({name:m.name,code:m.code||'',qty:m.qty||1,price:m.price||0,vat:m.vat??8,source:'TECHNICIAN',tag:'KTV/ngoài kho',local:!!m.local,snapshotAt:new Date().toLocaleString('vi-VN'),snapshotFrozen:false})),
   ];
   const id='o'+Date.now().toString(36);
   const workItems=S.createWorkItems.map(w=>({content:w.content,system:w.system||'—',local:!!w.local}));
