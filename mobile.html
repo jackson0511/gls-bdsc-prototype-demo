@@ -658,11 +658,17 @@ function pushLog(o,action,note,by){
 }
 function matSource(m){
   if(!m)return 'TECHNICIAN';
-  if(m.source)return m.source;
-  const t=(m.tag||'').toLowerCase();
-  if(t.includes('ktv')||t.includes('ngoài')||t.includes('nội bộ'))return 'TECHNICIAN';
-  if(m.code)return 'PWMS';
-  return 'TECHNICIAN';
+  /* Nguồn theo ID danh mục kho: có materialId → kho (PWMS/EXTERNAL); không ID → KTV ghi */
+  if(!m.materialId){
+    if(m.source==='TECHNICIAN'||m.local)return 'TECHNICIAN';
+    if(m.source==='PWMS'||m.source==='EXTERNAL')return m.source; /* legacy */
+    const t=(m.tag||'').toLowerCase();
+    if(t.includes('ktv')||t.includes('ngoài')||t.includes('nội bộ'))return 'TECHNICIAN';
+    return m.code?'PWMS':'TECHNICIAN';
+  }
+  if(m.source==='EXTERNAL')return 'EXTERNAL';
+  if(m.fulfillment==='EXTERNAL')return 'EXTERNAL';
+  return 'PWMS';
 }
 function materialSourceLabel(m){
   const s=matSource(m);
@@ -1441,71 +1447,75 @@ function openWorkItemSheet(o,idx){
 }
 function openAddWorkItemSheet(o){openWorkItemSheet(o,-1)}
 
-function renderMatPwmsFields(m){
-  const label=m?.code?`${m.code} · ${m.name||''}`:'';
-  return `
-    <div id="matPwmsFields" class="space-y-2">
-      <label class="field"><span>Chọn vật tư * <span class="hint">autocomplete · chạm chọn</span></span>
-        <div class="ac-wrap">
-          <input type="search" id="matCatalogAc" autocomplete="off" placeholder="Tìm mã / tên vật tư kho…" value="${esc(label)}" />
-          <div class="ac-dropdown hidden" id="matCatalogDd"></div>
-        </div>
-      </label>
-      <input type="hidden" id="matPickId" value="${esc(m?.code||'')}" />
-      <div class="grid grid-cols-2 gap-2">
-        <label class="field"><span>Mã</span><input id="matCode" readonly class="!bg-slate-50" value="${esc(m?.code||'')}" /></label>
-        <label class="field"><span>ĐVT</span><input id="matUom" readonly class="!bg-slate-50" value="${esc(m?.uom||'Cái')}" /></label>
-      </div>
-      <label class="field"><span>Tên</span><input id="matName" readonly class="!bg-slate-50" value="${esc(m?.name||'')}" /></label>
-      <div class="grid grid-cols-3 gap-2">
-        <label class="field"><span>Đơn giá</span><input id="matPrice" readonly class="!bg-slate-50" value="${m?.price??''}" /></label>
-        <label class="field"><span>VAT (%)</span><input id="matVat" type="number" min="0" step="0.1" value="${m?.vat??8}" /></label>
-        <label class="field"><span>NCC</span><input id="matSupplier" readonly class="!bg-slate-50" value="${esc(m?.supplier||'')}" /></label>
-      </div>
-      <label class="field"><span>Kho</span><input id="matWarehouse" readonly class="!bg-slate-50" value="${esc(m?.warehouse||'')}" /></label>
-      <p id="matFulfillHint" class="text-[11px] text-slate-600 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">Chọn vật tư → kiểm tra tồn: đủ → Xuất kho; thiếu → Sửa ngoài</p>
-    </div>`;
-}
-
-function renderMatTechFields(m){
-  return `
-    <div id="matTechFields" class="space-y-2">
-      <label class="field"><span>Chọn / nhập vật tư <span class="hint">autocomplete · tạo mới chỉ nội bộ</span></span>
-        <div class="ac-wrap">
-          <input type="search" id="matTechAc" autocomplete="off" placeholder="Tìm hoặc nhập tên…" value="${esc(m?.name||'')}" />
-          <div class="ac-dropdown hidden" id="matTechDd"></div>
-        </div>
-      </label>
-      <input type="hidden" id="matTechCode" value="${esc(m?.code||'')}" />
-      <input type="hidden" id="matTechLocal" value="${m?.local?1:0}" />
-    </div>`;
-}
-
 function openMaterialSheet(o,idx){
   if(!canEditOrderDetail(o)){toast('Chỉ sửa khi Nháp hoặc Bị từ chối');return}
   const isNew=idx==null||idx<0;
   const m=isNew?null:o.mats[idx];
-  const initSource=m?.source==='TECHNICIAN'?'TECHNICIAN':'PWMS';
+  /* materialId = ID danh mục kho PWMS; không có → KTV nhập */
   let matState={
-    source:initSource,
     qty:m?.qty??1,
-    pick:m?.code?{code:m.code,name:m.name,uom:m.uom||'Cái',refPrice:m.price,vat:m.vat??8,supplier:m.supplier||'',warehouse:m.warehouse||'',stockQty:m.stockAtSelect}:null,
-    techLocal:!!m?.local,
+    materialId:m?.materialId||null,
+    stockQty:m?.stockAtSelect??null,
   };
-  const getFulfill=()=>{
-    if(matState.source!=='PWMS'||!matState.pick)return null;
-    return resolveMaterialFulfillment({qty:matState.qty,stockQty:matState.pick.stockQty});
+  if(!matState.materialId&&m?.code){
+    const cat=materialMasterOptions().find(x=>x.code===m.code);
+    if(cat){matState.materialId=cat.id;matState.stockQty=cat.stockQty}
+  }
+  const refreshHint=()=>{
+    const el=$('#matFulfillHint');
+    if(!el)return;
+    const vat=$('#matVat')?.value??8;
+    if(!matState.materialId){
+      el.innerHTML=`Nguồn: <strong class="text-amber-800">KTV ghi</strong> · chỉ cần <strong>Tên</strong> · VAT ${vat}%`;
+      return;
+    }
+    const f=resolveMaterialFulfillment({qty:matState.qty,stockQty:matState.stockQty});
+    el.innerHTML=f.source==='PWMS'
+      ?`Nguồn kho · <strong class="text-emerald-700">Xuất kho</strong> · ${esc(f.reason)} · VAT <strong>${vat}%</strong>`
+      :`Nguồn kho · <strong class="text-violet-700">Sửa ngoài</strong> · ${esc(f.reason)} · VAT <strong>${vat}%</strong>`;
+  };
+  const clearCatalogLink=()=>{
+    matState.materialId=null;
+    matState.stockQty=null;
+    $('#matMaterialId').value='';
+    refreshHint();
+  };
+  const applyCatalog=x=>{
+    matState.materialId=x.id;
+    matState.stockQty=x.stockQty;
+    $('#matMaterialId').value=x.id||'';
+    $('#matName').value=x.name||'';
+    $('#matCode').value=x.code||'';
+    $('#matUom').value=x.uom||'Cái';
+    $('#matPrice').value=x.refPrice??0;
+    $('#matVat').value=x.vat??8;
+    $('#matSupplier').value=x.supplier||'';
+    $('#matWarehouse').value=x.warehouse||'';
+    refreshHint();
   };
   openOrderSheet(`
     <h2>${isNew?'Thêm vật tư dự kiến':'Sửa vật tư dự kiến'}</h2>
-    <p class="sub">${esc(o.code)} · chọn kho PWMS hoặc KTV ghi tay</p>
-    <label class="field"><span>Cách nhập</span>
-      <select id="matSource">
-        <option value="PWMS" ${initSource==='PWMS'?'selected':''}>Chọn từ danh mục kho</option>
-        <option value="TECHNICIAN" ${initSource==='TECHNICIAN'?'selected':''}>Kỹ thuật viên ghi tay</option>
-      </select>
+    <p class="sub">${esc(o.code)} · tìm tên trong kho để autofill · không có thì tạo mới (chỉ cần tên)</p>
+    <input type="hidden" id="matMaterialId" value="${esc(matState.materialId||'')}" />
+    <label class="field"><span>Tên vật tư * <span class="hint">autocomplete · chọn hoặc tạo mới</span></span>
+      <div class="ac-wrap">
+        <input type="search" id="matName" autocomplete="off" placeholder="Tìm hoặc nhập tên vật tư…" value="${esc(m?.name||'')}" />
+        <div class="ac-dropdown hidden" id="matNameDd"></div>
+      </div>
     </label>
-    <div id="matModeWrap">${initSource==='PWMS'?renderMatPwmsFields(m):renderMatTechFields(m)}</div>
+    <div class="grid grid-cols-2 gap-2">
+      <label class="field"><span>Mã</span><input id="matCode" type="text" value="${esc(m?.code||'')}" placeholder="Tự điền nếu chọn từ kho" /></label>
+      <label class="field"><span>ĐVT</span><input id="matUom" type="text" value="${esc(m?.uom||'Cái')}" /></label>
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <label class="field"><span>Đơn giá</span><input id="matPrice" type="number" min="0" value="${m?.price??''}" /></label>
+      <label class="field"><span>VAT (%)</span><input id="matVat" type="number" min="0" step="0.1" value="${m?.vat??8}" /></label>
+    </div>
+    <label class="field"><span>NCC</span>
+      <textarea id="matSupplier" rows="2" placeholder="Nhà cung cấp">${esc(m?.supplier||'')}</textarea>
+    </label>
+    <label class="field"><span>Kho</span><input id="matWarehouse" type="text" value="${esc(m?.warehouse||'')}" placeholder="Kho xuất / tồn" /></label>
+    <p id="matFulfillHint" class="text-[11px] text-slate-600 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 mb-3">—</p>
     <label class="field"><span>Số lượng *</span>
       <div class="qty-step">
         <button type="button" id="matQtyMinus" aria-label="Giảm">−</button>
@@ -1522,132 +1532,99 @@ function openMaterialSheet(o,idx){
     if(e.target===$('#orderSheetBg'))closeOrderSheet();
     else if(!e.target.closest('.ac-wrap'))hideAllAc();
   };
-  const refreshFulfill=()=>{
-    const f=getFulfill();
-    const el=$('#matFulfillHint');
-    if(!el||matState.source!=='PWMS')return;
-    if(!f){el.textContent='Chọn vật tư → kiểm tra tồn';return}
-    const vat=$('#matVat')?.value??matState.pick?.vat??8;
-    el.innerHTML=f.source==='PWMS'
-      ?`Hình thức: <strong class="text-emerald-700">Xuất kho</strong> · ${esc(f.reason)} · VAT <strong>${vat}%</strong>`
-      :`Hình thức: <strong class="text-violet-700">Sửa ngoài</strong> · ${esc(f.reason)} · VAT <strong>${vat}%</strong>`;
-  };
-  const applyPick=x=>{
-    matState.pick=x;
-    $('#matPickId').value=x.code||'';
-    $('#matCode').value=x.code||'';
-    $('#matName').value=x.name||'';
-    $('#matUom').value=x.uom||'Cái';
-    $('#matPrice').value=x.refPrice??0;
-    if($('#matVat'))$('#matVat').value=x.vat??8;
-    $('#matSupplier').value=x.supplier||'';
-    $('#matWarehouse').value=x.warehouse||'';
-    if($('#matCatalogAc'))$('#matCatalogAc').value=`${x.code} · ${x.name}`;
-    refreshFulfill();
-  };
-  const bindMat=()=>{
-    $('#matSource')?.addEventListener('change',()=>{
-      matState.source=$('#matSource').value;
-      matState.pick=null;
-      $('#matModeWrap').innerHTML=matState.source==='PWMS'?renderMatPwmsFields(null):renderMatTechFields(null);
-      bindMat();
-    },{once:true});
-    $('#matQty')?.addEventListener('input',()=>{matState.qty=Number($('#matQty').value)||1;refreshFulfill()});
-    $('#matQtyMinus')?.addEventListener('click',()=>{
-      const n=Math.max(0.01,Math.round(((Number($('#matQty').value)||1)-1)*100)/100);
-      $('#matQty').value=n;matState.qty=n;refreshFulfill();
-    });
-    $('#matQtyPlus')?.addEventListener('click',()=>{
-      const n=Math.round(((Number($('#matQty').value)||1)+1)*100)/100;
-      $('#matQty').value=n;matState.qty=n;refreshFulfill();
-    });
-    if($('#matCatalogAc')){
-      delete $('#matCatalogAc').dataset.acBound;
-      bindCreatableAc($('#matCatalogAc'),$('#matCatalogDd'),{
-        getOptions:()=>materialMasterOptions(),
-        allowCreate:false,
-        limit:15,
-        format:x=>`${esc(x.code)} · ${esc(x.name)}<span class="sub">tồn ${x.stockQty??'—'} · ${money(x.refPrice)} · VAT ${x.vat??8}%</span>`,
-        onPick:applyPick,
-        onCreate:()=>null,
-      });
-      if(matState.pick)applyPick(matState.pick);
-    }
-    if($('#matTechAc')){
-      delete $('#matTechAc').dataset.acBound;
-      bindCreatableAc($('#matTechAc'),$('#matTechDd'),{
-        getOptions:()=>ktvMaterialSelectOptions(),
-        allowCreate:true,
-        limit:12,
-        format:x=>`${x.code?esc(x.code)+' · ':''}${esc(x.name)}`,
-        onPick:x=>{
-          $('#matTechAc').value=x.name;
-          $('#matTechCode').value=x.code||'';
-          $('#matTechLocal').value=x.source==='local'?1:0;
-          matState.techLocal=x.source==='local';
-        },
-        onCreate:name=>{
-          LOCAL.materials=LOCAL.materials||[];
-          let item=LOCAL.materials.find(x=>x.name.toLowerCase()===name.toLowerCase());
-          if(!item){
-            item={id:'lm'+Date.now(),name,code:''};
-            LOCAL.materials.unshift(item);
-            saveLocalLookups(LOCAL);
-            toast('Đã lưu VT mới · chỉ nội bộ');
-          }
-          matState.techLocal=true;
-          return{...item,source:'local'};
-        },
-      });
-    }
-    $('#matSave').onclick=()=>{
-      matState.qty=Number($('#matQty').value)||1;
-      o.mats=o.mats||[];
-      let row;
-      if(matState.source==='PWMS'){
-        const pick=matState.pick;
-        if(!pick?.code&&!$('#matCode')?.value){toast('Chọn vật tư kho');$('#matCatalogAc')?.focus();return}
-        const code=$('#matCode').value||pick.code;
-        const cat=materialMasterOptions().find(x=>x.code===code)||pick;
-        const ful=resolveMaterialFulfillment({qty:matState.qty,stockQty:cat?.stockQty});
-        row={
-          id:m?.id||('mt-'+Date.now()),source:ful.source,
-          code,name:$('#matName').value||cat?.name,uom:$('#matUom').value||'Cái',
-          qty:matState.qty,price:Number($('#matPrice').value)||0,vat:Number($('#matVat').value??8),
-          supplier:$('#matSupplier').value||'',warehouse:$('#matWarehouse').value||'',
-          stockAtSelect:cat?.stockQty,
-          tag:ful.source==='PWMS'?'Kho MH · giá tham chiếu':'Sửa ngoài · thiếu tồn',
-        };
-      }else{
-        let name=($('#matTechAc')?.value||'').trim();
-        if(!name){toast('Chọn hoặc nhập tên vật tư');return}
-        const isLocal=$('#matTechLocal')?.value==='1'||matState.techLocal;
-        if(!ktvMaterialSelectOptions().some(x=>x.name.toLowerCase()===name.toLowerCase())){
-          LOCAL.materials=LOCAL.materials||[];
-          if(!LOCAL.materials.some(x=>x.name.toLowerCase()===name.toLowerCase())){
-            LOCAL.materials.unshift({id:'lm'+Date.now(),name,code:''});
-            saveLocalLookups(LOCAL);
-          }
-        }
-        row={
-          id:m?.id||('mt-'+Date.now()),source:'TECHNICIAN',
-          code:$('#matTechCode')?.value||'',name,qty:matState.qty,price:0,vat:8,
-          tag:isLocal?'KTV/ngoài kho · nội bộ':'KTV/ngoài kho',local:isLocal,
-        };
+  refreshHint();
+  bindCreatableAc($('#matName'),$('#matNameDd'),{
+    getOptions:()=>materialMasterOptions(),
+    allowCreate:true,
+    limit:15,
+    format:x=>`${esc(x.name)}<span class="sub">${esc(x.code)} · tồn ${x.stockQty??'—'} · ${money(x.refPrice)} · VAT ${x.vat??8}%</span>`,
+    onPick:x=>applyCatalog(x),
+    onCreate:name=>{
+      matState.materialId=null;
+      matState.stockQty=null;
+      $('#matMaterialId').value='';
+      $('#matName').value=name;
+      LOCAL.materials=LOCAL.materials||[];
+      if(!LOCAL.materials.some(x=>x.name.toLowerCase()===name.toLowerCase())){
+        LOCAL.materials.unshift({id:'lm'+Date.now(),name,code:''});
+        saveLocalLookups(LOCAL);
       }
-      if(!isNew)o.mats[idx]=row;
-      else{
-        const exist=row.code&&o.mats.find(x=>x.code===row.code);
-        if(exist){exist.qty=(Number(exist.qty)||1)+matState.qty;if(row.vat!=null)exist.vat=row.vat;toast('Đã tăng SL')}
-        else{o.mats.push(row);toast('Đã thêm vật tư')}
+      toast('Tạo mới · nguồn KTV (không có ID kho)');
+      refreshHint();
+      return null; /* đã set tên; không gọi onPick/autofill kho */
+    },
+  });
+  $('#matName').addEventListener('input',()=>{
+    const name=($('#matName').value||'').trim().toLowerCase();
+    const hit=materialMasterOptions().find(x=>(x.name||'').toLowerCase()===name);
+    if(hit){
+      if(String(matState.materialId)!==String(hit.id))applyCatalog(hit);
+    }else if(matState.materialId){
+      clearCatalogLink();
+    }else refreshHint();
+  });
+  $('#matQty').addEventListener('input',()=>{matState.qty=Number($('#matQty').value)||1;refreshHint()});
+  $('#matVat').addEventListener('input',refreshHint);
+  $('#matQtyMinus').onclick=()=>{
+    const n=Math.max(0.01,Math.round(((Number($('#matQty').value)||1)-1)*100)/100);
+    $('#matQty').value=n;matState.qty=n;refreshHint();
+  };
+  $('#matQtyPlus').onclick=()=>{
+    const n=Math.round(((Number($('#matQty').value)||1)+1)*100)/100;
+    $('#matQty').value=n;matState.qty=n;refreshHint();
+  };
+  $('#matSave').onclick=()=>{
+    const name=($('#matName').value||'').trim();
+    if(!name){toast('Nhập tên vật tư');$('#matName').focus();return}
+    matState.qty=Number($('#matQty').value)||1;
+    matState.materialId=$('#matMaterialId').value||matState.materialId||null;
+    o.mats=o.mats||[];
+    let source='TECHNICIAN';
+    let tag='KTV/ngoài kho';
+    let stockAtSelect=null;
+    if(matState.materialId){
+      const cat=materialMasterOptions().find(x=>String(x.id)===String(matState.materialId));
+      stockAtSelect=cat?.stockQty??matState.stockQty;
+      const ful=resolveMaterialFulfillment({qty:matState.qty,stockQty:stockAtSelect});
+      source=ful.source;
+      tag=source==='PWMS'?'Kho MH · giá tham chiếu':'Sửa ngoài · thiếu tồn';
+    }else{
+      LOCAL.materials=LOCAL.materials||[];
+      if(!LOCAL.materials.some(x=>x.name.toLowerCase()===name.toLowerCase())
+        &&!materialMasterOptions().some(x=>x.name.toLowerCase()===name.toLowerCase())){
+        LOCAL.materials.unshift({id:'lm'+Date.now(),name,code:($('#matCode').value||'').trim()});
+        saveLocalLookups(LOCAL);
       }
-      if(hasPwmsLines(o)&&o.mh==='NA')o.mh='NONE';
-      if(!hasPwmsLines(o)&&o.mh==='NONE')o.mh='NA';
-      recalcOrderCostMobile(o);
-      closeOrderSheet();renderOrder();
+    }
+    const row={
+      id:m?.id||('mt-'+Date.now()),
+      materialId:matState.materialId||null,
+      source,
+      code:($('#matCode').value||'').trim()||null,
+      name,
+      uom:($('#matUom').value||'Cái').trim()||'Cái',
+      qty:matState.qty,
+      price:Number($('#matPrice').value)||0,
+      vat:Number($('#matVat').value??8),
+      supplier:($('#matSupplier').value||'').trim()||'',
+      warehouse:($('#matWarehouse').value||'').trim()||'',
+      stockAtSelect,
+      tag,
+      local:!matState.materialId,
     };
+    if(!isNew)o.mats[idx]=row;
+    else{
+      const exist=row.materialId
+        ?o.mats.find(x=>String(x.materialId)===String(row.materialId))
+        :(row.code&&o.mats.find(x=>x.code===row.code));
+      if(exist){exist.qty=(Number(exist.qty)||1)+matState.qty;Object.assign(exist,{price:row.price,vat:row.vat,supplier:row.supplier,warehouse:row.warehouse,name:row.name,materialId:row.materialId,source:row.source});toast('Đã tăng SL')}
+      else{o.mats.push(row);toast('Đã thêm vật tư')}
+    }
+    if(hasPwmsLines(o)&&o.mh==='NA')o.mh='NONE';
+    if(!hasPwmsLines(o)&&o.mh==='NONE')o.mh='NA';
+    recalcOrderCostMobile(o);
+    closeOrderSheet();renderOrder();
   };
-  bindMat();
 }
 
 function openEditOrderSheet(o){
