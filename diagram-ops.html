@@ -160,6 +160,43 @@
       border-radius: 12px; padding: 10px 12px; font-size: 14px;
     }
     .times b { display: block; color: var(--brand-dark); margin-bottom: 2px; }
+    .group-label {
+      margin: 18px 0 8px;
+      font-size: 12px; font-weight: 700; letter-spacing: .04em;
+      text-transform: uppercase; color: var(--brand-dark);
+    }
+    .group-label:first-child { margin-top: 4px; }
+    .scr {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      background: #fff;
+      margin-bottom: 8px;
+    }
+    .scr-head {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px;
+      margin-bottom: 6px;
+    }
+    .scr-head h4 {
+      margin: 0; font-size: 15px; font-weight: 700; color: var(--ink);
+    }
+    .tag {
+      font-size: 11px; font-weight: 600;
+      padding: 2px 8px; border-radius: 999px;
+      border: 1px solid var(--line); background: #f8fafc; color: #475569;
+    }
+    .tag.web { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+    .tag.phone { background: #fdf4ff; border-color: #e9d5ff; color: #7e22ce; }
+    .tag.step {
+      background: #ecfdf5; border-color: #a7f3d0; color: #047857;
+    }
+    .scr p {
+      margin: 0; font-size: 14px; color: #334155;
+    }
+    .confirm {
+      margin: 14px 0 0; padding: 12px 14px; border-radius: 12px;
+      border: 1px dashed #86efac; background: #f0fdf4; font-size: 13px; color: #14532d;
+    }
     footer {
       margin-top: 8px; font-size: 12px; color: var(--muted);
       display: flex; flex-direction: column; gap: 8px;
@@ -190,24 +227,27 @@
   <main class="wrap">
     <h1>Quy trình bảo dưỡng &amp; sửa chữa xe</h1>
     <p class="lead">
-      Trang này dành cho quản lý xe và kỹ thuật — giải thích <strong>làm việc thế nào</strong>,
-      từ khai báo ban đầu đến kế hoạch, làm phiếu và đối chiếu chi phí.
-      Không dùng thuật ngữ kỹ thuật / lập trình.
+      Trang dành cho <strong>người xác nhận nghiệp vụ</strong> (quản lý xe, kỹ thuật).
+      Đọc để hiểu <em>làm việc thế nào</em> và <em>màn hình nào xử lý việc gì</em> — kèm sơ đồ đơn giản.
+      Không đi sâu từng nút / từng cột (chi tiết kỹ thuật xem file đặc tả màn hình riêng).
     </p>
 
-    <nav class="chips" aria-label="Các bước">
-      <a href="#b1"><strong>1.</strong> Khai báo ban đầu</a>
-      <a href="#b2"><strong>2.</strong> Hệ thống hỗ trợ</a>
-      <a href="#b3"><strong>3.</strong> Lập kế hoạch</a>
-      <a href="#b4"><strong>4.</strong> Làm phiếu</a>
-      <a href="#b5"><strong>5.</strong> Đối chiếu</a>
-      <a href="#b6"><strong>6.</strong> Vỏ lốp / ắc quy</a>
-      <a href="#b7"><strong>7.</strong> Giờ SC KTV</a>
+    <nav class="chips" aria-label="Mục lục">
+      <a href="#tong"><strong>0.</strong> Nhìn nhanh</a>
+      <a href="#manhinh"><strong>1.</strong> Màn hình &amp; nghiệp vụ</a>
+      <a href="#b1"><strong>2.</strong> Khai báo</a>
+      <a href="#b2"><strong>3.</strong> Nhắc &amp; đánh giá</a>
+      <a href="#b3"><strong>4.</strong> Kế hoạch</a>
+      <a href="#b4"><strong>5.</strong> Phiếu làm thật</a>
+      <a href="#b5"><strong>6.</strong> Đối chiếu</a>
+      <a href="#b6"><strong>7.</strong> Lốp / ắc</a>
+      <a href="#b7"><strong>8.</strong> Giờ kỹ thuật viên</a>
     </nav>
 
-    <section class="panel">
+    <!-- ========== 0 TỔNG QUAN ========== -->
+    <section class="panel" id="tong">
       <h2>Nhìn nhanh toàn bộ quy trình</h2>
-      <p class="sub">Đọc từ trên xuống: làm xong bước trên mới sang bước dưới.</p>
+      <p class="sub">Đọc từ trên xuống. Xong bước trên mới sang bước dưới.</p>
       <div class="legend">
         <span><i style="background:#fef3c7"></i>Người dùng thao tác</span>
         <span><i style="background:#dbeafe"></i>Bộ phận / phần mềm khác hỗ trợ</span>
@@ -216,13 +256,13 @@
       <div class="diagram">
         <pre class="mermaid">
 flowchart TD
-  A[1. Khai báo danh mục<br/>và quy tắc bảo dưỡng] --> B[2. Hệ thống nhắc việc<br/>và hỗ trợ đánh giá xe]
-  B --> C[3. Lập kế hoạch / dự toán<br/>từ nhắc · mẫu · đánh giá]
-  C --> D[4. Tạo phiếu làm thật<br/>bảo dưỡng hoặc sửa chữa]
-  D --> E[5. So sánh kế hoạch<br/>với thực tế · xem lịch sử]
-  B --> F[6. Vỏ lốp / ắc quy<br/>đồng bộ PWMS · cảnh báo]
+  A[Khai báo danh mục<br/>và quy tắc bảo dưỡng] --> B[Nhắc việc · gắn danh mục vào xe<br/>· đánh giá xe định kỳ]
+  B --> C[Lập kế hoạch / dự toán<br/>từ nhắc · mẫu · đánh giá]
+  C --> D[Tạo phiếu làm thật<br/>bảo dưỡng hoặc sửa chữa]
+  D --> E[Đối chiếu kế hoạch với thực tế<br/>· xem lịch sử trên xe]
+  B --> F[Vỏ lốp / ắc quy<br/>cảnh báo · đẩy dự toán]
   F --> C
-  D --> G[7. Giờ SC KTV<br/>tổng hợp · lịch tháng · barem]
+  D --> G[Giờ sửa chữa kỹ thuật viên<br/>báo cáo · lịch tháng · giờ chuẩn]
 
   style A fill:#fef3c7,stroke:#d97706
   style B fill:#dbeafe,stroke:#0284c8
@@ -233,11 +273,191 @@ flowchart TD
   style G fill:#e0e7ff,stroke:#4f46e5
         </pre>
       </div>
+      <div class="confirm">
+        <strong>Cách dùng khi xác nhận:</strong> đọc mục «Màn hình &amp; nghiệp vụ» để biết mỗi màn làm gì;
+        rồi duyệt từng bước có sơ đồ bên dưới. Đánh dấu Đồng ý / Có điều kiện / Không / Để sau cho từng ý.
+      </div>
     </section>
 
+    <!-- ========== MÀN HÌNH × NGHIỆP VỤ ========== -->
+    <section class="panel" id="manhinh">
+      <h2>Màn hình nào xử lý nghiệp vụ gì</h2>
+      <p class="sub">
+        Mỗi thẻ = một màn trên bản mẫu (máy tính hoặc điện thoại).
+        Chỉ mô tả <strong>việc nghiệp vụ</strong> — không liệt kê chi tiết từng ô nhập.
+      </p>
+
+      <div class="diagram">
+        <pre class="mermaid">
+flowchart LR
+  A[Danh sách xe / phiếu] --> B[Chi tiết xe]
+  B --> C[Đánh giá]
+  B --> D[Danh mục &amp; kế hoạch]
+  B --> E[Phiếu bảo dưỡng / sửa chữa]
+  C --> E
+  D --> E
+  E --> F[Mua hàng / BASE]
+  B --> G[Lốp · ắc · giờ kỹ thuật viên]
+
+  style A fill:#fef3c7,stroke:#d97706
+  style B fill:#dbeafe,stroke:#0284c8
+  style C fill:#fce7f3,stroke:#db2777
+  style D fill:#d1fae5,stroke:#059669
+  style E fill:#d1fae5,stroke:#059669
+  style F fill:#e0e7ff,stroke:#4f46e5
+  style G fill:#fff7ed,stroke:#ea580c
+        </pre>
+      </div>
+
+      <p class="group-label">Theo dõi đội xe &amp; phiếu</p>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Bảo dưỡng &amp; sửa chữa (danh sách)</h4>
+          <span class="tag web">Máy tính</span>
+          <span class="tag step">Bước 5</span>
+        </div>
+        <p>Xem toàn đội theo xe hoặc theo phiếu. Lọc trạng thái duyệt / đang làm. Tạo phiếu mới. Mở nhanh đánh giá hoặc chi tiết xe / phiếu.</p>
+      </div>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Danh sách xe · Việc cần xử lý</h4>
+          <span class="tag phone">Điện thoại</span>
+          <span class="tag step">Bước 5</span>
+        </div>
+        <p>Kỹ thuật viên chọn xe cần làm. Thấy xe sắp đến hạn đánh giá. Vào chi tiết xe hoặc tạo phiếu tại hiện trường.</p>
+      </div>
+
+      <p class="group-label">Trên một chiếc xe</p>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Chi tiết xe / mooc</h4>
+          <span class="tag web">Máy tính</span>
+          <span class="tag phone">Điện thoại</span>
+          <span class="tag step">Bước 3–5</span>
+        </div>
+        <p>Trung tâm theo đúng một xe: tab Đánh giá (lịch sử phiếu đánh giá), tab Danh mục bảo dưỡng đã gắn, tab Kế hoạch, tab Bảo dưỡng, tab Sửa chữa. Trên điện thoại thêm tab Việc cần.</p>
+      </div>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Tab Đánh giá trên xe</h4>
+          <span class="tag web">Máy tính</span>
+          <span class="tag phone">Điện thoại</span>
+          <span class="tag step">Bước 3</span>
+        </div>
+        <p>Xem <em>mọi lần</em> đã đánh giá của đúng xe đó. Mở xem lại kết quả đủ hạng mục như phiếu đánh giá thường. Bấm sang phiếu bảo dưỡng / sửa chữa gắn với lần đánh giá đó.</p>
+      </div>
+
+      <p class="group-label">Đánh giá phương tiện định kỳ</p>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Đánh giá phương tiện định kỳ (danh sách đội)</h4>
+          <span class="tag web">Máy tính</span>
+          <span class="tag step">Bước 3</span>
+        </div>
+        <p>Theo dõi xe đã nộp / chưa nộp / sắp hạn / quá hạn / khóa. Mở phiếu đánh giá. Tạo phiếu sửa chữa từ đánh giá còn lỗi. Cảnh báo lốp·ắc khi đến hạn.</p>
+      </div>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Phiếu / wizard đánh giá</h4>
+          <span class="tag web">Máy tính</span>
+          <span class="tag phone">Điện thoại</span>
+          <span class="tag step">Bước 3</span>
+        </div>
+        <p>Điền thông tin đầu phiếu → đánh giá từng hạng mục (Tốt / Sửa chữa / Thay) → kết luận. Có miễn kỳ. Sau nộp: tạo kế hoạch, hoặc tạo phiếu sửa chữa ngay, hoặc chỉ nộp để tạo phiếu sau.</p>
+      </div>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Tiêu chí đánh giá · Cài đặt nhắc đánh giá</h4>
+          <span class="tag web">Máy tính</span>
+          <span class="tag step">Bước 2</span>
+        </div>
+        <p>Quản lý bộ câu hỏi đánh giá. Cấu hình chu kỳ tuần/tháng, ngày hết hạn, ngày khóa, nhắc trước.</p>
+      </div>
+
+      <p class="group-label">Nhắc bảo dưỡng · danh mục · kế hoạch</p>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Nhắc bảo dưỡng</h4>
+          <span class="tag web">Máy tính</span>
+          <span class="tag step">Bước 3–4</span>
+        </div>
+        <p>Liệt kê xe–hạng mục đến hạn (chỉ danh mục đã gắn vào xe). Tạo kế hoạch hàng loạt hoặc theo dòng chọn. Có khối cảnh báo vỏ lốp / ắc quy.</p>
+      </div>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Danh mục bảo dưỡng (+ chi tiết mốc)</h4>
+          <span class="tag web">Máy tính</span>
+          <span class="tag step">Bước 2</span>
+        </div>
+        <p>Khai báo hạng mục bảo dưỡng và mốc km / tháng. Gắn danh mục vào nhiều xe cùng lúc. Trên chi tiết xe: gắn thêm / bỏ gắn (có xác nhận) / tạo kế hoạch từ hạng mục đến hạn.</p>
+      </div>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Kế hoạch bảo dưỡng / sửa chữa · Mẫu kế hoạch</h4>
+          <span class="tag web">Máy tính</span>
+          <span class="tag phone">Điện thoại (xem + tạo phiếu)</span>
+          <span class="tag step">Bước 4</span>
+        </div>
+        <p>Dự toán theo kỳ × xe × hạng mục (chưa phải phiếu xuất kho). Nguồn: tay, mẫu, nhắc, đánh giá. Áp mẫu cho nhiều xe. Từ dòng kế hoạch tạo phiếu làm thật. Không duyệt Ban lãnh đạo trên kế hoạch.</p>
+      </div>
+
+      <p class="group-label">Phiếu làm thật</p>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Chi tiết phiếu bảo dưỡng / sửa chữa</h4>
+          <span class="tag web">Máy tính</span>
+          <span class="tag phone">Điện thoại</span>
+          <span class="tag step">Bước 5</span>
+        </div>
+        <p>Chu kỳ: nháp → nộp duyệt → duyệt / từ chối → bắt đầu → làm từng hạng mục → phiếu tự hoàn thành khi hạng mục cuối xong. Hai phần vật tư: kỹ thuật đề nghị và mua hàng đã cấp. Gửi / đồng bộ mua hàng; đồng bộ BASE (duyệt lãnh đạo). Bốn mốc giờ hệ thống tự ghi.</p>
+      </div>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Tạo phiếu trên điện thoại</h4>
+          <span class="tag phone">Điện thoại</span>
+          <span class="tag step">Bước 5</span>
+        </div>
+        <p>Tạo phiếu theo bước ngắn: chọn xe → hạng mục → vật tư → gửi duyệt. Phù hợp nhập tại xưởng / hiện trường.</p>
+      </div>
+
+      <p class="group-label">Kho · mua hàng · lốp / ắc · giờ công</p>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Vật tư · Ánh xạ xe · Nội dung sửa chữa · Hệ thống xe</h4>
+          <span class="tag web">Máy tính</span>
+          <span class="tag step">Bước 2</span>
+        </div>
+        <p>Đồng bộ danh mục từ mua hàng / kho để gợi ý khi lập kế hoạch và phiếu. Ghép xe Quản lý xe với mã xe bên kho trước khi gửi phiếu sang mua hàng.</p>
+      </div>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Vỏ lốp / ắc quy</h4>
+          <span class="tag web">Máy tính</span>
+          <span class="tag step">Bước 7</span>
+        </div>
+        <p>Xem định mức kép (km + tháng), cảnh báo đến hạn, đẩy vào dự toán thay. Sau khi thay trên phiếu: đồng bộ vòng đời lại mua hàng.</p>
+      </div>
+      <div class="scr">
+        <div class="scr-head">
+          <h4>Giờ sửa chữa kỹ thuật viên · Giờ chuẩn · Báo cáo</h4>
+          <span class="tag web">Máy tính</span>
+          <span class="tag step">Bước 8</span>
+        </div>
+        <p>Giờ thực tế lấy từ lúc bắt đầu đến lúc hoàn thành hạng mục. Đối chiếu giờ chuẩn. Xem bảng tổng hợp theo kỹ thuật viên hoặc lịch tháng cá nhân.</p>
+      </div>
+
+      <div class="confirm">
+        <strong>Ý cần xác nhận (màn hình):</strong>
+        Tab Đánh giá trên xe = lịch sử mọi lần + xem đủ hạng mục + link phiếu của lần đó;
+        đồng bộ mua hàng luôn có sau duyệt; hoàn thành hạng mục cuối = hoàn thành phiếu;
+        nhắc chỉ theo danh mục đã gắn; không duyệt lãnh đạo trên kế hoạch.
+      </div>
+    </section>
+
+    <!-- ========== BƯỚC KHAI BÁO ========== -->
     <section class="panel" id="b1">
-      <h3 class="step">Bước 1 — Khai báo ban đầu</h3>
-      <p class="sub">Chuẩn bị “sổ quy tắc” trước khi lập kế hoạch hay làm phiếu.</p>
+      <h3 class="step">Bước — Khai báo ban đầu</h3>
+      <p class="sub">Chuẩn bị “sổ quy tắc” trước khi lập kế hoạch hay làm phiếu. Màn liên quan: Danh mục bảo dưỡng, Tiêu chí đánh giá, Cài đặt nhắc, Hệ thống xe, Vật tư, Ánh xạ xe.</p>
       <div class="diagram">
         <pre class="mermaid">
 flowchart TD
@@ -245,7 +465,7 @@ flowchart TD
   B --> C[Danh mục bảo dưỡng<br/>mốc km hoặc tháng]
   D[Bảng câu hỏi<br/>đánh giá xe định kỳ] --> E[Lịch nhắc đánh giá<br/>theo tuần / tháng]
   F[Danh mục vật tư<br/>và kho bên mua hàng] --> G[Ghép xe trên Quản lý xe<br/>với mã xe bên kho]
-  C --> H[Sẵn sàng lập kế hoạch]
+  C --> H[Sẵn sàng lập kế hoạch<br/>và đánh giá]
   E --> H
   G --> H
         </pre>
@@ -261,65 +481,66 @@ flowchart TD
         </div>
       </div>
       <div class="tip">
-        <strong>Ví dụ dễ hiểu:</strong> Danh mục “Thay dầu / lọc” = quy tắc chu kỳ.
-        Mỗi xe có “lần gần nhất” và “lần tới” (theo km hoặc ngày) để hệ thống biết khi nào cần nhắc.
+        <strong>Ví dụ:</strong> Danh mục «Thay dầu / lọc» = quy tắc chu kỳ.
+        Mỗi xe có «lần gần nhất» và «lần tới» để hệ thống biết khi nào cần nhắc.
       </div>
     </section>
 
+    <!-- ========== NHẮC & ĐÁNH GIÁ ========== -->
     <section class="panel" id="b2">
-      <h3 class="step">Bước 2 — Hệ thống hỗ trợ sau khi đã khai báo</h3>
-      <p class="sub">Không phải lúc nào cũng nhập tay: phần mềm giúp cập nhật vật tư, nhắc việc, và theo dõi đánh giá xe.</p>
+      <h3 class="step">Bước — Nhắc việc &amp; đánh giá xe</h3>
+      <p class="sub">Màn liên quan: Nhắc bảo dưỡng, Đánh giá định kỳ (danh sách), Phiếu đánh giá, Chi tiết xe → tab Đánh giá / Danh mục.</p>
       <div class="diagram">
         <pre class="mermaid">
 flowchart TD
-  A[Cập nhật danh sách vật tư<br/>tồn kho · giá tham khảo] --> D[Khi lập kế hoạch / phiếu<br/>có gợi ý vật tư]
-  B[Ghép xe với kho xong] --> E[Được phép gửi phiếu<br/>sang mua hàng]
-  C[Nhắc bảo dưỡng đến hạn<br/>+ cảnh báo lốp / ắc] --> F[Tạo tất cả KH sắp/quá hạn<br/>hoặc tích chọn → tạo KH]
-  G[Đánh giá xe định kỳ] --> H{Xe đạt không?}
-  H -->|Cần khắc phục| I[Đưa vào kế hoạch<br/>hoặc tạo phiếu sửa]
+  L[Gắn danh mục bảo dưỡng vào xe<br/>áp một xe hoặc nhiều xe] --> C[Nhắc bảo dưỡng đến hạn<br/>+ cảnh báo lốp / ắc]
+  C --> F[Tạo kế hoạch<br/>tất cả sắp/quá hạn hoặc chọn dòng]
+  G[Đánh giá xe định kỳ<br/>danh sách đội / điện thoại] --> H{Xe đạt không?}
+  H -->|Cần khắc phục| I[Tạo kế hoạch<br/>hoặc tạo phiếu sửa chữa]
   H -->|Đạt| J[Ghi nhận · chờ kỳ sau]
-  F --> K[Kế hoạch bảo dưỡng]
-  I --> K
-  L[Gắn danh mục BD vào xe<br/>áp hàng loạt: chọn nhiều xe] --> C
+  I --> K[Lưu vào lịch sử đánh giá<br/>của đúng xe đó]
+  J --> K
+  K --> M[Tab Đánh giá trên xe<br/>xem lại đủ hạng mục<br/>+ mở phiếu đã gắn]
+  F --> N[Kế hoạch bảo dưỡng]
+  I --> N
         </pre>
       </div>
       <ul class="plain">
-        <li><strong>Cập nhật vật tư từ kho:</strong> để khi chọn vật tư thấy tồn và giá tham khảo mới.</li>
-        <li><strong>Ghép xe với kho:</strong> cần làm trước khi gửi phiếu sang mua hàng (tránh nhầm xe).</li>
-        <li><strong>Nhắc bảo dưỡng:</strong> chỉ theo danh mục <em>đã gắn</em> vào xe + số km / ngày; kèm cảnh báo vỏ lốp / ắc quy; nút tạo tất cả KH sắp/quá hạn hoặc từ dòng đã chọn.</li>
-        <li><strong>Đánh giá định kỳ:</strong> theo bộ câu hỏi; cảnh báo lốp/ắc; không đạt → kế hoạch hoặc phiếu. Tab <em>Đánh giá</em> trên xe = lịch sử mọi phiếu ĐG (xem đủ hạng mục như form ĐG) + link phiếu BD/SC của lần đó.</li>
-        <li><strong>Gắn danh mục vào xe:</strong> popup chỉ thêm (không bỏ tại popup); bỏ gắn trên danh sách có xác nhận; áp hàng loạt từ màn Danh mục BD (popup liệt kê / chọn nhiều xe như mẫu KH).</li>
+        <li><strong>Gắn danh mục vào xe:</strong> thêm danh mục cần theo dõi; bỏ gắn phải xác nhận. Có thể áp cho nhiều xe cùng lúc từ màn Danh mục.</li>
+        <li><strong>Nhắc bảo dưỡng:</strong> chỉ nhắc hạng mục <em>đã gắn</em> vào xe + số km / ngày; kèm cảnh báo vỏ lốp / ắc quy.</li>
+        <li><strong>Đánh giá định kỳ:</strong> theo bộ câu hỏi; không đạt → kế hoạch hoặc phiếu sửa chữa.</li>
+        <li><strong>Lịch sử trên xe:</strong> mọi lần đã đánh giá của đúng xe; xem lại như phiếu đánh giá thường; bấm mở phiếu bảo dưỡng / sửa chữa của lần đó.</li>
       </ul>
     </section>
 
+    <!-- ========== KẾ HOẠCH ========== -->
     <section class="panel" id="b3">
-      <h3 class="step">Bước 3 — Lập kế hoạch</h3>
-      <p class="sub">Kế hoạch là bản <strong>dự toán</strong> (xe nào · làm gì · khoảng chi phí). Chưa phải phiếu xuất kho.</p>
+      <h3 class="step">Bước — Lập kế hoạch / dự toán</h3>
+      <p class="sub">Màn liên quan: Kế hoạch, Mẫu kế hoạch, tab Kế hoạch trên xe, Nhắc bảo dưỡng (đẩy sang kế hoạch).</p>
       <div class="diagram">
         <pre class="mermaid">
 flowchart TD
   A[Định mức hạng mục<br/>km / tháng] --> D[Hệ thống tính đến hạn]
   B[Lịch sử thay gần nhất<br/>trên xe] --> D
-  C[Số km GPS cập nhật] --> D
-  D --> E[Danh sách đến hạn<br/>sắp hạn / quá hạn]
-  E --> F[Tạo tất cả sắp/quá hạn<br/>hoặc tích chọn xe + hạng mục]
-  F --> G[Kế hoạch theo xe trước<br/>mẫu kế hoạch sau]
-  H[Tạo mẫu kế hoạch<br/>theo loại xe] --> I[Áp mẫu nhiều xe]
-  J[Đánh giá xe không đạt] --> G
+  C[Số km từ GPS] --> D
+  D --> E[Danh sách đến hạn]
+  E --> F[Tạo kế hoạch<br/>tất cả hoặc chọn dòng]
+  H[Mẫu kế hoạch<br/>theo nhóm xe] --> I[Áp mẫu nhiều xe]
+  J[Đánh giá xe không đạt] --> G[Kế hoạch theo xe]
+  F --> G
   I --> G
-  G --> K[Dòng dự toán có giá · VAT<br/>ĐVT · NCC từ PWMS]
-  K --> L[Tạo phiếu làm thật<br/>không duyệt LĐ trên kế hoạch]
-  M[Gắn danh mục BD vào xe<br/>+ tạo KH từ DM đến hạn] --> D
+  G --> K[Dòng dự toán có giá tham khảo<br/>từ dữ liệu mua hàng]
+  K --> L[Tạo phiếu làm thật<br/>không duyệt lãnh đạo trên kế hoạch]
         </pre>
       </div>
       <div class="cards three">
         <div class="box g">
           <strong>Cách 1 — Theo mẫu</strong>
-          Làm một mẫu cho nhóm xe giống nhau, rồi áp sang nhiều xe trong kỳ (tháng). Không cần duyệt Ban lãnh đạo trên kế hoạch.
+          Làm một mẫu cho nhóm xe giống nhau, rồi áp sang nhiều xe trong kỳ. Không duyệt Ban lãnh đạo trên kế hoạch.
         </div>
         <div class="box y">
-          <strong>Cách 2 — Theo nhắc việc (tự động hóa)</strong>
-          Hệ thống ghép định mức + lịch sử + km GPS → danh sách đến hạn → <em>tạo tất cả sắp/quá hạn</em> hoặc <em>tích chọn</em> → đẩy vào dự toán (có thể sửa kỳ).
+          <strong>Cách 2 — Theo nhắc</strong>
+          Hệ thống ghép định mức + lịch sử + km → danh sách đến hạn → tạo kế hoạch (có thể sửa kỳ).
         </div>
         <div class="box p">
           <strong>Cách 3 — Theo đánh giá</strong>
@@ -327,131 +548,133 @@ flowchart TD
         </div>
       </div>
       <div class="tip">
-        Giá trên kế hoạch: <strong>đơn giá · VAT · ĐVT · nhà cung cấp</strong> lấy từ dữ liệu PWMS đã đồng bộ về TMS (nút Đồng bộ khi chọn VT).
-        Chi phí thật lấy sau khi mua hàng xử lý và đồng bộ lại phiếu. Duyệt lãnh đạo của <em>phiếu</em> BD/SC qua <strong>BASE</strong> — không áp dụng duyệt LĐ lên kế hoạch.
+        Giá trên kế hoạch là <strong>tham khảo</strong> từ dữ liệu mua hàng đã đồng bộ.
+        Chi phí thật lấy sau khi mua hàng xử lý và đồng bộ lại phiếu.
+        Duyệt lãnh đạo nằm ở <em>phiếu</em> (qua BASE), không nằm trên kế hoạch.
       </div>
     </section>
 
+    <!-- ========== PHIẾU ========== -->
     <section class="panel" id="b4">
-      <h3 class="step">Bước 4 — Tạo phiếu làm thật (bảo dưỡng / sửa chữa)</h3>
-      <p class="sub">Phiếu có thể tạo từ kế hoạch, từ sự cố phát sinh, hoặc từ đánh giá / điện thoại kỹ thuật viên.</p>
+      <h3 class="step">Bước — Tạo phiếu làm thật</h3>
+      <p class="sub">Màn liên quan: Chi tiết phiếu (máy tính / điện thoại), Tạo phiếu trên điện thoại, danh sách Bảo dưỡng &amp; sửa chữa.</p>
       <div class="diagram">
         <pre class="mermaid">
 flowchart TD
-  A[Tạo phiếu] --> B[Kỹ thuật ghi phần dự kiến<br/>hạng mục + vật tư]
+  A[Tạo phiếu<br/>từ kế hoạch · sự cố · đánh giá · điện thoại] --> B[Kỹ thuật ghi phần dự kiến<br/>hạng mục + vật tư đề nghị]
   B --> C[Nộp duyệt · quản lý duyệt]
-  C --> D[Nút Đồng bộ BASE luôn hiện<br/>đẩy duyệt lãnh đạo]
-  C --> E[Gửi MH · ĐB mua hàng luôn có<br/>kể cả không có VT]
-  D --> F[Bắt đầu làm việc trên xưởng]
+  C --> D[Đồng bộ BASE<br/>duyệt lãnh đạo — nút luôn sẵn]
+  C --> E[Gửi / đồng bộ mua hàng<br/>luôn có sau duyệt]
+  D --> F[Bắt đầu làm trên xưởng]
   E --> F
   F --> G[Mua hàng xuất kho<br/>hoặc mua ngoài theo mã phiếu]
-  G --> H[Đồng bộ lại từ mua hàng<br/>thành phần dữ liệu thật]
-  H --> I[Hoàn thành từng hạng mục<br/>so giờ thực tế với barem]
-  I --> J[Hạng mục cuối HT → phiếu tự<br/>Hoàn thành · không nút HT phiếu]
-  J --> K[Nếu có thay lốp / ắc<br/>đồng bộ vòng đời → mua hàng]
+  G --> H[Đồng bộ lại dữ liệu mua hàng<br/>giá · chứng từ — không xóa phần dự kiến]
+  H --> I[Hoàn thành từng hạng mục<br/>giờ thực tế tự tính]
+  I --> J[Hạng mục cuối xong<br/>→ phiếu tự hoàn thành]
+  J --> K[Nếu thay lốp / ắc<br/>đồng bộ vòng đời → mua hàng]
         </pre>
       </div>
       <div class="cards two">
         <div class="box y">
           <strong>Phần dự kiến (kỹ thuật ghi)</strong>
-          Hạng mục + vật tư đề nghị. Chọn VT bằng <em>autocomplete tên</em> (có tạo mới).
-          Có <em>materialId</em> kho → autofill giá·VAT·ĐVT·NCC; đủ tồn = xuất kho / thiếu = sửa ngoài.
-          Không ID → <em>KTV ghi</em> (chỉ bắt buộc tên). Mobile: NCC = textarea; không dropdown «Cách nhập».
+          Hạng mục + vật tư đề nghị, giá tạm.
+          Chọn vật tư bằng gõ tìm tên; có trong kho thì tự điền giá / nhà cung cấp; đủ tồn = xuất kho, thiếu = sửa ngoài; không có trong kho = kỹ thuật viên ghi tay.
           Phần này <strong>không bị xóa</strong> khi đồng bộ mua hàng.
         </div>
         <div class="box b">
           <strong>Phần mua hàng (sau đồng bộ)</strong>
-          Giá thật, nhà cung cấp, chứng từ, ngày cấp — gắn đúng <strong>mã phiếu</strong>.
-          Nút «Đồng bộ mua hàng» luôn sẵn sau duyệt (có hoặc không có dòng VT).
+          Giá thật, nhà cung cấp, chứng từ, ngày cấp — gắn đúng mã phiếu.
+          Nút đồng bộ mua hàng luôn sẵn sau khi đã duyệt (kể cả phiếu không có dòng vật tư).
         </div>
       </div>
       <h3 class="step" style="border:none;padding:0;margin:16px 0 8px;font-size:15px">Bốn mốc giờ — hệ thống tự ghi, không nhập tay</h3>
       <ul class="times">
         <li><b>Thời gian bắt đầu</b>Khi bấm «Bắt đầu thực hiện» hoặc khi bắt đầu hạng mục đầu</li>
         <li><b>Thời gian đề nghị cấp vật tư</b>Lần gửi sớm nhất sang BASE hoặc sang mua hàng</li>
-        <li><b>Thời gian có đủ vật tư</b>Ngày cấp vật tư <em>sau cùng</em> trên chứng từ mua hàng / xuất kho</li>
-        <li><b>Thời gian hoàn thiện sửa chữa</b>Khi hạng mục công việc <em>cuối cùng</em> hoàn thành (phiếu tự HT — không nút HT phiếu)</li>
+        <li><b>Thời gian có đủ vật tư</b>Ngày cấp vật tư sau cùng trên chứng từ mua hàng / xuất kho</li>
+        <li><b>Thời gian hoàn thiện</b>Khi hạng mục công việc cuối cùng hoàn thành (phiếu tự hoàn thành — không cần nút «Hoàn thành phiếu» riêng)</li>
       </ul>
     </section>
 
+    <!-- ========== ĐỐI CHIẾU ========== -->
     <section class="panel" id="b5">
-      <h3 class="step">Bước 5 — Đối chiếu &amp; xem lại lịch sử</h3>
+      <h3 class="step">Bước — Đối chiếu &amp; xem lại lịch sử</h3>
+      <p class="sub">Màn liên quan: Chi tiết phiếu (khối lịch sử), Lịch sử theo xe, Lịch sử theo danh mục trên xe, tab Đánh giá trên xe.</p>
       <div class="diagram">
         <pre class="mermaid">
 flowchart TD
   A[Kế hoạch đã lập] --> C[So sánh<br/>số lượng · chi phí · tiến độ]
   B[Phiếu đã hoàn thành<br/>có phần mua hàng] --> C
   B --> D[Lịch sử theo từng xe<br/>và theo loại bảo dưỡng]
-  D --> E[Biết lần bảo dưỡng tiếp theo<br/>cập nhật mốc trên xe]
+  D --> E[Cập nhật mốc lần tới<br/>trên danh mục của xe]
+  F[Lịch sử đánh giá trên xe] --> G[Đối chiếu hạng mục lỗi<br/>với phiếu đã làm]
         </pre>
       </div>
       <p class="sub" style="margin-top:8px">
-        Sau khi hoàn thành phiếu bảo dưỡng định kỳ, hệ thống cập nhật “lần gần nhất” trên xe
-        và tính “lần tới” theo quy tắc danh mục (ví dụ cứ thêm 10.000 km, hoặc đủ 3 tháng — lấy mốc nào đến sớm hơn).
+        Sau khi hoàn thành phiếu bảo dưỡng định kỳ, hệ thống cập nhật «lần gần nhất» trên xe
+        và tính «lần tới» theo quy tắc danh mục (ví dụ cứ thêm 10.000 km, hoặc đủ 3 tháng — lấy mốc nào đến sớm hơn).
       </p>
     </section>
 
+    <!-- ========== LỐP ẮC ========== -->
     <section class="panel" id="b6">
-      <h3 class="step">Bước 6 — Vỏ lốp / ắc quy (hiển thị từ PWMS · cảnh báo · đẩy dự toán)</h3>
-      <p class="sub">TMS không giữ sổ riêng ghi ngược. Dữ liệu đồng bộ PWMS → TMS làm nguồn nội bộ; chỗ chọn VT có nút Đồng bộ khi cần.</p>
+      <h3 class="step">Bước — Vỏ lốp / ắc quy</h3>
+      <p class="sub">Màn liên quan: Vỏ lốp / ắc quy; cảnh báo cũng hiện trên Nhắc bảo dưỡng và Đánh giá.</p>
       <div class="diagram">
         <pre class="mermaid">
 flowchart TD
-  A[PWMS / mua hàng<br/>danh mục · seri · giá] -->|API đồng bộ| B[Bản nội bộ trên TMS<br/>màn Vỏ lốp / ắc quy]
+  A[Mua hàng / kho<br/>danh mục · seri · giá] -->|Đồng bộ| B[Hiển thị trên Quản lý xe<br/>màn Vỏ lốp / ắc quy]
   B --> C[Định mức kép<br/>km tối đa + số tháng]
-  C --> D{Chạm ngưỡng<br/>hoặc độ mòn?}
-  D -->|Có| E[Danh sách cảnh báo<br/>tích chọn]
+  C --> D{Chạm ngưỡng?}
+  D -->|Có| E[Cảnh báo · tích chọn]
   E --> F[Đẩy vào dự toán thay]
-  F --> G[Tạo phiếu thay lốp / ắc]
-  G --> H[KTV ghi thay / vị trí / mòn]
-  H -->|API vòng đời| I[Cập nhật lại sổ mua hàng]
+  F --> G[Tạo phiếu thay]
+  G --> H[Ghi nhận thay / vị trí / mòn]
+  H --> I[Đồng bộ vòng đời<br/>lại mua hàng]
   D -->|Chưa| B
         </pre>
       </div>
       <div class="cards two">
         <div class="box b">
-          <strong>Đồng bộ PWMS → TMS (khi nào)</strong>
-          Lần đầu / định kỳ / khi bấm «Đồng bộ» ở màn lốp–ắc hoặc form chọn VT.
-          Chỉ <em>hiển thị</em> seri, xe gắn, vị trí, km/tháng — không nhập sổ lệch PWMS.
+          <strong>Từ mua hàng sang Quản lý xe</strong>
+          Đồng bộ để xem seri, xe gắn, vị trí, định mức — không nhập sổ lệch với kho.
         </div>
         <div class="box y">
-          <strong>Đồng bộ ngược TMS → mua hàng (khi nào)</strong>
-          Sau khi phiếu đánh giá hoặc phiếu SC có thay / cập nhật hao mòn / đổi vị trí lốp–ắc:
-          bấm «Đồng bộ vòng đời → mua hàng» (hoặc tự đẩy khi hoàn thành phiếu — chốt kỹ thuật với MH).
+          <strong>Từ Quản lý xe về mua hàng</strong>
+          Sau phiếu đánh giá hoặc sửa chữa có thay / cập nhật hao mòn lốp–ắc: đẩy vòng đời lại mua hàng.
         </div>
       </div>
     </section>
 
+    <!-- ========== GIỜ KTV ========== -->
     <section class="panel" id="b7">
-      <h3 class="step">Bước 7 — Giờ sửa chữa kỹ thuật viên (báo cáo + barem)</h3>
-      <p class="sub">Khớp phân hệ Quản lý xe: không phải trang «lịch» riêng — lịch nằm trong màn giờ KTV cá nhân.</p>
+      <h3 class="step">Bước — Giờ sửa chữa kỹ thuật viên</h3>
+      <p class="sub">Màn liên quan: Cài đặt giờ chuẩn, Bảng tổng hợp giờ theo kỹ thuật viên, Bảng giờ kỹ thuật viên (lịch tháng).</p>
       <div class="diagram">
         <pre class="mermaid">
 flowchart TD
   A[Hạng mục hoàn thành<br/>bắt đầu → kết thúc] --> B[Giờ thực tế tự tính]
-  C[Cài đặt giờ sửa chữa KTV<br/>catalog barem theo hệ thống + nội dung] --> D[Giờ barem theo hạng mục]
-  B --> E[Bảng tổng hợp giờ SC theo KTV<br/>heatmap KTV × ngày]
+  C[Cài đặt giờ chuẩn<br/>theo hệ thống + nội dung] --> D[Giờ chuẩn theo hạng mục]
+  B --> E[Bảng tổng hợp<br/>theo kỹ thuật viên × ngày]
   D --> E
-  B --> F[Bảng giờ sửa chữa Kỹ Thuật Viên<br/>tab Lịch tháng + bảng theo ngày]
+  B --> F[Bảng giờ cá nhân<br/>lịch tháng + bảng theo ngày]
   D --> F
-  E --> G[KPI: giờ thực tế · vượt barem · số phiếu]
-  F --> H[Tổng thực tế / barem · màu ≤ / &gt; barem]
         </pre>
       </div>
       <div class="cards two">
         <div class="box g">
-          <strong>Bảng tổng hợp (quản lý)</strong>
-          Lọc tháng / KTV / trạng thái · 3 KPI · tab heatmap năng suất theo KTV · tab bảng theo ngày (cột giờ barem, thực tế, vượt, chờ VT…).
+          <strong>Quản lý xem tổng hợp</strong>
+          Lọc tháng / người / trạng thái. So giờ thực tế với giờ chuẩn, số phiếu.
         </div>
         <div class="box y">
-          <strong>Bảng giờ KTV (cá nhân)</strong>
-          Tab «Lịch giờ sửa chữa tháng» (màu: không DL / chưa HT / ≤ barem / &gt; barem) · tab bảng theo ngày. Cài đặt barem bắt buộc có trước khi đối chiếu.
+          <strong>Kỹ thuật viên xem lịch tháng</strong>
+          Màu theo mức giờ so với chuẩn. Có bảng chi tiết theo ngày.
         </div>
       </div>
     </section>
 
     <footer>
-      <span>GLS · Quy trình bảo dưỡng / sửa chữa · dành cho quản lý &amp; kỹ thuật</span>
+      <span>GLS · Quy trình bảo dưỡng / sửa chữa · dành cho xác nhận nghiệp vụ</span>
       <div class="foot-nav">
         <a href="index.html">Về trang demo</a>
         <a href="console.html">Mở màn hình thử</a>
