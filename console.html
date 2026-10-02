@@ -8512,6 +8512,44 @@ function pushCatalogsToPlan(rows) {
   else toast('Chưa chọn dòng hợp lệ');
 }
 
+/** Trạng thái đến hạn danh mục trên xe (normal | dueSoon | overdue). */
+function catalogDueOnVehicle(vid, cid) {
+  const v = vehicleById(vid);
+  const c = catById(cid);
+  if (!v || !c) return { status: 'normal', kmLeft: null };
+  const st = getCatState(vid, cid);
+  let nextKm = st.nextKm, nextDate = st.nextDate;
+  if (nextKm == null && nextDate == null) {
+    const comp = computeNextFromRules(c, st, v.km, v.hours || 0);
+    nextKm = comp.nextKm; nextDate = comp.nextDate;
+  }
+  const kmLeft = nextKm != null ? nextKm - v.km : null;
+  let status = 'normal';
+  if (kmLeft != null && kmLeft <= 0) status = 'overdue';
+  else if (kmLeft != null && kmLeft <= DB.settings.maintenanceRemindKmBefore) status = 'dueSoon';
+  return { status, kmLeft, nextKm, nextDate, cat: c, vehicle: v };
+}
+
+/** Tất cả cặp xe+danh mục sắp/quá hạn (đã gắn). */
+function collectDueCatalogPlanRows(note, source) {
+  ensureVehicleCatalogAssign();
+  const out = [];
+  (DB.vehicles || []).forEach(v => {
+    vehicleAssignedCatalogIds(v.id).forEach(cid => {
+      const d = catalogDueOnVehicle(v.id, cid);
+      if (d.status === 'overdue' || d.status === 'dueSoon') {
+        out.push({
+          vehicleId: v.id,
+          catalogId: Number(cid),
+          source: source || 'REMINDER',
+          note: note || 'Từ nhắc hạn (sắp/quá hạn)',
+        });
+      }
+    });
+  });
+  return out;
+}
+
 
 /* ----- VEHICLE DETAIL ----- */
 function pageVehicle() {
@@ -8749,12 +8787,12 @@ function renderVehicleCatalog(v) {
   });
   const tireAlerts = tireBatteryAlertsForVehicle(v);
   return `
-  <p class="mb-3 text-sm text-slate-600">Gắn <strong>danh mục bảo dưỡng</strong> vào xe này (hoặc áp hàng loạt). Chỉ danh mục đã gắn mới theo dõi mốc / nhắc hạn / tạo kế hoạch từ xe.</p>
+  <p class="mb-3 text-sm text-slate-600">Gắn <strong>danh mục bảo dưỡng</strong> vào xe này. Chỉ danh mục đã gắn mới theo dõi mốc / nhắc hạn / tạo kế hoạch từ xe. Áp hàng loạt nhiều xe: dùng màn <em>Danh mục bảo dưỡng</em> (popup chọn xe). Bỏ gắn trên từng dòng có xác nhận.</p>
   ${tireAlertBannerHtml(tireAlerts)}
   <div class="mb-3 flex flex-wrap gap-2">
-    <button type="button" id="btnAssignCatalogs" class="btn btn-outline btn-sm">+ Gắn / bỏ gắn danh mục</button>
-    <button type="button" id="btnBulkAssignCatalogs" class="btn btn-outline btn-sm">Áp danh mục hàng loạt cho nhiều xe</button>
-    <button type="button" id="btnCreatePlanFromVehicleCats" class="btn btn-primary btn-sm">Tạo kế hoạch từ danh mục đã chọn</button>
+    <button type="button" id="btnAssignCatalogs" class="btn btn-outline btn-sm">+ Gắn danh mục</button>
+    <button type="button" id="btnCreatePlanFromDueCats" class="btn btn-primary btn-sm">Tạo kế hoạch từ danh mục sắp/đã đến hạn</button>
+    <button type="button" id="btnCreatePlanFromVehicleCats" class="btn btn-outline btn-sm">Tạo kế hoạch từ dòng đã chọn</button>
   </div>
   ${filterBarShell([
     filterSearch('flt-search', 'Mã / tên danh mục…', f.search),
@@ -8805,7 +8843,7 @@ function renderVehicleCatalog(v) {
         </div>
         ${preview.length ? `<div class="mt-3 text-xs text-slate-500">LS gần đây: ${preview.map(h => h.code).join(', ')}</div>` : ''}
       </div>`;
-    }).join('') || `<div class="card p-8 text-center text-slate-500">Chưa gắn danh mục nào. Bấm «Gắn / bỏ gắn danh mục» hoặc xem «Tất cả danh mục master».</div>`}
+    }).join('') || `<div class="card p-8 text-center text-slate-500">Chưa gắn danh mục nào. Bấm «Gắn danh mục» hoặc xem «Tất cả danh mục master».</div>`}
   </div>`;
 }
 
@@ -10582,10 +10620,11 @@ function pageReminder() {
   };
   return pageShell(
     'Nhắc bảo dưỡng',
-    'Định mức + lịch sử + km GPS → tích chọn → đẩy dự toán (có thể sửa kỳ) · kế hoạch không duyệt LĐ',
-    `<button type="button" id="btnPushRemindPlan" class="btn btn-primary btn-sm">Tạo kế hoạch từ dòng đã chọn</button>`,
+    'Định mức + lịch sử + km GPS → tạo tất cả kế hoạch sắp/quá hạn, hoặc tích chọn → tạo từ dòng đã chọn · kế hoạch không duyệt LĐ',
+    `<button type="button" id="btnPushRemindPlanAll" class="btn btn-primary btn-sm">Tạo tất cả kế hoạch (sắp/quá hạn)</button>
+     <button type="button" id="btnPushRemindPlan" class="btn btn-outline btn-sm">Tạo kế hoạch từ dòng đã chọn</button>`,
     `
-    <div class="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950">Luồng: định mức hạng mục · lịch sử thay · km GPS → tích chọn → <strong>Tạo kế hoạch</strong>. Cảnh báo <strong>vỏ lốp / ắc quy</strong> xem khối bên dưới (và màn Vỏ lốp / ắc quy).</div>
+    <div class="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950">Luồng: định mức hạng mục · lịch sử thay · km GPS → <strong>Tạo tất cả kế hoạch (sắp/quá hạn)</strong> hoặc tích chọn → <strong>Tạo kế hoạch từ dòng đã chọn</strong>. Cảnh báo <strong>vỏ lốp / ắc quy</strong> xem khối bên dưới (và màn Vỏ lốp / ắc quy).</div>
     ${(() => {
       const allTire = (DB.vehicles || []).flatMap(v => tireBatteryAlertsForVehicle(v).map(a => ({...a, plate: v.plate, vehicleId: v.id})));
       const overdue = allTire.filter(a => a.level === 'overdue').length;
@@ -10643,7 +10682,7 @@ function pageReminder() {
         <tbody>
           ${(pgRem = paginate(filtered)).items.map(({ v, worst }) => `
             <tr class="row-h">
-              <td class="td text-center"><input type="checkbox" class="rem-row" data-vid="${v.id}" data-cid="${worst?.cat?.id||''}" ${worst?.status==='overdue'||worst?.status==='dueSoon'?'checked':''} /></td>
+              <td class="td text-center"><input type="checkbox" class="rem-row" data-vid="${v.id}" data-cid="${worst?.cat?.id||''}" data-due="${worst?.status==='overdue'||worst?.status==='dueSoon'?'1':'0'}" data-status="${worst?.status||''}" ${worst?.status==='overdue'||worst?.status==='dueSoon'?'checked':''} /></td>
               <td class="td"><button data-open-vehicle="${v.id}" class="font-medium text-blue-600 hover:underline">${v.plate}</button> ${vehicleChip(v)}</td>
               <td class="td text-right tabular-nums">${kmFmt(v.km)}</td>
               <td class="td">${worst ? worst.cat.name : '—'}</td>
@@ -10912,7 +10951,7 @@ function pageCatalogMaster() {
   const pg = paginate(filtered);
   return pageShell(
     'Danh mục bảo dưỡng',
-    'Gắn danh mục vào từng xe (tab Danh mục trên chi tiết xe) hoặc áp hàng loạt. Cảnh báo lốp/ắc theo định mức kép khi vật tư thuộc hệ thống Vỏ lốp / Ắc quy. · Mốc chu kỳ (km / giờ vận hành / tháng / năm) · bắt buộc thay · gắn hệ thống xe · tiêu chí đánh giá',
+    'Gắn danh mục vào từng xe (tab Danh mục trên chi tiết xe). Áp hàng loạt: chọn danh mục + chọn nhiều xe trên popup (liệt kê xe như mẫu kế hoạch). Cảnh báo lốp/ắc theo định mức kép.',
     `<button id="btnBulkAssignCatalogs" class="btn btn-outline">Áp danh mục hàng loạt cho xe</button>
      <button id="btnAddCatalog" class="btn btn-primary">+ Danh mục</button>`,
     `
@@ -15162,7 +15201,12 @@ render();
         });
         n++;
       });
-      save(); toast('Đã đẩy ' + n + ' dòng vào dự toán ' + period); view.name = 'plans'; render();
+      save(); toast('Đã đẩy ' + n + ' dòng vào kế hoạch ' + period); view.name = 'plans'; view.plansTab = 'lines'; render();
+    }
+    if (t.id === 'btnPushRemindPlanAll') {
+      const rows = collectDueCatalogPlanRows('Từ nhắc hạn (tạo tất cả sắp/quá hạn)', 'REMINDER');
+      if (!rows.length) { toast('Không có dòng sắp/quá hạn để tạo kế hoạch'); return; }
+      pushCatalogsToPlan(rows);
     }
     if (t.id === 'btnSyncTireBattery') {
       if (typeof enrichAllMaterials === 'function') enrichAllMaterials(true);
@@ -15240,10 +15284,20 @@ render();
       pushCatalogsToPlan(rows);
       return;
     }
+    if (t.id === 'btnCreatePlanFromDueCats') {
+      ensureVehicleCatalogAssign();
+      var vid = view.vehicleId;
+      var dueRows = vehicleAssignedCatalogIds(vid).map(Number).filter(function(cid){
+        var d = catalogDueOnVehicle(vid, cid);
+        return d.status === 'overdue' || d.status === 'dueSoon';
+      }).map(function(cid){
+        return { vehicleId: vid, catalogId: cid, source: 'VEHICLE_CATALOG', note: 'Từ danh mục sắp/đã đến hạn trên xe' };
+      });
+      if (!dueRows.length) { toast('Không có danh mục sắp/đã đến hạn trên xe này'); return; }
+      pushCatalogsToPlan(dueRows);
+      return;
+    }
     if (t.id === 'btnPushTireFromReminder') {
-      if (typeof document.getElementById('btnPushTirePlan') !== 'undefined') {
-        /* reuse tire page logic inline */
-      }
       var period = new Date().toISOString().slice(0,7);
       var mats = (DB.materials||[]).filter(function(m){
         var blob = ((m.name||'')+' '+(m.code||'')).toLowerCase();
@@ -15267,6 +15321,10 @@ render();
     if (tog) {
       var cid = Number(tog.getAttribute('data-toggle-assign-cat'));
       var on = !isCatalogAssignedToVehicle(view.vehicleId, cid);
+      if (!on) {
+        var c = catById(cid);
+        if (!confirm('Bỏ gắn danh mục «' + (c ? (c.code + ' · ' + c.name) : cid) + '» khỏi xe này?')) return;
+      }
       setCatalogAssigned(view.vehicleId, cid, on);
       toast(on ? 'Đã gắn danh mục vào xe' : 'Đã bỏ gắn');
       render();
@@ -15288,62 +15346,117 @@ render();
   });
 })();
 
+/** Popup gắn danh mục: chỉ chọn thêm (đã gắn = disabled, không bỏ tại đây). */
 function openAssignCatalogModal(vid) {
   ensureVehicleCatalogAssign();
   var assigned = new Set(vehicleAssignedCatalogIds(vid).map(Number));
+  var unassigned = (DB.catalog || []).filter(function(c){ return !assigned.has(Number(c.id)); });
   openModal(`<div class="border-b border-slate-200 px-5 py-4"><h2 class="text-lg font-bold">Gắn danh mục bảo dưỡng vào xe</h2>
-    <p class="text-sm text-slate-500">${esc(vehicleById(vid)?.plate || '')} · tích chọn danh mục áp dụng</p></div>
+    <p class="text-sm text-slate-500">${esc(vehicleById(vid)?.plate || '')} · chỉ chọn thêm danh mục mới · bỏ gắn dùng nút «Bỏ gắn» trên danh sách (có xác nhận)</p></div>
     <div class="max-h-80 overflow-y-auto px-5 py-3 space-y-2">
-      ${(DB.catalog||[]).map(c => `<label class="flex items-start gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm">
-        <input type="checkbox" class="assign-cat-cb mt-1" data-cid="${c.id}" ${assigned.has(Number(c.id))?'checked':''} />
+      ${assigned.size ? `<p class="text-xs text-slate-500 mb-2">Đã gắn ${assigned.size} danh mục (không bỏ tại popup này).</p>` : ''}
+      ${unassigned.length ? unassigned.map(c => `<label class="flex items-start gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
+        <input type="checkbox" class="assign-cat-cb mt-1" data-cid="${c.id}" />
         <span><strong>${esc(c.code)}</strong> · ${esc(c.name)}<br/><span class="text-xs text-slate-500">${esc(c.system)}</span></span>
-      </label>`).join('')}
+      </label>`).join('') : `<p class="text-sm text-slate-500 py-6 text-center">Không còn danh mục master nào để gắn thêm.</p>`}
     </div>
     <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
       <button type="button" data-close class="btn btn-outline">Hủy</button>
-      <button type="button" id="btnSaveAssignCats" class="btn btn-primary">Lưu</button>
+      <button type="button" id="btnSaveAssignCats" class="btn btn-primary" ${unassigned.length ? '' : 'disabled'}>Gắn đã chọn</button>
     </div>`, 'max-w-lg');
   document.querySelector('[data-close]').onclick = closeModal;
-  document.getElementById('btnSaveAssignCats').onclick = function(){
-    var ids = [...document.querySelectorAll('.assign-cat-cb:checked')].map(c => Number(c.dataset.cid));
-    DB.vehicleCatalogIds[String(vid)] = ids;
-    save(); closeModal(); toast('Đã cập nhật '+ids.length+' danh mục gắn xe'); render();
+  var saveBtn = document.getElementById('btnSaveAssignCats');
+  if (saveBtn) saveBtn.onclick = function(){
+    var addIds = [...document.querySelectorAll('.assign-cat-cb:checked')].map(function(c){ return Number(c.dataset.cid); });
+    if (!addIds.length) { toast('Chọn ít nhất 1 danh mục để gắn'); return; }
+    var set = new Set(vehicleAssignedCatalogIds(vid).map(Number));
+    addIds.forEach(function(id){ set.add(id); });
+    DB.vehicleCatalogIds[String(vid)] = [...set];
+    save(); closeModal(); toast('Đã gắn thêm '+addIds.length+' danh mục'); render();
   };
 }
 
+/** Áp hàng loạt từ màn Danh mục: chọn danh mục + chọn nhiều xe (popup giống mẫu KH). */
 function openBulkAssignCatalogModal() {
   ensureVehicleCatalogAssign();
-  openModal(`<div class="border-b border-slate-200 px-5 py-4"><h2 class="text-lg font-bold">Áp danh mục bảo dưỡng hàng loạt</h2>
-    <p class="text-sm text-slate-500">Chọn danh mục + nhóm xe (khu vực / tất cả). Gắn thêm (không xóa danh mục đã có).</p></div>
-    <form id="bulkAssignForm" class="space-y-3 px-5 py-4">
-      <label class="block text-sm font-medium">Khu vực xe
-        <select name="area" class="mt-1 w-full rounded border px-2 py-1.5">
-          <option value="ALL">Tất cả khu vực</option>
-          ${areas().map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('')}
-        </select>
-      </label>
-      <div class="max-h-56 overflow-y-auto space-y-1 rounded border border-slate-200 p-2">
-        ${(DB.catalog||[]).map(c => `<label class="flex gap-2 text-sm"><input type="checkbox" name="cid" value="${c.id}" /><span>${esc(c.code)} · ${esc(c.name)}</span></label>`).join('')}
-      </div>
-      <div class="flex justify-end gap-2 pt-2">
-        <button type="button" data-close class="btn btn-outline">Hủy</button>
-        <button class="btn btn-primary">Áp dụng</button>
-      </div>
-    </form>`, 'max-w-lg');
-  document.querySelector('[data-close]').onclick = closeModal;
-  document.getElementById('bulkAssignForm').onsubmit = function(ev){
-    ev.preventDefault();
-    var fd = new FormData(ev.target);
-    var area = fd.get('area');
-    var cids = fd.getAll('cid').map(Number);
-    if (!cids.length) { toast('Chọn ít nhất 1 danh mục'); return; }
-    var vs = (DB.vehicles||[]).filter(v => area==='ALL' || v.area===area);
-    vs.forEach(v => {
-      var set = new Set(vehicleAssignedCatalogIds(v.id).map(Number));
-      cids.forEach(id => set.add(id));
-      DB.vehicleCatalogIds[String(v.id)] = [...set];
+  var selectedVeh = new Set();
+  var selectedCat = new Set();
+  var branch = 'ALL';
+  var q = '';
+  var renderVehList = function(){
+    var list = vehiclesInBranch(branch, q);
+    var box = document.getElementById('bulkVehList');
+    var cnt = document.getElementById('bulkVehCount');
+    if (!box) return;
+    box.innerHTML = list.map(function(v){
+      var checked = selectedVeh.has(v.id);
+      return `<label class="flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-slate-50 cursor-pointer border-b border-slate-100">
+        <input type="checkbox" class="bulk-pick-veh" value="${v.id}" ${checked?'checked':''} />
+        <span class="font-medium text-slate-900">${esc(v.plate)}</span>
+        <span class="text-slate-500 flex-1">${esc(v.type)} · ${esc(v.brand)} ${esc(v.model)} · ${esc(v.area)}</span>
+      </label>`;
+    }).join('') || `<div class="px-3 py-8 text-center text-slate-400 text-sm">Không có xe khớp</div>`;
+    if (cnt) cnt.textContent = list.length + ' xe · đã chọn ' + selectedVeh.size;
+    document.querySelectorAll('.bulk-pick-veh').forEach(function(el){
+      el.onchange = function(){
+        var id = Number(el.value);
+        if (el.checked) selectedVeh.add(id); else selectedVeh.delete(id);
+        if (cnt) cnt.textContent = list.length + ' xe · đã chọn ' + selectedVeh.size;
+      };
     });
-    save(); closeModal(); toast('Đã gắn '+cids.length+' danh mục cho '+vs.length+' xe'); render();
+  };
+  openModal(`<div class="border-b border-slate-200 px-5 py-4">
+      <h2 class="text-lg font-bold">Áp danh mục bảo dưỡng hàng loạt</h2>
+      <p class="text-sm text-slate-600">Chọn danh mục cần gắn · chọn nhiều xe (giống mẫu kế hoạch) · chỉ <strong>gắn thêm</strong>, không bỏ gắn</p>
+    </div>
+    <div class="grid gap-4 px-5 py-4 md:grid-cols-2">
+      <div>
+        <p class="mb-2 text-sm font-medium text-slate-700">Danh mục</p>
+        <div id="bulkCatList" class="max-h-72 overflow-auto rounded-md border border-slate-200 p-2 space-y-1">
+          ${(DB.catalog||[]).map(c => `<label class="flex gap-2 text-sm px-2 py-1.5 rounded hover:bg-slate-50 cursor-pointer">
+            <input type="checkbox" class="bulk-pick-cat" value="${c.id}" />
+            <span><span class="font-mono text-xs">${esc(c.code)}</span> · ${esc(c.name)}</span>
+          </label>`).join('')}
+        </div>
+      </div>
+      <div>
+        <p class="mb-2 text-sm font-medium text-slate-700">Xe áp dụng</p>
+        <div class="mb-2 flex flex-wrap gap-2">
+          <select id="bulkVehBranch" class="rounded border px-2 py-1.5 text-sm">
+            <option value="ALL">Tất cả chi nhánh</option>
+            ${areas().map(a => `<option value="${esc(a)}">${esc(a)}</option>`).join('')}
+          </select>
+          <input id="bulkVehSearch" type="search" class="form-control flex-1 min-w-[140px]" placeholder="Tìm biển số, loại, hãng…" />
+        </div>
+        <p class="text-xs text-slate-500 mb-1" id="bulkVehCount">—</p>
+        <div id="bulkVehList" class="max-h-64 overflow-auto rounded-md border border-slate-200"></div>
+      </div>
+    </div>
+    <div class="flex justify-end gap-2 border-t border-slate-200 px-5 py-3">
+      <button type="button" data-close class="btn btn-outline">Hủy</button>
+      <button type="button" id="btnBulkAssignConfirm" class="btn btn-primary">Gắn vào xe đã chọn</button>
+    </div>`, 'max-w-4xl');
+  document.querySelector('[data-close]').onclick = closeModal;
+  document.querySelectorAll('.bulk-pick-cat').forEach(function(el){
+    el.onchange = function(){
+      var id = Number(el.value);
+      if (el.checked) selectedCat.add(id); else selectedCat.delete(id);
+    };
+  });
+  document.getElementById('bulkVehBranch').onchange = function(){ branch = this.value; renderVehList(); };
+  document.getElementById('bulkVehSearch').oninput = function(){ q = this.value; renderVehList(); };
+  renderVehList();
+  document.getElementById('btnBulkAssignConfirm').onclick = function(){
+    if (!selectedCat.size) { toast('Chọn ít nhất 1 danh mục'); return; }
+    if (!selectedVeh.size) { toast('Chọn ít nhất 1 xe'); return; }
+    selectedVeh.forEach(function(vid){
+      var set = new Set(vehicleAssignedCatalogIds(vid).map(Number));
+      selectedCat.forEach(function(cid){ set.add(cid); });
+      DB.vehicleCatalogIds[String(vid)] = [...set];
+    });
+    save(); closeModal();
+    toast('Đã gắn '+selectedCat.size+' danh mục cho '+selectedVeh.size+' xe');
+    render();
   };
 }
 </script>
