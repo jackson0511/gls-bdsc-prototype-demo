@@ -254,7 +254,7 @@
   <div id="toast" class="pointer-events-none fixed bottom-6 right-6 z-[60] hidden rounded-md bg-slate-900 px-4 py-2.5 text-sm text-white shadow-lg"></div>
 
 <script>
-const STORAGE_KEY = 'fleet-bdsc-proto-v28';
+const STORAGE_KEY = 'fleet-bdsc-proto-v29';
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const money = (n) => (n == null ? '—' : Number(n).toLocaleString('vi-VN') + ' ₫');
@@ -6504,7 +6504,143 @@ const DEFAULT = {
       },
     },
   },
+  /* Lịch sử phiếu ĐG (nhiều kỳ / xe) — tab Đánh giá trên xe */
+  evaluationHistory: [
+    {
+      id: 'ev-101-20260920', vehicleId: 101, date: '2026-09-20', status: 'SUBMITTED', note: 'Xe ổn định',
+      inspector: 'Nguyễn Văn Kỹ thuật', dateStart: '2026-09-01', dateEnd: '2026-09-30',
+      periodExempt: false, periodExemptReason: '', postEvalAction: 'later',
+      goodCount: 17, failCount: 0, linkedOrderIds: [], linkedPlanIds: [],
+      identity: {
+        inspectionDate: '2026-09-20', vehicleNumber: '51C-29273', chassisNumber: 'RLHBR90S0K1234567',
+        engineNumber: 'D13K460-112233', operatingKm: '1158402', trailerNumber: '51R-338.21',
+        driverName: 'Nguyễn Văn Tài', driverPhone: '0901 234 567', drivingLicense: 'B2 · 790123456789',
+        tractorDocuments: 'Đăng kiểm đến 12/2026', trailerDocuments: 'Đăng kiểm đến 08/2026',
+        civilLiabilityInsurance: 'TNDS · hạn 03/2027',
+      },
+      conclusion: { replacementRequest: '', mechanicManagerRemedies: '', driverRemedies: 'Vệ sinh cabin trước chuyến', driverOpinion: 'Xe vận hành ổn' },
+      items: { c1: 'ok', c2: 'ok', c3: 'ok', c4: 'ok', c5: 'ok', c6: 'ok', c7: 'ok', c8: 'ok', c9: 'ok', c10: 'ok', c11: 'ok', c12: 'ok', c13: 'ok', c14: 'ok', c15: 'ok', c16: 'ok', c17: 'ok' },
+      itemNotes: {}, details: {},
+    },
+    {
+      id: 'ev-101-20260823', vehicleId: 101, date: '2026-08-23', status: 'SUBMITTED', note: 'SC nhẹ hệ thống điện',
+      inspector: 'Trần KTV', dateStart: '2026-08-01', dateEnd: '2026-08-31',
+      periodExempt: false, periodExemptReason: '', postEvalAction: 'sc',
+      goodCount: 15, failCount: 1, linkedOrderIds: ['o2'], linkedPlanIds: [],
+      identity: {
+        inspectionDate: '2026-08-23', vehicleNumber: '51C-29273', chassisNumber: 'RLHBR90S0K1234567',
+        engineNumber: 'D13K460-112233', operatingKm: '1149200', trailerNumber: '51R-338.21',
+        driverName: 'Nguyễn Văn Tài', driverPhone: '0901 234 567', drivingLicense: 'B2',
+        tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
+      },
+      conclusion: { replacementRequest: 'Cảm biến', mechanicManagerRemedies: 'Thay cảm biến nguồn', driverRemedies: '', driverOpinion: 'Đèn báo điện' },
+      items: { c1: 'ok', c2: 'ok', c8: 'ok', c9: 'ok', c11: 'ok', c14: 'ok', c16: 'replace' },
+      itemNotes: { c16: 'Cực ắc / cảm biến yếu' },
+      details: { c16: { repairs: [], materials: [{ id: 'm1', code: 'VTU-342-1000002', name: 'Ắc Bi Nhê', qty: 1, uom: 'Cái' }] } },
+    },
+    {
+      id: 'ev-101-20260719', vehicleId: 101, date: '2026-07-19', status: 'SUBMITTED', note: 'Tất cả hạng mục tốt',
+      inspector: 'Phạm KTV', dateStart: '2026-07-01', dateEnd: '2026-07-31',
+      periodExempt: false, periodExemptReason: '', postEvalAction: 'later',
+      goodCount: 17, failCount: 0, linkedOrderIds: [], linkedPlanIds: [],
+      identity: {
+        inspectionDate: '2026-07-19', vehicleNumber: '51C-29273', chassisNumber: 'RLHBR90S0K1234567',
+        engineNumber: 'D13K460-112233', operatingKm: '1135000', trailerNumber: '51R-338.21',
+        driverName: 'Nguyễn Văn Tài', driverPhone: '0901 234 567', drivingLicense: 'B2',
+        tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
+      },
+      conclusion: { replacementRequest: '', mechanicManagerRemedies: '', driverRemedies: '', driverOpinion: 'Ổn' },
+      items: { c1: 'ok', c2: 'ok', c3: 'ok', c4: 'ok', c5: 'ok', c6: 'ok', c7: 'ok', c8: 'ok', c9: 'ok', c10: 'ok', c11: 'ok', c12: 'ok', c13: 'ok', c14: 'ok', c15: 'ok', c16: 'ok', c17: 'ok' },
+      itemNotes: {}, details: {},
+    },
+    {
+      id: 'ev-102-20260922', vehicleId: 102, date: '2026-09-22', status: 'SUBMITTED', note: 'Có SC phanh · đề xuất đưa kế hoạch tháng',
+      inspector: 'Trần KTV', dateStart: '2026-09-01', dateEnd: '2026-09-30',
+      periodExempt: false, periodExemptReason: '', postEvalAction: 'plan',
+      goodCount: 14, failCount: 2, linkedOrderIds: [], linkedPlanIds: ['p-eval-102a', 'p-eval-102b'],
+      identity: {
+        inspectionDate: '2026-09-22', vehicleNumber: '50H-87033', chassisNumber: '—',
+        engineNumber: '—', operatingKm: '1710613', trailerNumber: '',
+        driverName: 'Lê Tài', driverPhone: '0902 111 222', drivingLicense: 'B2',
+        tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
+      },
+      conclusion: { replacementRequest: '', mechanicManagerRemedies: 'Lên kế hoạch tán bố thắng', driverRemedies: '', driverOpinion: 'Phanh hơi yếu' },
+      items: { c1: 'ok', c8: 'ok', c9: 'repair', c11: 'ok', c14: 'ok', c16: 'repair' },
+      itemNotes: { c9: 'Bố thắng mòn', c16: 'Cực ắc quy oxy hóa' },
+      details: {
+        c9: { repairs: [{ id: 'ri1', name: 'Tán Bố Thắng Mooc', system: 'Nhân Công Sửa Chữa' }], materials: [] },
+        c16: { repairs: [{ id: 'ri5', name: 'Công kiểm tra', system: 'Hệ Thống Máy Xe' }], materials: [] },
+      },
+    },
+    {
+      id: 'ev-103-20260921', vehicleId: 103, date: '2026-09-21', status: 'SUBMITTED', note: 'Đánh giá định kỳ tháng 9',
+      inspector: 'Nguyễn Văn Kỹ thuật', dateStart: '2026-09-01', dateEnd: '2026-09-30',
+      periodExempt: false, periodExemptReason: '', postEvalAction: 'later',
+      goodCount: 16, failCount: 0, linkedOrderIds: [], linkedPlanIds: [],
+      identity: {
+        inspectionDate: '2026-09-21', vehicleNumber: '51C-41767', chassisNumber: '—',
+        engineNumber: '—', operatingKm: '1305486', trailerNumber: '',
+        driverName: 'Trần Minh', driverPhone: '0901 234 567', drivingLicense: 'B2',
+        tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
+      },
+      conclusion: { replacementRequest: '', mechanicManagerRemedies: '', driverRemedies: '', driverOpinion: 'Xe ổn' },
+      items: { c1: 'ok', c2: 'ok', c8: 'ok', c9: 'ok', c11: 'ok', c14: 'ok', c16: 'ok' },
+      itemNotes: {}, details: {},
+    },
+    {
+      id: 'ev-103-20260817', vehicleId: 103, date: '2026-08-17', status: 'SUBMITTED', note: 'SC phát sinh · kiểm tra tình trạng xe',
+      inspector: 'Vũ KTV', dateStart: '2026-08-01', dateEnd: '2026-08-31',
+      periodExempt: false, periodExemptReason: '', postEvalAction: 'sc',
+      goodCount: 14, failCount: 1, linkedOrderIds: ['o7'], linkedPlanIds: [],
+      identity: {
+        inspectionDate: '2026-08-17', vehicleNumber: '51C-41767', chassisNumber: '—',
+        engineNumber: '—', operatingKm: '1298000', trailerNumber: '',
+        driverName: 'Trần Minh', driverPhone: '0901 234 567', drivingLicense: 'B2',
+        tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
+      },
+      conclusion: { replacementRequest: '', mechanicManagerRemedies: 'Kiểm tra tổng quát đầu kéo + mooc', driverRemedies: '', driverOpinion: 'Có tiếng kêu' },
+      items: { c1: 'ok', c2: 'ok', c8: 'ok', c9: 'ok', c11: 'repair', c14: 'ok', c16: 'ok' },
+      itemNotes: { c11: 'Cần kiểm tra tổng quát' },
+      details: { c11: { repairs: [{ id: 'ri5', name: 'Công kiểm tra', system: 'Hệ Thống Máy Xe' }], materials: [] } },
+    },
+    {
+      id: 'ev-105-20260922', vehicleId: 105, date: '2026-09-22', status: 'SUBMITTED', note: 'Ắc quy yếu · tạo phiếu SC ngay',
+      inspector: 'Phạm KTV', dateStart: '2026-09-01', dateEnd: '2026-09-30',
+      periodExempt: false, periodExemptReason: '', postEvalAction: 'sc',
+      goodCount: 15, failCount: 1, linkedOrderIds: ['o23'], linkedPlanIds: [],
+      identity: {
+        inspectionDate: '2026-09-22', vehicleNumber: '50H-69138', chassisNumber: '—',
+        engineNumber: '—', operatingKm: '54538', trailerNumber: '',
+        driverName: 'Ngô Tài', driverPhone: '0903 333 444', drivingLicense: 'B2',
+        tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
+      },
+      conclusion: { replacementRequest: 'Ắc quy', mechanicManagerRemedies: 'Thay ắc ngay', driverRemedies: '', driverOpinion: 'Khó đề' },
+      items: { c1: 'ok', c8: 'ok', c9: 'ok', c11: 'ok', c14: 'ok', c16: 'replace' },
+      itemNotes: { c16: 'Ắc yếu' },
+      details: { c16: { repairs: [], materials: [{ id: 'm1', code: 'VTU-342-1000002', name: 'Ắc Bi Nhê', qty: 1, uom: 'Cái', price: 1850000 }] } },
+    },
+    {
+      id: 'ev-110-20260925', vehicleId: 110, date: '2026-09-25', status: 'SUBMITTED', note: 'Có hạng mục lỗi · chỉ nộp, tạo phiếu sau',
+      inspector: 'Vũ KTV', dateStart: '2026-09-01', dateEnd: '2026-09-30',
+      periodExempt: false, periodExemptReason: '', postEvalAction: 'later',
+      goodCount: 13, failCount: 2, linkedOrderIds: [], linkedPlanIds: [],
+      identity: {
+        inspectionDate: '2026-09-25', vehicleNumber: '50E-65517', chassisNumber: '—',
+        engineNumber: '—', operatingKm: '121090', trailerNumber: '',
+        driverName: 'Đỗ Tài', driverPhone: '0904 555 666', drivingLicense: 'B2',
+        tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
+      },
+      conclusion: { replacementRequest: '', mechanicManagerRemedies: 'Cần tạo phiếu SC sau', driverRemedies: '', driverOpinion: 'Đèn báo động cơ' },
+      items: { c5: 'ok', c11: 'repair', c13: 'repair' },
+      itemNotes: { c11: 'Rò dầu nhẹ', c13: 'Tiếng kêu bất thường' },
+      details: {
+        c11: { repairs: [{ id: 'ri5', name: 'Công kiểm tra', system: 'Hệ Thống Máy Xe' }], materials: [] },
+        c13: { repairs: [{ id: 'ri5', name: 'Công kiểm tra', system: 'Hệ Thống Máy Xe' }], materials: [] },
+      },
+    },
+  ],
 };
+
 
 function defaultFilters() {
   return {
@@ -7206,6 +7342,7 @@ function load() {
         },
         pwmsVehicleMaps: Array.isArray(parsed.pwmsVehicleMaps) ? parsed.pwmsVehicleMaps : structuredClone(DEFAULT.pwmsVehicleMaps || []),
         pwmsValueHistory: Array.isArray(parsed.pwmsValueHistory) ? parsed.pwmsValueHistory : [],
+        evaluationHistory: Array.isArray(parsed.evaluationHistory) ? parsed.evaluationHistory : structuredClone(DEFAULT.evaluationHistory || []),
         repairItems: parsed.repairItems?.length ? parsed.repairItems : structuredClone(DEFAULT_REPAIR_ITEMS),
         materials: parsed.materials?.length ? parsed.materials : structuredClone(DEFAULT_MATERIALS),
         vehicleSystems: parsed.vehicleSystems?.length ? parsed.vehicleSystems : structuredClone(DEFAULT_VEHICLE_SYSTEMS),
@@ -7236,6 +7373,7 @@ function save() { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }
 let DB = load();
 (DB.planTemplates || []).forEach(t => normalizePlanTemplate(t));
 ensurePwmsVehicleMaps();
+// evaluationHistory ensured after helper defs (see ensureEvaluationHistoryBoot)
 let view = {
   name: 'history', histTab: 'vehicles', vehicleId: null, vehicleTab: 'catalog',
   plansTab: 'lines', templateId: null,
@@ -8607,68 +8745,89 @@ function renderVehicleAssessment(v) {
     : enf === 'overdue' ? 'bg-amber-50 border-amber-200 text-amber-950'
     : enf === 'upcoming' ? 'bg-orange-50 border-orange-200 text-orange-950'
     : 'bg-emerald-50 border-emerald-200 text-emerald-900';
-  const fail = evalFailCount(ev);
-  const good = evalGoodCount(ev);
-  const orders = submitted ? ordersLinkedToEval(ev, v.id) : [];
-  const plans = submitted ? plansLinkedToEval(ev, v.id) : [];
+  const history = evaluationsOfVehicle(v.id);
   const tireAlerts = tireBatteryAlertsForVehicle(v);
   const periodLabel = typeof formatEvalPeriodRange === 'function' ? formatEvalPeriodRange(v, ev) : (ev?.dateStart && ev?.dateEnd ? `${ev.dateStart} → ${ev.dateEnd}` : '—');
   return `
-  <p class="mb-3 text-sm text-slate-600">Đánh giá phương tiện định kỳ trên xe này · tạo / xem lại phiếu ĐG · liên kết kế hoạch &amp; phiếu SC phát sinh.</p>
+  <p class="mb-3 text-sm text-slate-600">Lịch sử phiếu đánh giá định kỳ của <strong>${esc(v.plate)}</strong> — xem đầy đủ hạng mục như phiếu ĐG; mỗi lần gắn phiếu BD/SC phát sinh.</p>
   ${tireAlertBannerHtml(tireAlerts)}
   <div class="mb-4 rounded-md border px-4 py-3 text-sm ${enfCls}">
     <div class="flex flex-wrap items-center gap-2">
-      <strong>Cảnh báo ĐG:</strong> ${enfLabel}
+      <strong>Cảnh báo ĐG kỳ hiện tại:</strong> ${enfLabel}
       ${evalBadge(v.evalStatus)}
       <span class="text-xs opacity-80 ml-auto">Kỳ: ${esc(periodLabel)}</span>
     </div>
   </div>
   <div class="mb-4 flex flex-wrap gap-2">
-    <button type="button" data-eval="${v.id}" class="btn btn-primary btn-sm">${submitted ? 'Đánh giá lại / mở phiếu' : '+ Tạo phiếu đánh giá'}</button>
+    <button type="button" data-eval="${v.id}" class="btn btn-primary btn-sm">${submitted ? 'Đánh giá lại / mở phiếu mới' : '+ Tạo phiếu đánh giá'}</button>
     <button type="button" data-nav="assessment" class="btn btn-outline btn-sm">Danh sách ĐG đội xe</button>
   </div>
-  <div class="card overflow-hidden mb-4">
-    <div class="border-b border-slate-200 px-5 py-3"><h2 class="text-sm font-semibold text-slate-900 m-0">Phiếu đánh giá gần nhất</h2></div>
-    ${submitted ? `
-    <div class="p-5 grid gap-3 sm:grid-cols-2 text-sm">
-      <div><div class="text-xs text-slate-500">Ngày nộp</div><div class="font-medium">${esc(ev.date || '—')}</div></div>
-      <div><div class="text-xs text-slate-500">Kỹ thuật viên</div><div class="font-medium">${esc(ev.inspector || '—')}</div></div>
-      <div><div class="text-xs text-slate-500">Hạng mục đạt / lỗi</div><div class="font-medium tabular-nums">${good} đạt · <span class="text-rose-700">${fail} lỗi</span></div></div>
-      <div><div class="text-xs text-slate-500">Sau ĐG</div><div class="font-medium">${ev.postEvalAction === 'plan' ? 'Tạo kế hoạch' : ev.postEvalAction === 'sc' ? 'Tạo phiếu SC' : 'Để sau'}</div></div>
-      <div class="sm:col-span-2"><div class="text-xs text-slate-500">Ghi chú</div><div class="font-medium">${esc(ev.note || '—')}</div></div>
+  <div class="card overflow-hidden">
+    <div class="border-b border-slate-200 px-5 py-3 flex items-center justify-between gap-2">
+      <h2 class="text-sm font-semibold text-slate-900 m-0">Lịch sử đánh giá</h2>
+      <span class="text-xs text-slate-500">${history.length} phiếu</span>
+    </div>
+    ${history.length ? `
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600"><tr>
+          <th class="th text-left">Ngày ĐG</th>
+          <th class="th text-left">Kỳ</th>
+          <th class="th text-left">KTV</th>
+          <th class="th text-center">Kết quả hạng mục</th>
+          <th class="th text-left">Phiếu BD/SC liên kết</th>
+          <th class="th text-left">Kế hoạch</th>
+          <th class="th text-right">Thao tác</th>
+        </tr></thead>
+        <tbody>
+          ${history.map(h => {
+            const good = evalGoodCount(h);
+            const fail = evalFailCount(h);
+            const orders = ordersLinkedToEval(h, v.id);
+            const plans = plansLinkedToEval(h, v.id);
+            const ky = (h.dateStart && h.dateEnd) ? `${h.dateStart} → ${h.dateEnd}` : (h.date || '—');
+            return `<tr class="row-h align-top">
+              <td class="td whitespace-nowrap font-medium">${esc(h.date || '—')}</td>
+              <td class="td text-xs text-slate-600">${esc(ky)}</td>
+              <td class="td">${esc(h.inspector || '—')}</td>
+              <td class="td text-center tabular-nums">
+                <span class="text-emerald-700">${good} Tốt</span>
+                ${fail ? ` · <span class="text-rose-700">${fail} SC/Thay</span>` : ''}
+                ${h.periodExempt ? ' · <span class="chip bg-slate-100">Miễn kỳ</span>' : ''}
+              </td>
+              <td class="td">
+                ${orders.length ? orders.map(o =>
+                  `<button type="button" data-open-order="${o.id}" class="block text-left text-xs font-medium text-blue-600 hover:underline mb-0.5">${esc(o.code)} · ${o.type === 'PERIODIC' ? 'BD' : 'SC'}</button>`
+                ).join('') : '<span class="text-xs text-slate-400">—</span>'}
+              </td>
+              <td class="td">
+                ${plans.length ? plans.map(p =>
+                  `<div class="text-xs text-slate-700 mb-0.5"><span class="font-medium text-violet-700">${esc(p.code || 'KH')}</span> · ${esc(p.service || p.note || '')}</div>`
+                ).join('') : '<span class="text-xs text-slate-400">—</span>'}
+              </td>
+              <td class="td text-right whitespace-nowrap">
+                <button type="button" data-view-eval="${esc(h.id)}" class="btn btn-outline btn-sm">Xem phiếu ĐG</button>
+              </td>
+            </tr>
+            <tr class="border-b border-slate-100">
+              <td colspan="7" class="px-4 pb-3 pt-0">
+                <div class="rounded-md border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
+                  <span class="font-medium text-slate-700">Ghi chú:</span> ${esc(h.note || '—')}
+                  ${fail ? ` · Hạng mục lỗi: ${Object.entries(h.items || {}).filter(([,a]) => a === 'repair' || a === 'replace').map(([id,a]) => {
+                    const it = allEvalItemsFlat().find(x => x.id === id);
+                    return (it?.label || id) + ' (' + (a === 'repair' ? 'SC' : 'Thay') + ')';
+                  }).join(', ')}` : ''}
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
     </div>` : `
-    <div class="px-5 py-10 text-center text-sm text-slate-500">Chưa có phiếu đánh giá đã nộp cho xe này.</div>`}
-  </div>
-  <div class="grid gap-4 lg:grid-cols-2">
-    <div class="card overflow-hidden">
-      <div class="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-2">
-        <h3 class="text-sm font-semibold m-0">Kế hoạch từ ĐG</h3>
-        <span class="text-xs text-slate-500">${plans.length} dòng</span>
-      </div>
-      <div class="divide-y divide-slate-100">
-        ${plans.length ? plans.map(p => `<div class="px-4 py-3 text-sm">
-          <div class="font-medium text-blue-600">${esc(p.code || 'KH')}</div>
-          <div class="text-slate-800">${esc(p.service || p.note || '—')}</div>
-          <div class="text-xs text-slate-500 mt-0.5">${esc(p.period || '')} · ${esc(p.status || '')}</div>
-        </div>`).join('') : `<div class="px-4 py-8 text-center text-sm text-slate-400">Chưa liên kết kế hoạch</div>`}
-      </div>
-    </div>
-    <div class="card overflow-hidden">
-      <div class="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-2">
-        <h3 class="text-sm font-semibold m-0">Phiếu BD/SC từ ĐG</h3>
-        <span class="text-xs text-slate-500">${orders.length} phiếu</span>
-      </div>
-      <div class="divide-y divide-slate-100">
-        ${orders.length ? orders.map(o => `<div class="px-4 py-3 text-sm flex flex-wrap items-center gap-2">
-          <button type="button" data-open-order="${o.id}" class="font-medium text-blue-600 hover:underline">${esc(o.code)}</button>
-          ${o.type === 'PERIODIC' ? '<span class="chip bg-sky-50 text-sky-800">BD</span>' : '<span class="chip bg-amber-50 text-amber-900">SC</span>'}
-          <span class="text-xs text-slate-500 ml-auto">${esc(o.status || '')}</span>
-          <div class="w-full text-slate-700">${esc(o.content || '')}</div>
-        </div>`).join('') : `<div class="px-4 py-8 text-center text-sm text-slate-400">Chưa liên kết phiếu</div>`}
-      </div>
-    </div>
+    <div class="px-5 py-12 text-center text-sm text-slate-500">Chưa có lịch sử đánh giá đã nộp cho xe này.</div>`}
   </div>`;
 }
+
 
 function renderVehiclePlans(v) {
   const f = F();
@@ -10805,7 +10964,57 @@ function plansLinkedToEval(ev, vehicleId) {
     (Number(p.vehicleId) === Number(vehicleId) && p.source === 'PERIODIC_ASSESSMENT' && ev?.date && p.fromEvalDate === ev.date)
   );
 }
+function assessChip(a) {
+  if (a === 'ok') return '<span class="chip border border-emerald-200 bg-emerald-50 text-emerald-800">Tốt</span>';
+  if (a === 'repair') return '<span class="chip border border-amber-200 bg-amber-50 text-amber-900">SC</span>';
+  if (a === 'replace') return '<span class="chip border border-sky-200 bg-sky-50 text-sky-900">Thay</span>';
+  return '<span class="chip bg-slate-100 text-slate-500">—</span>';
+}
+function ensureEvaluationHistory() {
+  if (!Array.isArray(DB.evaluationHistory)) DB.evaluationHistory = [];
+  if (!DB.evaluationHistory.length && Array.isArray(DEFAULT.evaluationHistory)) {
+    DB.evaluationHistory = structuredClone(DEFAULT.evaluationHistory);
+  }
+  Object.entries(DB.evaluations || {}).forEach(([vid, ev]) => {
+    if (!ev || ev.status !== 'SUBMITTED') return;
+    const id = ev.id || ('ev-' + vid + '-' + (ev.date || 'na'));
+    const exists = DB.evaluationHistory.find(h =>
+      h.id === id || (Number(h.vehicleId) === Number(vid) && h.date === ev.date && (h.inspector || '') === (ev.inspector || ''))
+    );
+    if (!exists) {
+      DB.evaluationHistory.push({ ...structuredClone(ev), id, vehicleId: Number(vid) });
+    } else {
+      const keepId = exists.id;
+      Object.assign(exists, structuredClone(ev), { id: keepId, vehicleId: Number(vid) });
+    }
+  });
+}
+function archiveEvaluation(vid, ev) {
+  if (!ev || ev.status !== 'SUBMITTED') return;
+  ensureEvaluationHistory();
+  const id = ev.id || ('ev-' + vid + '-' + (ev.date || todayDateKey()) + '-' + Date.now().toString(36));
+  const copy = { ...structuredClone(ev), id, vehicleId: Number(vid) };
+  const idx = DB.evaluationHistory.findIndex(h =>
+    h.id === id || (Number(h.vehicleId) === Number(vid) && h.date === copy.date && (h.inspector || '') === (copy.inspector || ''))
+  );
+  if (idx >= 0) DB.evaluationHistory[idx] = { ...DB.evaluationHistory[idx], ...copy, id: DB.evaluationHistory[idx].id };
+  else DB.evaluationHistory.unshift(copy);
+  DB.evaluations[vid] = { ...DB.evaluations[vid], id: copy.id };
+  save();
+}
+function evaluationById(id) {
+  ensureEvaluationHistory();
+  return (DB.evaluationHistory || []).find(e => String(e.id) === String(id)) || null;
+}
+function evaluationsOfVehicle(vid) {
+  ensureEvaluationHistory();
+  return (DB.evaluationHistory || [])
+    .filter(e => Number(e.vehicleId) === Number(vid) && e.status === 'SUBMITTED')
+    .slice()
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+}
 function openCreateOrderFromEval(vid) {
+
   openCreateOrderModal(Number(vid), 'INCIDENTAL', 'PERIODIC_ASSESSMENT');
   toast('Nguồn «Đánh giá định kỳ» · thêm hạng mục rồi tạo phiếu');
 }
@@ -12180,6 +12389,145 @@ function closeModal() {
   root.innerHTML = '';
 }
 
+function openEvalResultModal(evalId) {
+  const ev = evaluationById(evalId);
+  if (!ev) { toast('Không tìm thấy phiếu đánh giá'); return; }
+  const v = vehicleById(ev.vehicleId);
+  const checklist = getEvalChecklist();
+  const id = ev.identity || {};
+  const conc = ev.conclusion || {};
+  const items = ev.items || {};
+  const notes = ev.itemNotes || {};
+  const details = ev.details || {};
+  const orders = ordersLinkedToEval(ev, ev.vehicleId);
+  const plans = plansLinkedToEval(ev, ev.vehicleId);
+  const good = evalGoodCount(ev);
+  const fail = evalFailCount(ev);
+  const weekLabel = (() => {
+    const ds = ev.dateStart || ev.date;
+    if (!ds) return '—';
+    const d = new Date(ds);
+    const onejan = new Date(d.getFullYear(), 0, 1);
+    const week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
+    return `Tuần ${week} · Tháng ${d.getMonth() + 1}/${d.getFullYear()}`;
+  })();
+
+  const detailHtml = (itemId, assess) => {
+    const d = details[itemId] || {};
+    if (assess === 'repair') {
+      const list = d.repairs || [];
+      if (!list.length) return '<div class="text-xs text-slate-400">Chưa gắn hạng mục SC</div>';
+      return `<div class="text-xs text-amber-900">${list.map(r => `• ${esc(r.name)}${r.system ? ' · ' + esc(r.system) : ''}`).join('<br>')}</div>`;
+    }
+    if (assess === 'replace') {
+      const list = d.materials || [];
+      if (!list.length) return '<div class="text-xs text-slate-400">Chưa gắn vật tư</div>';
+      return `<div class="text-xs text-sky-900">${list.map(m => `• ${m.code ? esc(m.code) + ' · ' : ''}${esc(m.name)} × ${m.qty || 1}`).join('<br>')}</div>`;
+    }
+    return '';
+  };
+
+  openModal(`
+    <div class="border-b border-slate-200 px-5 py-4">
+      <h2 class="text-lg font-bold text-slate-900">Phiếu đánh giá phương tiện định kỳ</h2>
+      <p class="text-sm text-slate-600">${esc(v?.plate || id.vehicleNumber || '—')} · ${esc(v?.type || '')} · ${esc(weekLabel)} · chỉ xem</p>
+    </div>
+    <div class="px-5 py-4 max-h-[70vh] overflow-y-auto">
+      <section class="mb-4 rounded-md border border-amber-100 bg-gradient-to-br from-amber-50/70 to-white p-4">
+        <p class="mb-3 text-center text-sm font-semibold uppercase tracking-wide text-slate-700">Thông tin đầu phiếu</p>
+        <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+          <div><div class="text-xs text-slate-500">Kỹ thuật viên</div><div class="font-medium">${esc(ev.inspector || '—')}</div></div>
+          <div><div class="text-xs text-slate-500">Từ ngày / Đến ngày</div><div class="font-medium">${esc(ev.dateStart || '—')} → ${esc(ev.dateEnd || '—')}</div></div>
+          <div><div class="text-xs text-slate-500">Ngày kiểm tra</div><div class="font-medium">${esc(id.inspectionDate || ev.date || '—')}</div></div>
+          <div><div class="text-xs text-slate-500">Số xe</div><div class="font-medium">${esc(id.vehicleNumber || v?.plate || '—')}</div></div>
+          <div><div class="text-xs text-slate-500">Số khung</div><div class="font-medium">${esc(id.chassisNumber || '—')}</div></div>
+          <div><div class="text-xs text-slate-500">Số máy</div><div class="font-medium">${esc(id.engineNumber || '—')}</div></div>
+          <div><div class="text-xs text-slate-500">Số km hoạt động</div><div class="font-medium tabular-nums">${esc(id.operatingKm || '—')}</div></div>
+          <div><div class="text-xs text-slate-500">Số rơ mooc</div><div class="font-medium">${esc(id.trailerNumber || '—')}</div></div>
+          <div><div class="text-xs text-slate-500">Tài xế</div><div class="font-medium">${esc(id.driverName || '—')}</div></div>
+          <div><div class="text-xs text-slate-500">Điện thoại</div><div class="font-medium">${esc(id.driverPhone || '—')}</div></div>
+          <div><div class="text-xs text-slate-500">GPLX</div><div class="font-medium">${esc(id.drivingLicense || '—')}</div></div>
+          <div class="sm:col-span-2"><div class="text-xs text-slate-500">Giấy tờ / BH</div><div class="font-medium">${esc(id.tractorDocuments || '—')} · ${esc(id.trailerDocuments || '—')} · ${esc(id.civilLiabilityInsurance || '—')}</div></div>
+          <div class="sm:col-span-2 lg:col-span-3"><div class="text-xs text-slate-500">Ghi chú phiếu</div><div class="font-medium">${esc(ev.note || '—')}</div></div>
+        </div>
+        ${ev.periodExempt ? `<div class="mt-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"><strong>Miễn kỳ</strong> — ${esc(ev.periodExemptReason || '—')}</div>` : ''}
+        <div class="mt-3 flex flex-wrap gap-2 text-sm">
+          <span class="chip bg-emerald-50 text-emerald-800">${good} Tốt</span>
+          <span class="chip bg-rose-50 text-rose-800">${fail} SC/Thay</span>
+        </div>
+      </section>
+
+      ${ev.periodExempt ? '' : `
+      <p class="mb-2 text-xs text-slate-500">Kết quả từng hạng mục (giống phiếu đánh giá định kỳ — chỉ xem).</p>
+      ${checklist.map(g => `
+        <div class="mb-4 rounded-md border border-slate-200">
+          <div class="bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600">${esc(g.group)}</div>
+          <div>
+            ${g.items.map(it => {
+              const a = items[it.id] || '';
+              return `<div class="eval-row !items-start border-t border-slate-100 px-3 py-2.5">
+                <span class="mr-auto min-w-[160px] pt-0.5 text-sm font-medium text-slate-800">${esc(it.label)}<span class="mt-0.5 block text-[11px] font-normal text-slate-400">${esc(METHOD_LABEL[it.method] || it.method || '')}</span></span>
+                <div class="flex w-full flex-col gap-1.5 sm:max-w-md">
+                  <div>${assessChip(a)}</div>
+                  ${notes[it.id] ? `<div class="text-xs text-slate-600">Ghi chú: ${esc(notes[it.id])}</div>` : ''}
+                  ${detailHtml(it.id, a)}
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+      `).join('')}
+
+      <section class="mb-4 space-y-2 rounded-md border border-slate-200 bg-slate-50/50 p-4">
+        <h3 class="text-sm font-semibold text-slate-900 m-0">Kết luận &amp; đề xuất</h3>
+        <div class="text-sm"><div class="text-xs text-slate-500">Đề nghị thay thế</div><div>${esc(conc.replacementRequest || '—')}</div></div>
+        <div class="text-sm"><div class="text-xs text-slate-500">Hạng mục Kỹ thuật / QL xe cần khắc phục</div><div>${esc(conc.mechanicManagerRemedies || '—')}</div></div>
+        <div class="text-sm"><div class="text-xs text-slate-500">Hạng mục Tài xế cần khắc phục</div><div>${esc(conc.driverRemedies || '—')}</div></div>
+        <div class="text-sm"><div class="text-xs text-slate-500">Ý kiến Lái xe</div><div>${esc(conc.driverOpinion || '—')}</div></div>
+      </section>
+      `}
+
+      <section class="mb-2 grid gap-3 lg:grid-cols-2">
+        <div class="rounded-md border border-slate-200">
+          <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">Phiếu BD/SC của lần ĐG này · ${orders.length}</div>
+          <div class="divide-y divide-slate-100">
+            ${orders.length ? orders.map(o => `<div class="px-3 py-2.5 text-sm flex flex-wrap items-center gap-2">
+              <button type="button" data-open-order="${o.id}" class="font-medium text-blue-600 hover:underline">${esc(o.code)}</button>
+              ${o.type === 'PERIODIC' ? '<span class="chip bg-sky-50 text-sky-800">BD</span>' : '<span class="chip bg-amber-50 text-amber-900">SC</span>'}
+              <span class="text-xs text-slate-500 ml-auto">${esc(o.status || '')}</span>
+              <div class="w-full text-slate-700 text-xs">${esc(o.content || '')}</div>
+            </div>`).join('') : '<div class="px-3 py-6 text-center text-xs text-slate-400">Không có phiếu liên kết</div>'}
+          </div>
+        </div>
+        <div class="rounded-md border border-slate-200">
+          <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">Kế hoạch từ lần ĐG · ${plans.length}</div>
+          <div class="divide-y divide-slate-100">
+            ${plans.length ? plans.map(p => `<div class="px-3 py-2.5 text-sm">
+              <div class="font-medium text-violet-700">${esc(p.code || 'KH')}</div>
+              <div class="text-slate-800 text-xs mt-0.5">${esc(p.service || p.note || '—')}</div>
+            </div>`).join('') : '<div class="px-3 py-6 text-center text-xs text-slate-400">Không có kế hoạch liên kết</div>'}
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-3">
+      <button type="button" data-close class="btn btn-outline">Đóng</button>
+      ${v ? `<button type="button" id="btnEvalViewReopen" class="btn btn-primary">Đánh giá lại xe này</button>` : ''}
+    </div>`, 'max-w-4xl');
+
+  $('[data-close]')?.addEventListener('click', closeModal);
+  $$('#modalRoot [data-open-order]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    closeModal();
+    openOrderDetail(b.dataset.openOrder);
+  });
+  $('#btnEvalViewReopen')?.addEventListener('click', () => {
+    closeModal();
+    openEvalModal(ev.vehicleId);
+  });
+}
+
+
 function openEvalModal(vid) {
   const v = vehicleById(vid);
   const prevEval = DB.evaluations[vid] || {};
@@ -12705,6 +13053,7 @@ function openEvalModal(vid) {
       DB.evaluations[vid].linkedOrderIds = createdOrder ? [createdOrder.id] : [];
       DB.evaluations[vid].postEvalAction = postAction;
     }
+    if (formStatus === 'SUBMITTED') archiveEvaluation(vid, DB.evaluations[vid]);
 
     closeModal();
 
@@ -14782,6 +15131,7 @@ function bind() {
     render();
   });
   $$('[data-eval]').forEach(b => b.onclick = () => openEvalModal(Number(b.dataset.eval)));
+  $$('[data-view-eval]').forEach(b => b.onclick = () => openEvalResultModal(b.dataset.viewEval));
   $$('[data-create-order-from-eval]').forEach(b => b.onclick = () => openCreateOrderFromEval(Number(b.dataset.createOrderFromEval)));
   $$('[data-goto-plan-vehicle]').forEach(b => b.onclick = () => {
     view = { ...view, name: 'vehicle', vehicleId: Number(b.dataset.gotoPlanVehicle), vehicleTab: 'catalog', from: 'assessment', filters: defaultFilters(), page: 1 };
@@ -15254,6 +15604,7 @@ $('#btnReset').onclick = () => {
   }
 };
 
+ensureEvaluationHistory();
 render();
 </script>
 <script>
