@@ -341,37 +341,36 @@ flowchart TD
   A[Tạo phiếu] --> B[Kỹ thuật ghi phần dự kiến<br/>hạng mục + vật tư]
   B --> C[Nộp duyệt · quản lý duyệt]
   C --> D[Nút Đồng bộ BASE luôn hiện<br/>đẩy duyệt lãnh đạo]
-  C --> E[Gửi / đồng bộ mua hàng]
+  C --> E[Gửi MH · ĐB mua hàng luôn có<br/>kể cả không có VT]
   D --> F[Bắt đầu làm việc trên xưởng]
   E --> F
   F --> G[Mua hàng xuất kho<br/>hoặc mua ngoài theo mã phiếu]
   G --> H[Đồng bộ lại từ mua hàng<br/>thành phần dữ liệu thật]
   H --> I[Hoàn thành từng hạng mục<br/>so giờ thực tế với barem]
-  I --> J[Đủ hạng mục → phiếu tự<br/>chuyển Hoàn thành]
+  I --> J[Hạng mục cuối HT → phiếu tự<br/>Hoàn thành · không nút HT phiếu]
   J --> K[Nếu có thay lốp / ắc<br/>đồng bộ vòng đời → mua hàng]
         </pre>
       </div>
       <div class="cards two">
         <div class="box y">
           <strong>Phần dự kiến (kỹ thuật ghi)</strong>
-          Hạng mục công việc và vật tư đề nghị.
-          Có vật tư trong kho đủ số lượng → <em>xuất kho</em>;
-          hết / thiếu / không có mã → <em>sửa ngoài</em>;
-          mua tại chỗ ghi tay → <em>kỹ thuật ghi</em>.
+          Hạng mục + vật tư đề nghị. Chọn VT bằng <em>autocomplete tên</em> (có tạo mới).
+          Có <em>materialId</em> kho → autofill giá·VAT·ĐVT·NCC; đủ tồn = xuất kho / thiếu = sửa ngoài.
+          Không ID → <em>KTV ghi</em> (chỉ bắt buộc tên). Mobile: NCC = textarea; không dropdown «Cách nhập».
           Phần này <strong>không bị xóa</strong> khi đồng bộ mua hàng.
         </div>
         <div class="box b">
           <strong>Phần mua hàng (sau đồng bộ)</strong>
-          Giá thật, nhà cung cấp, chứng từ, ngày cấp vật tư — gắn đúng <strong>mã phiếu</strong>.
-          Dùng để tính chi phí chuẩn và đối chiếu với phần dự kiến.
+          Giá thật, nhà cung cấp, chứng từ, ngày cấp — gắn đúng <strong>mã phiếu</strong>.
+          Nút «Đồng bộ mua hàng» luôn sẵn sau duyệt (có hoặc không có dòng VT).
         </div>
       </div>
       <h3 class="step" style="border:none;padding:0;margin:16px 0 8px;font-size:15px">Bốn mốc giờ — hệ thống tự ghi, không nhập tay</h3>
       <ul class="times">
-        <li><b>Thời gian bắt đầu</b>Khi bấm «Bắt đầu thực hiện» hoặc khi hoàn thành hạng mục đầu</li>
+        <li><b>Thời gian bắt đầu</b>Khi bấm «Bắt đầu thực hiện» hoặc khi bắt đầu hạng mục đầu</li>
         <li><b>Thời gian đề nghị cấp vật tư</b>Lần gửi sớm nhất sang BASE hoặc sang mua hàng</li>
         <li><b>Thời gian có đủ vật tư</b>Ngày cấp vật tư <em>sau cùng</em> trên chứng từ mua hàng / xuất kho</li>
-        <li><b>Thời gian hoàn thiện sửa chữa</b>Khi đủ hạng mục công việc đã hoàn thành (phiếu tự chuyển Hoàn thành)</li>
+        <li><b>Thời gian hoàn thiện sửa chữa</b>Khi hạng mục công việc <em>cuối cùng</em> hoàn thành (phiếu tự HT — không nút HT phiếu)</li>
       </ul>
     </section>
 
