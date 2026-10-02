@@ -728,8 +728,8 @@ function finalizeOrderIfAllWorkItemsDone(o){
   }
   o.status='COMPLETED';
   o.repairCompletedAt=at;
-  pushLog(o,'COMPLETE','Tự động HT phiếu · đủ '+(o.workItems||[]).length+' hạng mục · khóa thực tế');
-  toast('Đã hoàn thành phiếu');
+  pushLog(o,'COMPLETE','Tự động HT phiếu khi hạng mục cuối xong · đủ '+(o.workItems||[]).length+' hạng mục');
+  toast('Hạng mục cuối đã HT · phiếu tự hoàn thành');
   return true;
 }
 function startWorkItemMobile(o,idx){
@@ -868,42 +868,50 @@ function cycleHintMobile(o){
   const ap=o.approval||'DRAFT';
   const mh=o.mh||'NONE';
   return({
-    DRAFT:'Chu kỳ: Nháp → Nộp duyệt → Chờ duyệt → Duyệt → Thực hiện → Đồng bộ MH → Hoàn thành từng hạng mục (đủ thì phiếu tự HT)',
+    DRAFT:'Chu kỳ: Nháp → Nộp duyệt → Duyệt → Thực hiện hạng mục → HT hạng mục cuối = phiếu tự HT · ĐB MH luôn có (có/không VT)',
     PENDING_APPROVAL:'Đang chờ duyệt · sau duyệt mới thực hiện và đồng bộ mua hàng',
     REJECTED:'Đã từ chối · sửa → Nộp lại → Duyệt → …',
     APPROVED:o.status==='COMPLETED'
-      ?(mh==='SYNCED'?'Đã khép chu kỳ (có đồng bộ MH)':'Đã hoàn thành · kiểm tra đồng bộ MH')
-      :(mh==='SYNCED'?'Đã duyệt · đang làm · đã đồng bộ MH':'Đã duyệt · cần đồng bộ MH trước khi khóa chi phí'),
+      ?(mh==='SYNCED'?'Đã HT (hạng mục cuối) · đã ĐB MH':'Đã HT khi hạng mục cuối xong · có thể ĐB MH')
+      :(mh==='SYNCED'?'Đã duyệt · đang làm · đã ĐB MH':'Đã duyệt · HT từng hạng mục · ĐB MH bất kỳ lúc nào'),
   })[ap]||'';
 }
 function canSendPurchaseMobile(o){
   if(o.approval!=='APPROVED')return false;
   if(!(o.status==='NOT_STARTED'||o.status==='IN_PROGRESS'||o.status==='COMPLETED'))return false;
-  return hasPwmsLines(o);
+  return true; /* luôn cho gửi MH, kể cả không có VT */
 }
 function canSyncPurchaseMobile(o){
-  if(!hasPwmsLines(o))return false;
   if(o.approval!=='APPROVED')return false;
-  return o.status==='IN_PROGRESS'||o.status==='COMPLETED';
+  return o.status==='IN_PROGRESS'||o.status==='COMPLETED'||o.status==='NOT_STARTED';
+}
+function ensureMhStatusMobile(o){
+  if(!o)return;
+  if(o.mh==='NA'||!o.mh)o.mh='NONE'; /* luôn cho phép ĐB MH, không ẩn vì thiếu VT */
 }
 function mhBannerMobile(o){
+  ensureMhStatusMobile(o);
   const has=hasPwmsLines(o);
   const mh=o.mh||'NONE';
-  if(!has){
-    return `<div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] text-slate-600">Không có dòng XK/SN trong cụm dự kiến · không tạo cụm MH.</div>`;
-  }
   if(mh==='SYNCING'){
     return `<div class="rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-[12px] text-sky-900"><span class="font-semibold">Đang đồng bộ với mua hàng…</span><br/>Đang lấy đơn giá và mã phiếu xuất kho.</div>`;
   }
   if(mh==='SYNCED'){
-    return `<div class="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900"><span class="font-semibold">Đã đồng bộ mua hàng</span> ${mhBadge('SYNCED')}<br/>Phiếu xuất: <strong>${esc(o.purchaseIssueDoc||'—')}</strong> · Lúc: <strong>${esc(o.purchaseSyncedAt||'—')}</strong></div>`;
+    return `<div class="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-[12px] text-emerald-900"><span class="font-semibold">Đã đồng bộ mua hàng</span> ${mhBadge('SYNCED')}<br/>Phiếu xuất: <strong>${esc(o.purchaseIssueDoc||'—')}</strong> · Lúc: <strong>${esc(o.purchaseSyncedAt||'—')}</strong>${has?'':' · không có dòng VT XK/SN'}</div>`;
   }
-  const lock=o.approval!=='APPROVED'?'Chỉ đồng bộ sau khi phiếu đã duyệt và bắt đầu thực hiện.'
-    :o.status==='NOT_STARTED'?'Bấm «Bắt đầu thực hiện» trước, rồi đồng bộ mua hàng.'
-    :'Đơn giá đang là <strong>giá tạm</strong>. Bấm «Đồng bộ mua hàng» để kéo giá / chứng từ.';
+  const lock=o.approval!=='APPROVED'?'Chỉ đồng bộ sau khi phiếu đã duyệt.'
+    :'Đồng bộ mua hàng luôn khả dụng (có hoặc không có vật tư). Giá tạm sẽ được kéo về khi có dòng XK/SN.';
   return `<div class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-950"><span class="font-semibold">Trước khi đồng bộ</span> ${mhBadge(mh)}<br/>${lock}</div>`;
 }
+function pushSyncMhButton(acts,o){
+  ensureMhStatusMobile(o);
+  if(o.approval!=='APPROVED')return;
+  if(!(o.status==='NOT_STARTED'||o.status==='IN_PROGRESS'||o.status==='COMPLETED'))return;
+  if(o.mh==='SYNCING')acts.push(`<button class="btn btn-outline btn-touch" disabled>Đang đồng bộ MH…</button>`);
+  else acts.push(`<button type="button" class="btn btn-sky btn-touch" id="btnSyncMh">${o.mh==='SYNCED'?'Đồng bộ lại mua hàng':'Đồng bộ mua hàng'}</button>`);
+}
 function buildOrderActions(o){
+  ensureMhStatusMobile(o);
   const ap=o.approval||'DRAFT';
   const psend=o.purchaseSend||{status:'NONE'};
   const acts=[];
@@ -917,26 +925,21 @@ function buildOrderActions(o){
     acts.push(`<button type="button" class="btn btn-outline btn-touch" id="btnEditOrder">Sửa thông tin chung</button>`);
     acts.push(`<button type="button" class="btn btn-primary btn-touch" id="btnResubmitOrder">Nộp lại</button>`);
   }else if(ap==='APPROVED'&&o.status==='NOT_STARTED'){
-    if(canSendPurchaseMobile(o)&&psend.status!=='SENDING'){
+    if(psend.status!=='SENDING'){
       acts.push(`<button type="button" class="btn btn-outline btn-touch" id="btnSendPurchase">${psend.status==='SENT'?'Gửi lại phiếu MH':'Gửi phiếu sang mua hàng'}</button>`);
     }
+    /* Không có nút HT phiếu — phiếu tự HT khi hạng mục cuối hoàn thành */
     acts.push(`<button type="button" class="btn btn-primary btn-touch" id="btnStart">Bắt đầu thực hiện</button>`);
+    pushSyncMhButton(acts,o);
   }else if(ap==='APPROVED'&&o.status==='IN_PROGRESS'){
-    if(canSendPurchaseMobile(o)){
-      if(psend.status==='SENDING')acts.push(`<button class="btn btn-outline btn-touch" disabled>Đang gửi MH…</button>`);
-      else acts.push(`<button type="button" class="btn btn-outline btn-touch" id="btnSendPurchase">${psend.status==='SENT'?'Gửi lại phiếu MH':'Gửi phiếu sang mua hàng'}</button>`);
-    }
-    if(hasPwmsLines(o)){
-      if(o.mh==='SYNCING')acts.push(`<button class="btn btn-outline btn-touch" disabled>Đang đồng bộ MH…</button>`);
-      else acts.push(`<button type="button" class="btn btn-sky btn-touch" id="btnSyncMh">${o.mh==='SYNCED'?'Đồng bộ lại mua hàng':'Đồng bộ mua hàng'}</button>`);
-    }
+    if(psend.status==='SENDING')acts.push(`<button class="btn btn-outline btn-touch" disabled>Đang gửi MH…</button>`);
+    else acts.push(`<button type="button" class="btn btn-outline btn-touch" id="btnSendPurchase">${psend.status==='SENT'?'Gửi lại phiếu MH':'Gửi phiếu sang mua hàng'}</button>`);
+    pushSyncMhButton(acts,o);
   }else if(ap==='APPROVED'&&o.status==='COMPLETED'){
-    if(canSendPurchaseMobile(o)&&psend.status!=='SENDING'){
+    if(psend.status!=='SENDING'){
       acts.push(`<button type="button" class="btn btn-outline btn-touch" id="btnSendPurchase">${psend.status==='SENT'?'Gửi lại phiếu MH':'Gửi phiếu sang mua hàng'}</button>`);
     }
-    if(hasPwmsLines(o)&&o.mh!=='SYNCED'){
-      acts.push(`<button type="button" class="btn btn-sky btn-touch" id="btnSyncMh">Đồng bộ mua hàng</button>`);
-    }
+    pushSyncMhButton(acts,o);
   }
   if((o.content||'').trim()){
     if(o.base.status==='SYNCING')acts.push(`<button class="btn btn-outline btn-touch" disabled>Đang đồng bộ BASE…</button>`);
@@ -1003,6 +1006,7 @@ function renderOrderLogTab(o){
 function renderOrder(){
   const o=ORDERS.find(x=>x.id===S.orderId); if(!o) return;
   ensureOrderMobile(o);
+  ensureMhStatusMobile(o);
   recalcOrderCostMobile(o);
   $$('#orderTabs [data-otab]').forEach(b=>b.classList.toggle('on',b.dataset.otab===S.orderTab));
 
@@ -1088,7 +1092,7 @@ function renderOrder(){
           <div class="text-[11px] text-slate-500">${money(m.price)} · ×${m.qty??1} · ${esc(m.purchaseDocCode||'—')} · ${fmtStampVi(m.issuedAt)}</div>
         </div>
       </div>`).join('')
-    : `<p class="text-sm text-slate-400 px-1 py-3 text-center">${!hasPwmsLines(o)?'Không có cụm MH':'Chưa đồng bộ — cụm MH trống'}</p>`;
+    : `<p class="text-sm text-slate-400 px-1 py-3 text-center">${o.mh==='SYNCED'?'Đã ĐB MH · không có dòng XK/SN':'Chưa đồng bộ — bấm «Đồng bộ mua hàng» (kể cả khi không có VT)'}</p>`;
 
   const imgHtml=(o.images||[]).length
     ? `<div class="img-grid">${(o.images||[]).map((img,i)=>`<div class="img-card">
@@ -1221,7 +1225,7 @@ function bindOrderDetailActions(o){
     },900);
   });
   $('#btnSyncMh')?.addEventListener('click',()=>{
-    if(!canSyncPurchaseMobile(o)){toast('Chỉ đồng bộ khi đã duyệt và đang/đã thực hiện');return}
+    if(!canSyncPurchaseMobile(o)){toast('Chỉ đồng bộ khi phiếu đã duyệt');return}
     o.mh='SYNCING';renderOrder();toast('Đang đồng bộ mua hàng…');
     setTimeout(()=>{
       const at=nowStampMobile();
@@ -1230,7 +1234,7 @@ function bindOrderDetailActions(o){
       const mhLines=[];
       plannedMats(o).forEach(m=>{
         if(matSource(m)!=='PWMS'&&matSource(m)!=='EXTERNAL')return;
-        const cat=MATERIALS.find(x=>x.code===m.code);
+        const cat=MATERIALS.find(x=>x.code===m.code||(m.materialId&&x.id===m.materialId));
         if(cat)enrichMat(cat,false);
         const base=cat?.refPrice??m.price??100000;
         const next=Math.round(base*(1.02+(hashStr(o.code+(m.code||m.name))%6)/100));
@@ -1247,11 +1251,11 @@ function bindOrderDetailActions(o){
       o.purchaseMaterials=mhLines;
       recomputeMaterialReadyAt(o);
       o.mh='SYNCED';
-      o.purchaseIssueDoc=issueDoc;
+      o.purchaseIssueDoc=mhLines.length?issueDoc:('MH-'+String(o.code||'').replace(/^RO-/,''));
       o.purchaseSyncedAt=at;
       recalcOrderCostMobile(o);
-      pushLog(o,'SYNC','Đồng bộ cụm MH · '+issueDoc+' · '+mhLines.length+' dòng');
-      toast('Đã đồng bộ MH · cụm dự kiến giữ nguyên');renderOrder();
+      pushLog(o,'SYNC','Đồng bộ MH · '+(mhLines.length?issueDoc+' · '+mhLines.length+' dòng':'không có dòng XK/SN · vẫn ghi nhận ĐB'));
+      toast(mhLines.length?'Đã đồng bộ MH · cụm dự kiến giữ nguyên':'Đã đồng bộ MH (không có VT XK/SN)');renderOrder();
     },1200);
   });
   $$('[data-rm-wi]').forEach(b=>b.onclick=()=>{
@@ -1265,8 +1269,9 @@ function bindOrderDetailActions(o){
   $$('[data-edit-mat]').forEach(b=>b.onclick=()=>openMaterialSheet(o,+b.dataset.editMat));
   $$('[data-rm-mat]').forEach(b=>b.onclick=()=>{
     o.mats.splice(+b.dataset.rmMat,1);
+    if(o.mh==='NA')o.mh='NONE';
     if(hasPwmsLines(o)&&o.mh==='NA')o.mh='NONE';
-    if(!hasPwmsLines(o)&&o.mh==='NONE')o.mh='NA';
+    /* không đặt mh=NA khi thiếu VT — luôn giữ NONE để còn nút ĐB MH */
     recalcOrderCostMobile(o);
     toast('Đã xóa vật tư');renderOrder();
   });
@@ -1620,8 +1625,9 @@ function openMaterialSheet(o,idx){
       if(exist){exist.qty=(Number(exist.qty)||1)+matState.qty;Object.assign(exist,{price:row.price,vat:row.vat,supplier:row.supplier,warehouse:row.warehouse,name:row.name,materialId:row.materialId,source:row.source});toast('Đã tăng SL')}
       else{o.mats.push(row);toast('Đã thêm vật tư')}
     }
+    if(o.mh==='NA')o.mh='NONE';
     if(hasPwmsLines(o)&&o.mh==='NA')o.mh='NONE';
-    if(!hasPwmsLines(o)&&o.mh==='NONE')o.mh='NA';
+    /* không đặt mh=NA khi thiếu VT — luôn giữ NONE để còn nút ĐB MH */
     recalcOrderCostMobile(o);
     closeOrderSheet();renderOrder();
   };
@@ -1778,7 +1784,7 @@ function renderEval(){
       }
       if(S.createSc){
         orderCode='RO-2026-'+(1100+Math.floor(Math.random()*800));
-        ORDERS.unshift({id:'o'+Date.now().toString(36),vehicleId:v.id,code:orderCode,type:'INCIDENTAL',occ:ordersOf(v.id).filter(o=>o.type==='INCIDENTAL').length+1,date:'2026-09-30',km:v.km,garage:v.garage,source:'Đánh giá định kỳ',status:'NOT_STARTED',approval:'DRAFT',content:'SC từ đánh giá ('+badEntries.length+' hạng mục)',cost:0,system:'Từ đánh giá',mh:'NA',base:{status:'NONE',code:null,baseStatus:null},mats:[],log:[{at:'Vừa xong',text:'Tạo từ đánh giá · không qua kế hoạch'}]});
+        ORDERS.unshift({id:'o'+Date.now().toString(36),vehicleId:v.id,code:orderCode,type:'INCIDENTAL',occ:ordersOf(v.id).filter(o=>o.type==='INCIDENTAL').length+1,date:'2026-09-30',km:v.km,garage:v.garage,source:'Đánh giá định kỳ',status:'NOT_STARTED',approval:'DRAFT',content:'SC từ đánh giá ('+badEntries.length+' hạng mục)',cost:0,system:'Từ đánh giá',mh:'NONE',base:{status:'NONE',code:null,baseStatus:null},mats:[],log:[{at:'Vừa xong',text:'Tạo từ đánh giá · không qua kế hoạch'}]});
       }
     }
     if(v) v.eval='ok';
@@ -1862,7 +1868,7 @@ document.body.addEventListener('click',e=>{
     if(!plan)return;
     const id='o'+Date.now().toString(36);
     const code='RO-2026-'+(1200+Math.floor(Math.random()*700));
-    ORDERS.unshift({id,vehicleId:v.id,code,type:plan.source==='PERIODIC_ASSESSMENT'?'INCIDENTAL':'PERIODIC',occ:ordersOf(v.id).length+1,date:'2026-09-30',km:v.km,garage:v.garage,source:plan.source==='PERIODIC_ASSESSMENT'?'Đánh giá định kỳ':'Dự toán',status:'NOT_STARTED',approval:'DRAFT',content:plan.name,cost:0,system:plan.system,mh:'NA',base:{status:'NONE',code:null,baseStatus:null},mats:[],log:[{at:'Vừa xong',text:'Tạo từ kế hoạch '+plan.code}]});
+    ORDERS.unshift({id,vehicleId:v.id,code,type:plan.source==='PERIODIC_ASSESSMENT'?'INCIDENTAL':'PERIODIC',occ:ordersOf(v.id).length+1,date:'2026-09-30',km:v.km,garage:v.garage,source:plan.source==='PERIODIC_ASSESSMENT'?'Đánh giá định kỳ':'Dự toán',status:'NOT_STARTED',approval:'DRAFT',content:plan.name,cost:0,system:plan.system,mh:'NONE',base:{status:'NONE',code:null,baseStatus:null},mats:[],log:[{at:'Vừa xong',text:'Tạo từ kế hoạch '+plan.code}]});
     if(plan.status==='Mới')plan.status='Đã xếp lịch';
     toast('Đã tạo phiếu '+code+' từ '+plan.code);
     S.orderId=id;S.orderTab='slip';show('order');
@@ -2205,7 +2211,7 @@ $('#btnCreateSave')?.addEventListener('click',()=>{
     date:$('#cDate')?.value||'2026-09-30',km:Number($('#cKm')?.value)||v.km,
     garage,source:$('#cSource')?.value||'KTV tạo',
     status:'NOT_STARTED',approval:'DRAFT',content,cost:0,
-    system,mh:mats.some(x=>x.tag==='Kho MH')?'NONE':'NA',
+    system,mh:'NONE',
     base:{status:'NONE',code:null,baseStatus:null},mats,workItems,
     log:[{at:'Vừa xong',text:'Tạo nháp · '+workItems.length+' hạng mục'+(cat?' · '+cat.code:'')}]
   });
