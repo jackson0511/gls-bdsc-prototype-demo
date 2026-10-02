@@ -8558,6 +8558,7 @@ function pageVehicle() {
   if (!v) return pageShell('Không tìm thấy', '', '', '<button data-nav-back class="btn btn-outline">← Quay lại</button>');
   const tabs = [
     { id: 'catalog', label: 'Danh mục bảo dưỡng' },
+    { id: 'assessment', label: 'Đánh giá' },
     { id: 'plan', label: 'Kế hoạch' },
     { id: 'maintenance', label: 'Bảo dưỡng' },
     { id: 'repair', label: 'Sửa chữa' },
@@ -8575,7 +8576,7 @@ function pageVehicle() {
       </div>
       <div class="text-sm">Odo: <strong class="tabular-nums">${kmFmt(v.km)} km</strong></div>
       ${evalBadge(v.evalStatus)}
-      <button data-eval="${v.id}" class="btn btn-outline">Đánh giá</button>
+      <button type="button" data-vehicle-tab="assessment" class="btn btn-outline">Đánh giá</button>
       <button data-vehicle-history="${v.id}" class="btn btn-outline">Lịch sử BD/SC</button>
       <button id="btnQuickBd" class="btn btn-emerald btn-sm">Ghi nhận BD xong + tính kỳ</button>
     </div>
@@ -8589,11 +8590,84 @@ function pageVehicle() {
 }
 
 function renderVehicleTab(v) {
+  if (view.vehicleTab === 'assessment') return renderVehicleAssessment(v);
   if (view.vehicleTab === 'plan') return renderVehiclePlans(v);
   if (view.vehicleTab === 'maintenance') return renderVehicleOrders(v, 'PERIODIC');
   if (view.vehicleTab === 'repair') return renderVehicleOrders(v, 'INCIDENTAL');
   if (view.vehicleTab === 'catalog') return renderVehicleCatalog(v);
   return '';
+}
+
+function renderVehicleAssessment(v) {
+  const ev = DB.evaluations[v.id];
+  const submitted = ev?.status === 'SUBMITTED';
+  const enf = resolveEvalEnforcement(v, ev);
+  const enfLabel = enf === 'locked' ? 'Đã khóa' : enf === 'overdue' ? 'Quá hạn' : enf === 'upcoming' ? 'Sắp đến hạn' : (submitted ? 'Đã nộp / đúng hạn' : 'Chưa nộp');
+  const enfCls = enf === 'locked' ? 'bg-rose-50 border-rose-200 text-rose-900'
+    : enf === 'overdue' ? 'bg-amber-50 border-amber-200 text-amber-950'
+    : enf === 'upcoming' ? 'bg-orange-50 border-orange-200 text-orange-950'
+    : 'bg-emerald-50 border-emerald-200 text-emerald-900';
+  const fail = evalFailCount(ev);
+  const good = evalGoodCount(ev);
+  const orders = submitted ? ordersLinkedToEval(ev, v.id) : [];
+  const plans = submitted ? plansLinkedToEval(ev, v.id) : [];
+  const tireAlerts = tireBatteryAlertsForVehicle(v);
+  const periodLabel = typeof formatEvalPeriodRange === 'function' ? formatEvalPeriodRange(v, ev) : (ev?.dateStart && ev?.dateEnd ? `${ev.dateStart} → ${ev.dateEnd}` : '—');
+  return `
+  <p class="mb-3 text-sm text-slate-600">Đánh giá phương tiện định kỳ trên xe này · tạo / xem lại phiếu ĐG · liên kết kế hoạch &amp; phiếu SC phát sinh.</p>
+  ${tireAlertBannerHtml(tireAlerts)}
+  <div class="mb-4 rounded-md border px-4 py-3 text-sm ${enfCls}">
+    <div class="flex flex-wrap items-center gap-2">
+      <strong>Cảnh báo ĐG:</strong> ${enfLabel}
+      ${evalBadge(v.evalStatus)}
+      <span class="text-xs opacity-80 ml-auto">Kỳ: ${esc(periodLabel)}</span>
+    </div>
+  </div>
+  <div class="mb-4 flex flex-wrap gap-2">
+    <button type="button" data-eval="${v.id}" class="btn btn-primary btn-sm">${submitted ? 'Đánh giá lại / mở phiếu' : '+ Tạo phiếu đánh giá'}</button>
+    <button type="button" data-nav="assessment" class="btn btn-outline btn-sm">Danh sách ĐG đội xe</button>
+  </div>
+  <div class="card overflow-hidden mb-4">
+    <div class="border-b border-slate-200 px-5 py-3"><h2 class="text-sm font-semibold text-slate-900 m-0">Phiếu đánh giá gần nhất</h2></div>
+    ${submitted ? `
+    <div class="p-5 grid gap-3 sm:grid-cols-2 text-sm">
+      <div><div class="text-xs text-slate-500">Ngày nộp</div><div class="font-medium">${esc(ev.date || '—')}</div></div>
+      <div><div class="text-xs text-slate-500">Kỹ thuật viên</div><div class="font-medium">${esc(ev.inspector || '—')}</div></div>
+      <div><div class="text-xs text-slate-500">Hạng mục đạt / lỗi</div><div class="font-medium tabular-nums">${good} đạt · <span class="text-rose-700">${fail} lỗi</span></div></div>
+      <div><div class="text-xs text-slate-500">Sau ĐG</div><div class="font-medium">${ev.postEvalAction === 'plan' ? 'Tạo kế hoạch' : ev.postEvalAction === 'sc' ? 'Tạo phiếu SC' : 'Để sau'}</div></div>
+      <div class="sm:col-span-2"><div class="text-xs text-slate-500">Ghi chú</div><div class="font-medium">${esc(ev.note || '—')}</div></div>
+    </div>` : `
+    <div class="px-5 py-10 text-center text-sm text-slate-500">Chưa có phiếu đánh giá đã nộp cho xe này.</div>`}
+  </div>
+  <div class="grid gap-4 lg:grid-cols-2">
+    <div class="card overflow-hidden">
+      <div class="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-2">
+        <h3 class="text-sm font-semibold m-0">Kế hoạch từ ĐG</h3>
+        <span class="text-xs text-slate-500">${plans.length} dòng</span>
+      </div>
+      <div class="divide-y divide-slate-100">
+        ${plans.length ? plans.map(p => `<div class="px-4 py-3 text-sm">
+          <div class="font-medium text-blue-600">${esc(p.code || 'KH')}</div>
+          <div class="text-slate-800">${esc(p.service || p.note || '—')}</div>
+          <div class="text-xs text-slate-500 mt-0.5">${esc(p.period || '')} · ${esc(p.status || '')}</div>
+        </div>`).join('') : `<div class="px-4 py-8 text-center text-sm text-slate-400">Chưa liên kết kế hoạch</div>`}
+      </div>
+    </div>
+    <div class="card overflow-hidden">
+      <div class="border-b border-slate-200 px-4 py-3 flex items-center justify-between gap-2">
+        <h3 class="text-sm font-semibold m-0">Phiếu BD/SC từ ĐG</h3>
+        <span class="text-xs text-slate-500">${orders.length} phiếu</span>
+      </div>
+      <div class="divide-y divide-slate-100">
+        ${orders.length ? orders.map(o => `<div class="px-4 py-3 text-sm flex flex-wrap items-center gap-2">
+          <button type="button" data-open-order="${o.id}" class="font-medium text-blue-600 hover:underline">${esc(o.code)}</button>
+          ${o.type === 'PERIODIC' ? '<span class="chip bg-sky-50 text-sky-800">BD</span>' : '<span class="chip bg-amber-50 text-amber-900">SC</span>'}
+          <span class="text-xs text-slate-500 ml-auto">${esc(o.status || '')}</span>
+          <div class="w-full text-slate-700">${esc(o.content || '')}</div>
+        </div>`).join('') : `<div class="px-4 py-8 text-center text-sm text-slate-400">Chưa liên kết phiếu</div>`}
+      </div>
+    </div>
+  </div>`;
 }
 
 function renderVehiclePlans(v) {
