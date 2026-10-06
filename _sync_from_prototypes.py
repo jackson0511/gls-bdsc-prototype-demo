@@ -9,6 +9,7 @@ SRC = {
     "console.html": PLAN / "10-prototype-bdsc-console.html",
     "console-v2.html": PLAN / "10-prototype-bdsc-console-v2.html",
     "mobile.html": PLAN / "11-prototype-mobile-ktv.html",
+    "mobile-v2.html": PLAN / "11-prototype-mobile-ktv-v2.html",
 }
 
 
