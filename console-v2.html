@@ -132,7 +132,8 @@
     }
     .plan-tb-btn.is-ghost:hover { background: #f4f4f5; }
     .plan-period-bar .plan-plate-search,
-    .plan-grid-toolbar .plan-plate-search {
+    .plan-grid-toolbar .plan-plate-search,
+    .plan-period-bar .plan-plate-search {
       height: 28px;
       min-width: 180px;
       width: 220px;
@@ -141,6 +142,19 @@
       padding: 0 8px 0 28px;
       font-size: 12px;
       font-family: inherit;
+    }
+    .plan-period-bar .plan-plate-search:disabled,
+    .plan-grid-toolbar .plan-plate-search:disabled {
+      background: #f4f4f5;
+      color: #71717a;
+      cursor: not-allowed;
+      opacity: .85;
+    }
+    #plan-grid-container .slick-headerrow-column select.search-filter:disabled {
+      background: #f4f4f5;
+      color: #3f3f46;
+      cursor: not-allowed;
+      opacity: .95;
     }
     .plan-period-bar .plan-plate-wrap,
     .plan-grid-toolbar .plan-plate-wrap { position: relative; display: flex; align-items: center; flex-shrink: 0; }
@@ -64743,26 +64757,67 @@ function planWorkspacePeriodLabel() {
   const label = (m !== '—' ? String(m).padStart(2, '0') : '—') + '/' + y;
   return label + ' → ' + label;
 }
+/** Giá trị khóa cột phương tiện khi xem kế hoạch trong chi tiết xe */
+function planVehicleLockValues(v) {
+  if (!v) return null;
+  const soXe = planSoXe(v);
+  const soMooc = v.trailerPlate || planTrailerPlate(v) || (v.isTrailer ? (v.plate || '') : '') || '—';
+  const ptId = planPtId(v);
+  return {
+    soXe: soXe && soXe !== '—' ? soXe : '',
+    soMooc: soMooc && soMooc !== '—' ? soMooc : '',
+    ptId: ptId && ptId !== '—' ? String(ptId) : '',
+  };
+}
+function applyPlanVehicleLocks(v) {
+  const lock = planVehicleLockValues(v);
+  if (!lock) return;
+  view.planPlateQ = '';
+  view.planGridColFilters = {
+    ...(view.planGridColFilters || {}),
+    soXe: lock.soXe,
+    soMooc: lock.soMooc,
+    ptId: lock.ptId,
+  };
+  view.planVehicleScoped = true;
+}
+function clearPlanVehicleLocksIfNeeded(vehicleMode) {
+  if (vehicleMode) return;
+  if (!view.planVehicleScoped) return;
+  if (view.planGridColFilters) {
+    delete view.planGridColFilters.soXe;
+    delete view.planGridColFilters.soMooc;
+    delete view.planGridColFilters.ptId;
+  }
+  view.planPlateQ = '';
+  view.planVehicleScoped = false;
+}
 function planWorkspaceHtml(groups, vehicleMode) {
   window._planGridGroups = groups || [];
   ensurePlanGridDefaultPeriod();
+  if (vehicleMode) applyPlanVehicleLocks(vehicleById(view.vehicleId));
+  else clearPlanVehicleLocksIfNeeded(false);
   const open = !!view.planPanelOpen;
   const g = open ? (groups.find(x => x.key === view.selectedPlanGroupKey) || null) : null;
   if (open && !g) view.planPanelOpen = false;
   const nSel = planCheckedKeys().length;
   const kpi = planWorkspaceKpi(groups);
   const updatedAt = new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const plateDisabled = !!vehicleMode;
+  const plateTitle = plateDisabled
+    ? 'Đang xem chi tiết xe — Số xe / rơ-mooc / mã phương tiện đã cố định theo xe này'
+    : 'Tìm theo biển số, rơ-mooc hoặc mã phương tiện';
   return `
-  <div class="plan-workspace ${view.planPanelOpen ? 'is-open' : ''}">
+  <div class="plan-workspace ${view.planPanelOpen ? 'is-open' : ''}" data-plan-vehicle-mode="${vehicleMode ? '1' : '0'}">
     <div class="plan-grid-pane">
       <div class="plan-period-bar">
         <div class="flex items-center gap-2 flex-wrap min-w-0">
           <span class="plan-period-label">Kỳ kế hoạch</span>
           <span class="plan-period-range" data-plan-period-range>${esc(planWorkspacePeriodLabel())}</span>
           <button type="button" class="plan-btn-change-period" id="btnPlanAllPeriods">${view.planShowAllPeriods ? 'Lọc kỳ mới nhất' : 'Đổi kỳ'}</button>
-          <div class="plan-plate-wrap ml-1">
+          <div class="plan-plate-wrap ml-1" title="${esc(plateTitle)}">
             ${planTbIco('search')}
-            <input id="planPlateSearch" class="plan-plate-search" type="search" placeholder="Biển số / rơ-mooc / mã PT…" value="${esc(view.planPlateQ || '')}" />
+            <input id="planPlateSearch" class="plan-plate-search" type="search" placeholder="${plateDisabled ? 'Đã khóa theo xe đang xem' : 'Biển số / rơ-mooc / mã phương tiện…'}" value="${esc(plateDisabled ? '' : (view.planPlateQ || ''))}" ${plateDisabled ? 'disabled' : ''} aria-disabled="${plateDisabled ? 'true' : 'false'}" title="${esc(plateTitle)}" />
           </div>
         </div>
         <div class="plan-kpi-strip" aria-label="Tóm tắt lưới">
@@ -64962,6 +65017,9 @@ function mountPlanSlickGrid() {
   const uniq = (field) => [...new Set(rows.map(r => r[field]).filter(v => v != null && String(v).trim() !== ''))].sort((a, b) => String(a).localeCompare(String(b), 'vi'));
   const selectFields = { year: true, month: true, soXe: true, soMooc: true, applyTo: true, ptId: true, statusText: true, sourceLabel: true };
   const skipFilterCols = { _ck: 1, _idx: 1, _act: 1, lastTouch: 1 };
+  const vehicleGridMode = host.getAttribute('data-plan-grid') === 'vehicle' || !!view.planVehicleScoped;
+  const vehicleLockedFields = { soXe: true, soMooc: true, ptId: true };
+  if (vehicleGridMode && view.vehicleId) applyPlanVehicleLocks(vehicleById(view.vehicleId));
   const fillHeaderFilterNode = (node, col) => {
     if (!node || !col || skipFilterCols[col.id]) {
       if (node) node.innerHTML = '';
@@ -64973,15 +65031,24 @@ function mountPlanSlickGrid() {
     const wrap = document.createElement('div');
     wrap.className = 'slick-filter';
     const cur = (view.planGridColFilters || {})[col.id] || '';
+    const locked = vehicleGridMode && vehicleLockedFields[col.id];
     if (selectFields[col.id]) {
       const sel = document.createElement('select');
       sel.className = 'search-filter';
       sel.setAttribute('aria-label', 'Lọc ' + (col.name || col.id));
-      sel.innerHTML = `<option value="">Tất cả</option>` + uniq(col.field).map(v => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(v)}</option>`).join('');
-      sel.addEventListener('change', () => {
-        view.planGridColFilters[col.id] = sel.value;
-        applyColFilters();
-      });
+      const opts = uniq(col.field);
+      if (locked && cur && !opts.some(v => String(v) === String(cur))) opts.unshift(cur);
+      sel.innerHTML = (locked ? '' : `<option value="">Tất cả</option>`) + opts.map(v => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(v)}</option>`).join('');
+      if (locked) {
+        sel.disabled = true;
+        sel.title = 'Đang xem chi tiết xe — cố định theo xe này';
+        if (cur) sel.value = cur;
+      } else {
+        sel.addEventListener('change', () => {
+          view.planGridColFilters[col.id] = sel.value;
+          applyColFilters();
+        });
+      }
       sel.addEventListener('click', (e) => e.stopPropagation());
       wrap.appendChild(sel);
       wrap.appendChild(planTbIcoEl('chev', 'plan-hdr-chevron'));
@@ -65190,7 +65257,7 @@ function bindPlanSidePanel() {
 function bindPlanGridToolbar() {
   $('#planSideBackdrop')?.addEventListener('click', () => closePlanPanel());
   const plate = $('#planPlateSearch');
-  if (plate) {
+  if (plate && !plate.disabled) {
     plate.addEventListener('input', () => {
       view.planPlateQ = plate.value;
       if (typeof window._planApplyColFilters === 'function') window._planApplyColFilters();
@@ -65224,12 +65291,15 @@ function bindPlanGridToolbar() {
     view.planGridColFilters = {};
     view.planPlateQ = '';
     const plate = $('#planPlateSearch');
-    if (plate) plate.value = '';
+    if (plate && !plate.disabled) plate.value = '';
     ensurePlanGridDefaultPeriod();
+    if (view.planVehicleScoped || (view.name === 'vehicle' && view.vehicleTab === 'plan')) {
+      applyPlanVehicleLocks(vehicleById(view.vehicleId));
+    }
     if (typeof window._planApplyColFilters === 'function') window._planApplyColFilters();
     if (typeof window._planPaintHeaderFilters === 'function') window._planPaintHeaderFilters();
     else render();
-    toast('Đã xóa lọc cột');
+    toast(view.planVehicleScoped ? 'Đã xóa lọc cột (vẫn giữ khóa theo xe đang xem)' : 'Đã xóa lọc cột');
   });
   if (!window._planKeysBound) {
     window._planKeysBound = true;
