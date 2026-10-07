@@ -266,13 +266,25 @@
       overflow: visible;
     }
     .plan-tb-ico {
-      display: inline-block;
+      display: inline-flex;
       width: 16px; height: 16px;
       flex-shrink: 0;
-      background: currentColor;
-      -webkit-mask: var(--ico) center / contain no-repeat;
-      mask: var(--ico) center / contain no-repeat;
+      align-items: center;
+      justify-content: center;
     }
+    .plan-tb-ico svg {
+      display: block;
+      width: 16px; height: 16px;
+      stroke: currentColor;
+      fill: none;
+    }
+    .plan-hdr-search-icon.plan-tb-ico,
+    .plan-hdr-chevron.plan-tb-ico {
+      width: 14px; height: 14px;
+      color: #94a3b8;
+    }
+    .plan-hdr-search-icon.plan-tb-ico svg,
+    .plan-hdr-chevron.plan-tb-ico svg { width: 14px; height: 14px; }
     #plan-grid-container .slick-headerrow-column .slick-filter {
       position: relative;
       display: flex;
@@ -64671,22 +64683,29 @@ function createOrdersFromCheckedPlanGroups() {
   view = { ...view, name: 'order', orderId: created[0].id, from: 'plans' };
   render();
 }
-/** Toolbar icons via CSS mask — không phụ thuộc glyph MDI (tránh ô vuông) */
-const PLAN_TB_ICO = {
-  plus: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E\")",
-  pin: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 17v5M9 3h6l1 7a4 4 0 11-8 0L9 3z'/%3E%3C/svg%3E\")",
-  cal: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M16 3v4M8 3v4M3 11h18M14 15h4'/%3E%3C/svg%3E\")",
-  x: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E\")",
-  refresh: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 10-3.2 6.7M21 3v7h-7'/%3E%3C/svg%3E\")",
-  cols: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Crect x='3' y='4' width='5' height='16' rx='1'/%3E%3Crect x='10' y='4' width='5' height='16' rx='1'/%3E%3Crect x='17' y='4' width='4' height='16' rx='1'/%3E%3C/svg%3E\")",
-  wrap: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 7h16M4 12h10a3 3 0 010 6H9M9 18l-2-2 2-2'/%3E%3C/svg%3E\")",
-  filter: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 5h16l-6 7v5l-4 2v-7L4 5z'/%3E%3C/svg%3E\")",
-  dens: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M8 9l4-4 4 4M8 15l4 4 4-4'/%3E%3C/svg%3E\")",
-  search: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E\")",
-  chev: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
+/** Inline SVG icons — không dùng MDI / CSS mask (tránh ô vuông) */
+const PLAN_TB_SVG = {
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  pin: '<path d="M12 17v5"/><path d="M9 3h6l1 7a4 4 0 1 1-8 0L9 3z"/>',
+  cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M14 15h4"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  refresh: '<path d="M21 12a9 9 0 1 0-3.2 6.7"/><path d="M21 3v7h-7"/>',
+  cols: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="16" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/>',
+  wrap: '<path d="M4 7h16M4 12h10a3 3 0 0 1 0 6H9"/><path d="M9 18l-2-2 2-2"/>',
+  filter: '<path d="M4 5h16l-6 7v5l-4 2v-7L4 5z"/>',
+  dens: '<path d="M8 9l4-4 4 4M8 15l4 4 4-4"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  chev: '<path d="M6 9l6 6 6-6"/>',
 };
-function planTbIco(name) {
-  return `<span class="plan-tb-ico" style="--ico:${PLAN_TB_ICO[name] || PLAN_TB_ICO.plus}" aria-hidden="true"></span>`;
+function planTbIco(name, extraClass) {
+  const body = PLAN_TB_SVG[name] || PLAN_TB_SVG.plus;
+  const cls = extraClass ? ('plan-tb-ico ' + extraClass) : 'plan-tb-ico';
+  return `<span class="${cls}" aria-hidden="true"><svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg></span>`;
+}
+function planTbIcoEl(name, extraClass) {
+  const wrap = document.createElement('span');
+  wrap.innerHTML = planTbIco(name, extraClass);
+  return wrap.firstElementChild;
 }
 function planWorkspaceKpi(groups) {
   const rows = planGridRows(groups || []);
@@ -64938,9 +64957,6 @@ function mountPlanSlickGrid() {
     wrap.className = 'slick-filter';
     const cur = (view.planGridColFilters || {})[col.id] || '';
     if (selectFields[col.id]) {
-      const chev = document.createElement('span');
-      chev.className = 'plan-hdr-chevron plan-tb-ico';
-      chev.style.setProperty('--ico', PLAN_TB_ICO.chev);
       const sel = document.createElement('select');
       sel.className = 'search-filter';
       sel.setAttribute('aria-label', 'Lọc ' + (col.name || col.id));
@@ -64951,14 +64967,8 @@ function mountPlanSlickGrid() {
       });
       sel.addEventListener('click', (e) => e.stopPropagation());
       wrap.appendChild(sel);
-      wrap.appendChild(chev);
+      wrap.appendChild(planTbIcoEl('chev', 'plan-hdr-chevron'));
     } else {
-      const icon = document.createElement('span');
-      icon.className = 'plan-hdr-search-icon plan-tb-ico';
-      icon.style.setProperty('--ico', PLAN_TB_ICO.search);
-      const chev = document.createElement('span');
-      chev.className = 'plan-hdr-chevron plan-tb-ico';
-      chev.style.setProperty('--ico', PLAN_TB_ICO.chev);
       const input = document.createElement('input');
       input.type = 'search';
       input.className = 'search-filter';
@@ -64972,9 +64982,9 @@ function mountPlanSlickGrid() {
       });
       input.addEventListener('click', (e) => e.stopPropagation());
       input.addEventListener('keydown', (e) => e.stopPropagation());
-      wrap.appendChild(icon);
+      wrap.appendChild(planTbIcoEl('search', 'plan-hdr-search-icon'));
       wrap.appendChild(input);
-      wrap.appendChild(chev);
+      wrap.appendChild(planTbIcoEl('chev', 'plan-hdr-chevron'));
     }
     node.appendChild(wrap);
   };
