@@ -64250,7 +64250,7 @@ function planLineSideRowsHtml(g) {
       : '<span class="chip bg-slate-100 text-slate-600">Nhập tay</span>';
     const drift = planPriceDrift(p);
     const driftChip = drift
-      ? `<span class="chip ${drift.pct > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">Giá ${drift.pct > 0 ? '+' : ''}${drift.pct}% so với trung vị</span>`
+      ? `<span class="chip ${drift.pct > 0 ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}" title="So với mức giá hay gặp của cùng hạng mục trên kế hoạch">${drift.pct > 0 ? 'Đắt hơn giá thường ' + drift.pct + '%' : 'Rẻ hơn giá thường ' + Math.abs(drift.pct) + '%'}</span>`
       : '';
     const keepChip = p.keepOnPlan ? '<span class="chip bg-slate-200 text-slate-700">Giữ trên kế hoạch</span>' : '';
     const linked = planLineLinkedOrder(p);
