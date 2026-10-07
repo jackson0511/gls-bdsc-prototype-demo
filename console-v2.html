@@ -64941,10 +64941,10 @@ function mountPlanSlickGrid() {
       if (f.month && String(r.month) !== String(f.month)) return false;
       const q = String(view.planPlateQ || '').trim().toLowerCase();
       if (q && ![r.soXe, r.soMooc, r.ptId, r.plate].some(x => String(x || '').toLowerCase().includes(q))) return false;
-      if (!includes(r.soXe, f.soXe)) return false;
-      if (!includes(r.soMooc, f.soMooc)) return false;
+      if (f.soXe && String(r.soXe || '') !== String(f.soXe)) return false;
+      if (f.soMooc && String(r.soMooc || '') !== String(f.soMooc)) return false;
       if (f.applyTo && r.applyTo !== f.applyTo) return false;
-      if (!includes(r.ptId, f.ptId)) return false;
+      if (f.ptId && String(r.ptId || '') !== String(f.ptId)) return false;
       if (!includes(r.totalText, f.totalText)) return false;
       if (!includes(r.pmhNote, f.pmhNote)) return false;
       if (!includes(r.statusText, f.statusText)) return false;
@@ -64959,8 +64959,8 @@ function mountPlanSlickGrid() {
   };
   window._planApplyColFilters = applyColFilters;
   applyColFilters();
-  const uniq = (field) => [...new Set(rows.map(r => r[field]).filter(v => v != null && v !== ''))].sort((a, b) => String(a).localeCompare(String(b), 'vi'));
-  const selectFields = { year: true, month: true, applyTo: true, statusText: true, sourceLabel: true };
+  const uniq = (field) => [...new Set(rows.map(r => r[field]).filter(v => v != null && String(v).trim() !== ''))].sort((a, b) => String(a).localeCompare(String(b), 'vi'));
+  const selectFields = { year: true, month: true, soXe: true, soMooc: true, applyTo: true, ptId: true, statusText: true, sourceLabel: true };
   const skipFilterCols = { _ck: 1, _idx: 1, _act: 1, lastTouch: 1 };
   const fillHeaderFilterNode = (node, col) => {
     if (!node || !col || skipFilterCols[col.id]) {
