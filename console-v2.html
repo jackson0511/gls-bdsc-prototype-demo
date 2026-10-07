@@ -248,11 +248,30 @@
       box-shadow: inset 0 0 0 2px var(--order-grid-selection-border);
       z-index: 1;
     }
+    /* Force filter row visible (theme CDN đôi khi ẩn headerrow) */
+    #plan-grid-container .slick-headerrow,
+    #plan-grid-container .slick-headerrow-columns {
+      display: block !important;
+      height: 40px !important;
+      line-height: 40px;
+      background: #fafafa;
+      border-bottom: 1px solid #e4e4e7;
+    }
     #plan-grid-container .slick-headerrow-column {
-      display: flex;
+      display: flex !important;
       align-items: center;
       padding: 4px 6px;
       box-sizing: border-box;
+      height: 40px !important;
+      overflow: visible;
+    }
+    .plan-tb-ico {
+      display: inline-block;
+      width: 16px; height: 16px;
+      flex-shrink: 0;
+      background: currentColor;
+      -webkit-mask: var(--ico) center / contain no-repeat;
+      mask: var(--ico) center / contain no-repeat;
     }
     #plan-grid-container .slick-headerrow-column .slick-filter {
       position: relative;
@@ -64652,6 +64671,23 @@ function createOrdersFromCheckedPlanGroups() {
   view = { ...view, name: 'order', orderId: created[0].id, from: 'plans' };
   render();
 }
+/** Toolbar icons via CSS mask — không phụ thuộc glyph MDI (tránh ô vuông) */
+const PLAN_TB_ICO = {
+  plus: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 5v14M5 12h14'/%3E%3C/svg%3E\")",
+  pin: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 17v5M9 3h6l1 7a4 4 0 11-8 0L9 3z'/%3E%3C/svg%3E\")",
+  cal: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='16' rx='2'/%3E%3Cpath d='M16 3v4M8 3v4M3 11h18M14 15h4'/%3E%3C/svg%3E\")",
+  x: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 6l12 12M18 6L6 18'/%3E%3C/svg%3E\")",
+  refresh: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a9 9 0 10-3.2 6.7M21 3v7h-7'/%3E%3C/svg%3E\")",
+  cols: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Crect x='3' y='4' width='5' height='16' rx='1'/%3E%3Crect x='10' y='4' width='5' height='16' rx='1'/%3E%3Crect x='17' y='4' width='4' height='16' rx='1'/%3E%3C/svg%3E\")",
+  wrap: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 7h16M4 12h10a3 3 0 010 6H9M9 18l-2-2 2-2'/%3E%3C/svg%3E\")",
+  filter: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 5h16l-6 7v5l-4 2v-7L4 5z'/%3E%3C/svg%3E\")",
+  dens: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M8 9l4-4 4 4M8 15l4 4 4-4'/%3E%3C/svg%3E\")",
+  search: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E\")",
+  chev: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")",
+};
+function planTbIco(name) {
+  return `<span class="plan-tb-ico" style="--ico:${PLAN_TB_ICO[name] || PLAN_TB_ICO.plus}" aria-hidden="true"></span>`;
+}
 function planWorkspaceKpi(groups) {
   const rows = planGridRows(groups || []);
   let nBd = 0, nSc = 0;
@@ -64702,29 +64738,29 @@ function planWorkspaceHtml(groups, vehicleMode) {
       <div id="planGridToolbar" class="plan-grid-toolbar ${nSel ? 'has-sel' : ''}">
         <div class="plan-grid-toolbar-left">
           <button type="button" class="plan-tb-btn is-success" id="btnPlanBulkOrder" ${nSel ? '' : 'disabled'} title="Tạo phiếu từ dòng đã chọn">
-            <span class="mdi mdi-file-plus-outline"></span> Tạo phiếu
+            ${planTbIco('plus')} Tạo phiếu
           </button>
           <button type="button" class="plan-tb-btn" id="btnPlanKeepSel" ${nSel ? '' : 'disabled'}>
-            <span class="mdi mdi-pin-outline"></span> Giữ kế hoạch
+            ${planTbIco('pin')} Giữ kế hoạch
           </button>
           <button type="button" class="plan-tb-btn" id="btnPlanCopyNext" ${nSel ? '' : 'disabled'}>
-            <span class="mdi mdi-calendar-export"></span> Dời tháng sau
+            ${planTbIco('cal')} Dời tháng sau
           </button>
           <button type="button" class="plan-tb-btn" id="btnPlanClearSel" ${nSel ? '' : 'disabled'}>
-            <span class="mdi mdi-close"></span> Xóa lựa chọn
+            ${planTbIco('x')} Xóa lựa chọn
           </button>
           <button type="button" class="plan-tb-btn" id="btnPlanReloadGrid" title="Tải lại">
-            <span class="mdi mdi-refresh"></span> Tải lại
+            ${planTbIco('refresh')} Tải lại
           </button>
           <span class="plan-tb-updated hidden lg:inline">Cập nhật lần cuối lúc ${esc(updatedAt)}</span>
         </div>
         <div class="plan-grid-toolbar-right">
           <span data-plan-sel-count class="text-xs font-medium text-slate-600 tabular-nums">${nSel ? ('Đã chọn ' + nSel) : ''}</span>
           <span class="plan-tb-divider"></span>
-          <button type="button" class="plan-tb-btn is-ghost" title="Cột hiển thị" aria-label="Cột"><span class="mdi mdi-view-column"></span></button>
-          <button type="button" class="plan-tb-btn is-ghost" title="Bọc chữ" aria-label="Bọc chữ"><span class="mdi mdi-format-text-wrapping-wrap"></span></button>
-          <button type="button" class="plan-tb-btn is-ghost" title="Xóa lọc cột" id="btnPlanClearColFilters" aria-label="Xóa lọc"><span class="mdi mdi-filter-remove-outline"></span></button>
-          <button type="button" class="plan-tb-btn is-ghost" title="Mật độ dòng" aria-label="Mật độ"><span class="mdi mdi-arrow-collapse-vertical"></span></button>
+          <button type="button" class="plan-tb-btn is-ghost" title="Cột hiển thị" aria-label="Cột">${planTbIco('cols')}</button>
+          <button type="button" class="plan-tb-btn is-ghost" title="Bọc chữ" aria-label="Bọc chữ">${planTbIco('wrap')}</button>
+          <button type="button" class="plan-tb-btn is-ghost" title="Xóa lọc cột" id="btnPlanClearColFilters" aria-label="Xóa lọc">${planTbIco('filter')}</button>
+          <button type="button" class="plan-tb-btn is-ghost" title="Mật độ dòng" aria-label="Mật độ">${planTbIco('dens')}</button>
         </div>
       </div>
       <div id="plan-grid-container" class="sg-has-group-header">
@@ -64889,49 +64925,98 @@ function mountPlanSlickGrid() {
   applyColFilters();
   const uniq = (field) => [...new Set(rows.map(r => r[field]).filter(v => v != null && v !== ''))].sort((a, b) => String(a).localeCompare(String(b), 'vi'));
   const selectFields = { year: true, month: true, applyTo: true, statusText: true, sourceLabel: true };
+  const skipFilterCols = { _ck: 1, _idx: 1, _act: 1, lastTouch: 1 };
+  const fillHeaderFilterNode = (node, col) => {
+    if (!node || !col || skipFilterCols[col.id]) {
+      if (node) node.innerHTML = '';
+      return;
+    }
+    if (node.dataset.planFilterBound === col.id) return;
+    node.innerHTML = '';
+    node.dataset.planFilterBound = col.id;
+    const wrap = document.createElement('div');
+    wrap.className = 'slick-filter';
+    const cur = (view.planGridColFilters || {})[col.id] || '';
+    if (selectFields[col.id]) {
+      const chev = document.createElement('span');
+      chev.className = 'plan-hdr-chevron plan-tb-ico';
+      chev.style.setProperty('--ico', PLAN_TB_ICO.chev);
+      const sel = document.createElement('select');
+      sel.className = 'search-filter';
+      sel.setAttribute('aria-label', 'Lọc ' + (col.name || col.id));
+      sel.innerHTML = `<option value="">Tất cả</option>` + uniq(col.field).map(v => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(v)}</option>`).join('');
+      sel.addEventListener('change', () => {
+        view.planGridColFilters[col.id] = sel.value;
+        applyColFilters();
+      });
+      sel.addEventListener('click', (e) => e.stopPropagation());
+      wrap.appendChild(sel);
+      wrap.appendChild(chev);
+    } else {
+      const icon = document.createElement('span');
+      icon.className = 'plan-hdr-search-icon plan-tb-ico';
+      icon.style.setProperty('--ico', PLAN_TB_ICO.search);
+      const chev = document.createElement('span');
+      chev.className = 'plan-hdr-chevron plan-tb-ico';
+      chev.style.setProperty('--ico', PLAN_TB_ICO.chev);
+      const input = document.createElement('input');
+      input.type = 'search';
+      input.className = 'search-filter';
+      input.placeholder = 'Tìm…';
+      input.setAttribute('aria-label', 'Tìm ' + (col.name || col.id));
+      input.value = cur;
+      input.style.paddingRight = '22px';
+      input.addEventListener('input', () => {
+        view.planGridColFilters[col.id] = input.value;
+        applyColFilters();
+      });
+      input.addEventListener('click', (e) => e.stopPropagation());
+      input.addEventListener('keydown', (e) => e.stopPropagation());
+      wrap.appendChild(icon);
+      wrap.appendChild(input);
+      wrap.appendChild(chev);
+    }
+    node.appendChild(wrap);
+  };
+  const paintAllHeaderFilters = () => {
+    try {
+      if (typeof grid.setHeaderRowVisibility === 'function') grid.setHeaderRowVisibility(true);
+      if (typeof grid.setOptions === 'function') grid.setOptions({ showHeaderRow: true, headerRowHeight: 40 });
+    } catch (e) {}
+    cols.forEach(col => {
+      let node = null;
+      try {
+        if (typeof grid.getHeaderRowColumn === 'function') node = grid.getHeaderRowColumn(col.id);
+      } catch (e) {}
+      if (!node) {
+        node = host.querySelector('.slick-headerrow-column.l' + cols.indexOf(col))
+          || host.querySelector(`[id$="${col.id}"]`);
+      }
+      /* Slick gắn id dạng *_colId trên headerrow cell */
+      if (!node) {
+        const all = host.querySelectorAll('.slick-headerrow-column');
+        const idx = cols.findIndex(c => c.id === col.id);
+        if (idx >= 0 && all[idx]) node = all[idx];
+      }
+      if (node) {
+        delete node.dataset.planFilterBound;
+        fillHeaderFilterNode(node, col);
+      }
+    });
+  };
   if (grid.onHeaderRowCellRendered) {
     grid.onHeaderRowCellRendered.subscribe((_e, args) => {
-      const node = args.node;
-      const col = args.column;
-      node.innerHTML = '';
-      if (!col || col.id === '_ck' || col.id === '_idx' || col.id === '_act' || col.id === 'lastTouch') return;
-      const wrap = document.createElement('div');
-      wrap.className = 'slick-filter';
-      const cur = (view.planGridColFilters || {})[col.id] || '';
-      if (selectFields[col.id]) {
-        const chev = document.createElement('span');
-        chev.className = 'mdi mdi-chevron-down plan-hdr-chevron';
-        const sel = document.createElement('select');
-        sel.className = 'search-filter';
-        sel.innerHTML = `<option value="">Tất cả</option>` + uniq(col.field).map(v => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(v)}</option>`).join('');
-        sel.addEventListener('change', () => {
-          view.planGridColFilters[col.id] = sel.value;
-          applyColFilters();
-        });
-        wrap.appendChild(sel);
-        wrap.appendChild(chev);
-      } else {
-        const icon = document.createElement('span');
-        icon.className = 'mdi mdi-magnify plan-hdr-search-icon';
-        const chev = document.createElement('span');
-        chev.className = 'mdi mdi-chevron-down plan-hdr-chevron';
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'search-filter';
-        input.value = cur;
-        input.style.paddingRight = '22px';
-        input.addEventListener('input', () => {
-          view.planGridColFilters[col.id] = input.value;
-          applyColFilters();
-        });
-        wrap.appendChild(icon);
-        wrap.appendChild(input);
-        wrap.appendChild(chev);
+      if (args && args.node && args.column) {
+        delete args.node.dataset.planFilterBound;
+        fillHeaderFilterNode(args.node, args.column);
       }
-      node.appendChild(wrap);
     });
-    try { grid.setHeaderRowVisibility(true); grid.render(); } catch (e) {}
   }
+  try { grid.render(); } catch (e) {}
+  paintAllHeaderFilters();
+  requestAnimationFrame(paintAllHeaderFilters);
+  setTimeout(paintAllHeaderFilters, 50);
+  setTimeout(paintAllHeaderFilters, 200);
   const bindHeaderCheck = () => {
     const headers = host.querySelectorAll('.slick-header:not(.slick-preheader-panel) .slick-header-column');
     const ckHeader = [...headers].find(el => String(el.id || '').includes('_ck')) || headers[0];
@@ -65006,11 +65091,13 @@ function mountPlanSlickGrid() {
     try {
       /* forceFitColumns: true → resizeCanvas giãn cột hết chiều ngang container */
       grid.resizeCanvas();
+      paintAllHeaderFilters();
     } catch (e) {}
   };
+  window._planPaintHeaderFilters = paintAllHeaderFilters;
   window._planGridResize = () => fitPlanGridWidth();
   window.addEventListener('resize', window._planGridResize);
-  requestAnimationFrame(() => { fitPlanGridWidth(); bindHeaderCheck(); });
+  requestAnimationFrame(() => { fitPlanGridWidth(); bindHeaderCheck(); paintAllHeaderFilters(); });
   setTimeout(fitPlanGridWidth, 0);
   setTimeout(fitPlanGridWidth, 120);
 }
@@ -65113,6 +65200,7 @@ function bindPlanGridToolbar() {
     if (plate) plate.value = '';
     ensurePlanGridDefaultPeriod();
     if (typeof window._planApplyColFilters === 'function') window._planApplyColFilters();
+    if (typeof window._planPaintHeaderFilters === 'function') window._planPaintHeaderFilters();
     else render();
     toast('Đã xóa lọc cột');
   });
