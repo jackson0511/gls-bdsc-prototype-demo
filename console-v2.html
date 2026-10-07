@@ -67198,65 +67198,94 @@ function renderVehicleCatalog(v) {
     return true;
   });
   const tireAlerts = tireBatteryAlertsForVehicle(v);
+  const rowsHtml = cats.map(c => {
+    const st = getCatState(v.id, c.id);
+    const assigned = assignedIds.has(Number(c.id));
+    const computed = computeNextFromRules(c, st, v.km, v.hours || 0);
+    const dueKm = st.nextKm ?? computed.nextKm;
+    const dueHours = st.nextHours ?? computed.nextHours;
+    const dueDate = st.nextDate ?? computed.nextDate;
+    const kmLeft = dueKm != null ? dueKm - v.km : null;
+    let dueCls = 'text-slate-700';
+    if (kmLeft != null && kmLeft <= DB.settings.maintenanceRemindKmBefore) dueCls = 'text-amber-700 font-medium';
+    if (kmLeft != null && kmLeft <= 0) dueCls = 'font-semibold text-rose-700';
+    const hist = catalogHistory(v.id, c.id);
+    const dec = planDecisionForCatalog(c, (st.occurrence || 0) + 1);
+    const dueTxt = [
+      dueKm != null ? kmFmt(dueKm) + ' km' : '',
+      dueHours != null ? kmFmt(dueHours) + ' giờ' : '',
+      dueDate || '',
+    ].filter(Boolean).join(' · ') || '—';
+    const lastTxt = [st.lastDate || null, st.lastKm != null ? kmFmt(st.lastKm) + ' km' : null].filter(Boolean).join(' · ') || '—';
+    const rulesTip = (c.rules || []).map(r => `#${r.seq} ${r.label}: ${ruleTypeLabel(r.type)}=${r.value}`).join(' · ') || 'Chưa có chu kỳ';
+    const dis = assigned ? '' : 'disabled';
+    return `<tr class="row-h ${assigned ? '' : 'opacity-60'}">
+      <td class="td text-center w-10">
+        <input type="checkbox" class="vc-plan-row" data-cid="${c.id}" ${assigned ? '' : 'disabled'} aria-label="Chọn ${esc(c.code)}" />
+      </td>
+      <td class="td min-w-[12rem]">
+        <div class="font-medium text-slate-900">${esc(c.code)}</div>
+        <div class="text-xs text-slate-600 leading-snug">${esc(c.name)}</div>
+        <div class="mt-0.5 flex flex-wrap gap-1">${decisionBadge(dec)}${assigned ? '' : '<span class="chip bg-slate-100 text-slate-600">Chưa gắn</span>'}</div>
+      </td>
+      <td class="td text-sm text-slate-700 whitespace-nowrap">${esc(c.system || '—')}</td>
+      <td class="td text-sm tabular-nums whitespace-nowrap">
+        <div>${st.occurrence || 0} lần BD</div>
+        <div class="text-xs text-slate-500">${hist.length} phiếu LS</div>
+      </td>
+      <td class="td text-sm tabular-nums whitespace-nowrap">${esc(lastTxt)}</td>
+      <td class="td text-sm whitespace-nowrap">
+        <div class="${dueCls} tabular-nums">${esc(dueTxt)}</div>
+        ${kmLeft != null ? `<div class="text-xs text-slate-500">Còn ${kmFmt(kmLeft)} km</div>` : ''}
+      </td>
+      <td class="td text-xs text-slate-600 max-w-[10rem]">
+        <span class="line-clamp-2" title="${esc(rulesTip)}">${esc(rulesTip)}</span>
+      </td>
+      <td class="td whitespace-nowrap">
+        <div class="flex flex-wrap items-center gap-1 justify-end">
+          <button type="button" data-toggle-assign-cat="${c.id}" class="btn btn-outline btn-xs">${assigned ? 'Bỏ gắn' : 'Gắn'}</button>
+          <button type="button" data-create-plan-one="${c.id}" class="btn btn-primary btn-xs" ${dis}>Kế hoạch</button>
+          <button type="button" data-create-order-from-due="${v.id}" data-cid="${c.id}" class="btn btn-outline btn-xs" ${dis}>Phiếu</button>
+          <button type="button" data-cat-history="${c.id}" class="btn btn-outline btn-xs">LS</button>
+          <button type="button" data-edit-due="${c.id}" class="btn btn-outline btn-xs" title="Sửa mốc tiếp theo">Mốc</button>
+          <button type="button" data-apply-rule="${c.id}" class="btn btn-outline btn-xs !border-blue-300 !bg-blue-50 text-blue-800" title="Áp dụng chu kỳ định mức">Chu kỳ</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
   return `
-  <p class="mb-3 text-sm text-slate-600">Gắn <strong>danh mục bảo dưỡng</strong> vào xe này. Chỉ danh mục đã gắn mới theo dõi mốc / nhắc hạn / tạo kế hoạch từ xe. Áp hàng loạt nhiều xe: dùng màn <em>Danh mục bảo dưỡng</em> (popup chọn xe). Bỏ gắn trên từng dòng có xác nhận.</p>
+  <p class="mb-2 text-sm text-slate-600">Danh mục gắn xe — theo dõi mốc / nhắc hạn / tạo kế hoạch. Áp hàng loạt: màn <em>Danh mục bảo dưỡng</em>.</p>
   ${tireAlertBannerHtml(tireAlerts, { plate: v.plate, vid: v.id, tab: tireAlerts.some(a => a.kind === 'BATTERY') && !tireAlerts.some(a => a.kind === 'TIRE') ? 'BATTERY' : 'TIRE' })}
   <div class="mb-3 flex flex-wrap gap-2">
     <button type="button" id="btnAssignCatalogs" class="btn btn-outline btn-sm">+ Gắn danh mục</button>
-    <button type="button" id="btnCreatePlanFromDueCats" class="btn btn-primary btn-sm">Tạo kế hoạch từ danh mục sắp/đã đến hạn</button>
-    <button type="button" id="btnCreatePlanFromVehicleCats" class="btn btn-outline btn-sm">Tạo kế hoạch từ dòng đã chọn</button>
+    <button type="button" id="btnCreatePlanFromDueCats" class="btn btn-primary btn-sm">Tạo KH từ sắp/đã đến hạn</button>
+    <button type="button" id="btnCreatePlanFromVehicleCats" class="btn btn-outline btn-sm">Tạo KH từ dòng đã chọn</button>
   </div>
   ${filterBarShell([
     filterSearch('flt-search', 'Mã / tên danh mục…', f.search),
     filterSelect('flt-system', 'Hệ thống', f.system, [['ALL','Tất cả'], ...systems().map(s => [s, s])]),
     filterSelect('flt-vcShow', 'Hiển thị', f.vcShow || 'ASSIGNED', [['ASSIGNED','Đã gắn xe'],['ALL','Tất cả danh mục master']]),
-  ].join(''), `${cats.length} danh mục · đã gắn ${assignedIds.size}`)}
-  <div class="space-y-3">
-    ${cats.map(c => {
-      const st = getCatState(v.id, c.id);
-      const assigned = assignedIds.has(Number(c.id));
-      const computed = computeNextFromRules(c, st, v.km, v.hours || 0);
-      const dueKm = st.nextKm ?? computed.nextKm;
-      const dueHours = st.nextHours ?? computed.nextHours;
-      const dueDate = st.nextDate ?? computed.nextDate;
-      const kmLeft = dueKm != null ? dueKm - v.km : null;
-      let dueCls = 'text-slate-700';
-      if (kmLeft != null && kmLeft <= DB.settings.maintenanceRemindKmBefore) dueCls = 'text-amber-700';
-      if (kmLeft != null && kmLeft <= 0) dueCls = 'font-semibold text-rose-700';
-      const hist = catalogHistory(v.id, c.id);
-      const preview = hist.slice(0, 3);
-      return `<div class="card p-4 ${assigned ? '' : 'opacity-70 border-dashed'}">
-        <div class="flex flex-wrap gap-2">
-          <label class="mt-1"><input type="checkbox" class="vc-plan-row" data-cid="${c.id}" ${assigned ? '' : 'disabled'} /></label>
-          <div class="mr-auto">
-            <div class="flex flex-wrap items-center gap-2">
-              <div class="font-semibold text-slate-900">${c.code} · ${c.name}</div>
-              ${assigned ? '<span class="chip bg-emerald-100 text-emerald-800">Đã gắn</span>' : '<span class="chip bg-slate-100 text-slate-600">Chưa gắn</span>'}
-              ${decisionBadge(planDecisionForCatalog(c, (st.occurrence || 0) + 1))}
-              ${evalBadBadge(c)}
-            </div>
-            <div class="text-xs text-slate-500">${c.system} · Đã BD ${st.occurrence || 0} lần · ${hist.length} phiếu LS</div>
-          </div>
-          <button data-toggle-assign-cat="${c.id}" class="btn btn-outline btn-sm">${assigned ? 'Bỏ gắn' : 'Gắn vào xe'}</button>
-          <button data-create-plan-one="${c.id}" class="btn btn-primary btn-sm" ${assigned ? '' : 'disabled'}>Tạo kế hoạch</button>
-          <button type="button" data-create-order-from-due="${v.id}" data-cid="${c.id}" class="btn btn-outline btn-sm" ${assigned ? '' : 'disabled'}>Tạo phiếu</button>
-          <button data-cat-history="${c.id}" class="btn btn-outline btn-sm">Xem lịch sử</button>
-          <button data-edit-due="${c.id}" class="btn btn-outline btn-sm">Sửa mốc tiếp theo</button>
-          <button data-apply-rule="${c.id}" class="btn btn-outline btn-sm !border-blue-300 !bg-blue-50 text-blue-800">Áp dụng chu kỳ định mức</button>
-        </div>
-        <div class="mt-3 grid gap-3 text-sm md:grid-cols-3">
-          <div class="rounded-md bg-slate-50 p-3"><div class="text-xs text-slate-500">Lần gần nhất</div><div>${st.lastDate || '—'} · ${st.lastKm != null ? kmFmt(st.lastKm)+' km' : '—'}</div></div>
-          <div class="rounded-md bg-slate-50 p-3"><div class="text-xs text-slate-500">Mốc tiếp theo</div>
-            <div class="${dueCls}">${dueKm != null ? kmFmt(dueKm)+' km' : ''}${dueHours != null ? ((dueKm!=null?' · ':'')+kmFmt(dueHours)+' giờ') : ''}${(dueKm!=null||dueHours!=null) && dueDate ? ' · ' : ''}${dueDate || (dueKm==null&&dueHours==null?'—':'')}</div>
-            ${kmLeft != null ? `<div class="mt-1 text-xs">Còn ${kmFmt(kmLeft)} km</div>` : ''}
-          </div>
-          <div class="rounded-md bg-slate-50 p-3"><div class="text-xs text-slate-500">Chu kỳ định mức</div>
-            <ul class="mt-1 list-disc pl-4 text-xs text-slate-700">${(c.rules||[]).map(r => `<li>#${r.seq} ${esc(r.label)}: ${ruleTypeLabel(r.type)} = ${r.value}</li>`).join('')}</ul>
-          </div>
-        </div>
-        ${preview.length ? `<div class="mt-3 text-xs text-slate-500">LS gần đây: ${preview.map(h => h.code).join(', ')}</div>` : ''}
-      </div>`;
-    }).join('') || `<div class="card p-8 text-center text-slate-500">Chưa gắn danh mục nào. Bấm «Gắn danh mục» hoặc xem «Tất cả danh mục master».</div>`}
+  ].join(''), `${cats.length} dòng · đã gắn ${assignedIds.size}`)}
+  <div class="card overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead class="bg-slate-50 text-slate-600">
+          <tr>
+            <th class="th text-center w-10"></th>
+            <th class="th text-left">Danh mục</th>
+            <th class="th text-left">Hệ thống</th>
+            <th class="th text-left">BD / LS</th>
+            <th class="th text-left">Lần gần nhất</th>
+            <th class="th text-left">Mốc tiếp theo</th>
+            <th class="th text-left">Chu kỳ</th>
+            <th class="th text-right">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml || `<tr><td colspan="8" class="px-5 py-10 text-center text-slate-500">Chưa gắn danh mục. Bấm «Gắn danh mục» hoặc chọn «Tất cả danh mục master».</td></tr>`}
+        </tbody>
+      </table>
+    </div>
   </div>`;
 }
 
