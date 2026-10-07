@@ -64796,9 +64796,9 @@ function mountPlanSlickGrid() {
   const options = {
     enableCellNavigation: true,
     enableColumnReorder: true,
-    forceFitColumns: false,
+    forceFitColumns: true,
     fullWidthRows: true,
-    frozenColumn: 1,
+    frozenColumn: -1,
     rowHeight: 32,
     headerRowHeight: 40,
     showHeaderRow: true,
@@ -64967,9 +64967,17 @@ function mountPlanSlickGrid() {
     if (!cell || cell.row == null) return;
     showPlanCtx(e, filtered[cell.row]);
   });
-  window._planGridResize = () => { try { grid.resizeCanvas(); } catch (e) {} };
+  const fitPlanGridWidth = () => {
+    try {
+      /* forceFitColumns: true → resizeCanvas giãn cột hết chiều ngang container */
+      grid.resizeCanvas();
+    } catch (e) {}
+  };
+  window._planGridResize = () => fitPlanGridWidth();
   window.addEventListener('resize', window._planGridResize);
-  requestAnimationFrame(() => { try { grid.resizeCanvas(); bindHeaderCheck(); } catch (e) {} });
+  requestAnimationFrame(() => { fitPlanGridWidth(); bindHeaderCheck(); });
+  setTimeout(fitPlanGridWidth, 0);
+  setTimeout(fitPlanGridWidth, 120);
 }
 function bindPlanSidePanel() {
   const panel = document.getElementById('planSidePanel');
