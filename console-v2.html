@@ -43,7 +43,12 @@
     .td { white-space: nowrap; padding: .75rem .75rem; }
     .row-h { border-top: 1px solid #f1f5f9; transition: background .15s; }
     .row-h:hover { background: #f8fafc; }
-    :root { --slick-font-family: Inter, system-ui, sans-serif; }
+    :root {
+      --slick-font-family: Inter, system-ui, sans-serif;
+      --slick-header-input-height: 28px;
+      --slick-cell-padding: 2px 6px;
+      --heroui-default-200: #dedee0;
+    }
     .plan-workspace {
       display: flex;
       min-height: 0;
@@ -61,49 +66,185 @@
       flex: 1;
     }
     .plan-workspace.is-open .plan-grid-pane { min-width: 0; }
+    /* Period strip (trucking-like date bar) */
+    .plan-period-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .75rem;
+      flex-wrap: wrap;
+      height: auto;
+      min-height: 2.5rem;
+      padding: .35rem .5rem;
+      border-bottom: 1px solid #e4e4e7;
+      background: #fff;
+      font-size: 12px;
+      color: #334155;
+    }
+    .plan-period-bar .plan-period-label { color: #64748b; font-weight: 500; }
+    .plan-period-bar .plan-period-range { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .plan-btn-change-period {
+      height: 28px; padding: 0 10px; border-radius: .375rem;
+      border: 1px solid #7dd3fc; background: #e0f2fe; color: #075985;
+      font-size: 12px; font-weight: 600; font-family: inherit; cursor: pointer;
+    }
+    .plan-btn-change-period:hover { background: #bae6fd; }
+    /* Toolbar h-11 like OrderGridToolBar */
     .plan-grid-toolbar {
       display: flex;
       align-items: center;
-      gap: .5rem;
-      flex-wrap: wrap;
-      padding: .5rem .75rem;
+      justify-content: space-between;
+      gap: .75rem;
+      flex-wrap: nowrap;
+      height: 2.75rem;
+      min-height: 2.75rem;
+      padding: 0 .5rem;
       border-bottom: 1px solid #e4e4e7;
-      background: #fafafa;
+      background: #fff;
       font-size: 12px;
       color: #475569;
+      overflow: hidden;
     }
+    .plan-grid-toolbar-left {
+      display: flex; align-items: center; gap: .375rem;
+      min-width: 0; flex: 1; overflow-x: auto;
+    }
+    .plan-grid-toolbar-right {
+      display: flex; align-items: center; gap: .5rem; flex-shrink: 0;
+    }
+    .plan-tb-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+      height: 32px; padding: 0 10px; border-radius: .375rem;
+      border: 1px solid #d4d4d8; background: #fff; color: #3f3f46;
+      font-size: 12px; font-weight: 500; font-family: inherit; cursor: pointer;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .plan-tb-btn .mdi { font-size: 16px; line-height: 1; }
+    .plan-tb-btn:hover { background: #fafafa; border-color: #a1a1aa; }
+    .plan-tb-btn:disabled { opacity: .45; cursor: not-allowed; }
+    .plan-tb-btn.is-primary { border-color: #1d4ed8; background: #eff6ff; color: #1e40af; }
+    .plan-tb-btn.is-primary:hover { background: #dbeafe; }
+    .plan-tb-btn.is-success { border-color: #86efac; background: #f0fdf4; color: #166534; }
+    .plan-tb-btn.is-ghost {
+      width: 32px; min-width: 32px; padding: 0; border-color: transparent; background: transparent; color: #52525b;
+    }
+    .plan-tb-btn.is-ghost:hover { background: #f4f4f5; }
+    .plan-period-bar .plan-plate-search,
     .plan-grid-toolbar .plan-plate-search {
       height: 28px;
-      min-width: 220px;
-      flex: 1;
-      max-width: 320px;
+      min-width: 180px;
+      width: 220px;
       border: 1px solid #d4d4d8;
-      border-radius: 2px;
+      border-radius: .375rem;
       padding: 0 8px 0 28px;
       font-size: 12px;
       font-family: inherit;
     }
-    .plan-grid-toolbar .plan-plate-wrap { position: relative; display: flex; align-items: center; }
+    .plan-period-bar .plan-plate-wrap,
+    .plan-grid-toolbar .plan-plate-wrap { position: relative; display: flex; align-items: center; flex-shrink: 0; }
+    .plan-period-bar .plan-plate-wrap .mdi,
     .plan-grid-toolbar .plan-plate-wrap .mdi { position: absolute; left: 8px; color: #94a3b8; font-size: 15px; pointer-events: none; }
-    .plan-grid-actions { display: none; align-items: center; gap: .4rem; flex-wrap: wrap; }
-    .plan-grid-toolbar.has-sel .plan-grid-actions { display: flex; }
+    .plan-tb-updated { font-size: 11px; color: #94a3b8; white-space: nowrap; }
+    .plan-tb-divider { width: 1px; height: 20px; background: #e4e4e7; flex-shrink: 0; }
+    /* KPI glass pills (OrderGridDispatchSummaryStrip) */
+    .plan-kpi-strip { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+    .plan-kpi-chip {
+      display: inline-flex; align-items: center; gap: .375rem;
+      height: 32px; padding: 0 10px 0 4px; border-radius: 999px;
+      background: linear-gradient(90deg, rgba(239,246,255,.7), rgba(239,246,255,.4), transparent);
+      box-shadow: inset 0 0 0 1px rgba(219,234,254,.8);
+    }
+    .plan-kpi-chip .plan-kpi-ico {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 22px; height: 22px; border-radius: 999px;
+      background: #dbeafe; color: #2563eb; font-size: 12px; font-weight: 700;
+    }
+    .plan-kpi-chip .plan-kpi-val {
+      font-size: 12px; font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums;
+    }
+    /* Status pill like trucking IN_PROGRESS */
+    .plan-status-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      max-width: 100%; border-radius: 999px; border: 1px solid #ca8a04;
+      background: #fefce8; color: #ca8a04; padding: 1px 6px;
+      font-size: 12px; font-weight: 600; line-height: 1.25;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .plan-status-chip .dot {
+      width: 6px; height: 6px; border-radius: 999px; background: #eab308; flex-shrink: 0;
+    }
+    .plan-status-chip.is-ok { border-color: #059669; background: #ecfdf5; color: #047857; }
+    .plan-status-chip.is-ok .dot { background: #10b981; }
+    .plan-status-chip.is-muted { border-color: #94a3b8; background: #f8fafc; color: #475569; }
+    .plan-status-chip.is-muted .dot { background: #94a3b8; }
+    .plan-dt-empty { color: #94a3b8; font-variant-numeric: tabular-nums; font-size: 12px; }
     #plan-grid-container {
       position: relative;
       flex: 1;
       min-height: 0;
       min-width: 0;
       overflow: hidden;
+      --sg-divider-color: rgba(17, 17, 17, 0.15);
+      --sg-divider: inset 2px 0 0 var(--sg-divider-color);
+      --order-grid-selection-border: #0078d4;
+      --order-grid-selection-fill: rgba(0, 120, 212, 0.12);
+      --slick-cell-padding: 2px 6px;
+      --slick-header-input-height: 28px;
     }
+    #plan-grid-container .slickgrid-container {
+      box-sizing: border-box;
+      border: 1px solid var(--heroui-default-200, #dedee0);
+      height: 100%;
+    }
+    #plan-grid-container .slick-preheader-panel { border-top: none !important; }
     #plan-grid-container .slick-preheader-panel .slick-header-column {
+      --slick-preheader-grouped-title-justify: center;
       font-weight: 600;
       font-size: 12px;
       color: #334155;
       justify-content: center;
+      align-items: center;
+    }
+    #plan-grid-container .slick-preheader-panel .slick-header-column:not(:first-child) {
+      box-shadow: var(--sg-divider);
+    }
+    #plan-grid-container.sg-has-group-header
+      .slick-pane-header
+      > .slick-header:not(.slick-preheader-panel)
+      .slick-header-column::after {
+      content: "";
+      position: absolute;
+      z-index: 1;
+      top: 0; right: 0; left: 0;
+      height: 2px;
+      background: var(--sg-divider-color);
+      pointer-events: none;
+    }
+    #plan-grid-container
+      .slick-pane-header
+      > .slick-header:not(.slick-preheader-panel)
+      .slick-header-column:not(:first-child)::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 20%;
+      height: 60%; width: 2px;
+      background: var(--sg-divider-color);
+      pointer-events: none;
     }
     #plan-grid-container .slick-header-columns .slick-header-column {
       font-size: 12px;
       font-weight: 600;
       color: #334155;
+      position: relative;
+    }
+    #plan-grid-container .slick-viewport .slick-row .slick-cell {
+      padding: var(--slick-cell-padding, 2px 6px);
+      font-size: 12px;
+      align-items: center;
+    }
+    #plan-grid-container .slick-viewport .slick-row .slick-cell.active {
+      box-shadow: inset 0 0 0 2px var(--order-grid-selection-border);
+      z-index: 1;
     }
     #plan-grid-container .slick-headerrow-column {
       display: flex;
@@ -125,11 +266,19 @@
       color: #94a3b8;
       pointer-events: none;
     }
+    #plan-grid-container .slick-headerrow-column .plan-hdr-chevron {
+      position: absolute;
+      right: 6px;
+      z-index: 1;
+      font-size: 14px;
+      color: #94a3b8;
+      pointer-events: none;
+    }
     #plan-grid-container .slick-headerrow-column input.search-filter,
     #plan-grid-container .slick-headerrow-column select.search-filter {
       width: 100%;
-      height: 28px;
-      min-height: 28px;
+      height: var(--slick-header-input-height, 28px);
+      min-height: var(--slick-header-input-height, 28px);
       box-sizing: border-box;
       border: 1px solid #d4d4d8;
       border-radius: 2px;
@@ -142,7 +291,10 @@
       padding: 0 8px 0 24px;
     }
     #plan-grid-container .slick-headerrow-column select.search-filter {
-      padding: 0 6px;
+      padding: 0 22px 0 6px;
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: none;
     }
     #plan-grid-container .slick-headerrow-column input.search-filter:focus,
     #plan-grid-container .slick-headerrow-column select.search-filter:focus {
@@ -64433,17 +64585,23 @@ function refreshPlanGridChecks() {
     all.indeterminate = !all.checked && rows.some(r => isPlanGroupChecked(r.key));
   }
   const bar = document.getElementById('planGridToolbar');
+  const n = planCheckedKeys().length;
   if (bar) {
-    const n = planCheckedKeys().length;
     bar.classList.toggle('has-sel', n > 0);
     const count = bar.querySelector('[data-plan-sel-count]');
     if (count) count.textContent = n ? ('Đã chọn ' + n) : '';
+    ['btnPlanBulkOrder', 'btnPlanKeepSel', 'btnPlanCopyNext', 'btnPlanClearSel'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) btn.disabled = n === 0;
+    });
   }
-  const vis = bar && bar.querySelector('[data-plan-vis-count]');
+  const vis = document.querySelector('[data-plan-vis-count]');
   if (vis) {
     const shown = (window._planGridData || []).length;
-    vis.textContent = shown + ' dòng';
+    vis.textContent = String(shown);
   }
+  const range = document.querySelector('[data-plan-period-range]');
+  if (range) range.textContent = planWorkspacePeriodLabel();
 }
 function createOrdersFromCheckedPlanGroups() {
   const keys = planCheckedKeys();
@@ -64460,6 +64618,25 @@ function createOrdersFromCheckedPlanGroups() {
   view = { ...view, name: 'order', orderId: created[0].id, from: 'plans' };
   render();
 }
+function planWorkspaceKpi(groups) {
+  const rows = planGridRows(groups || []);
+  let nBd = 0, nSc = 0;
+  (groups || []).forEach(g => {
+    (g.lines || []).forEach(p => {
+      if (planLineWorkKind(p) === 'MAINT') nBd++;
+      else nSc++;
+    });
+  });
+  return { total: rows.length, nBd, nSc, nSel: planCheckedKeys().length };
+}
+function planWorkspacePeriodLabel() {
+  ensurePlanGridDefaultPeriod();
+  if (view.planShowAllPeriods) return 'Tất cả kỳ';
+  const y = view.planGridColFilters?.year || '—';
+  const m = view.planGridColFilters?.month || '—';
+  const label = (m !== '—' ? String(m).padStart(2, '0') : '—') + '/' + y;
+  return label + ' → ' + label;
+}
 function planWorkspaceHtml(groups, vehicleMode) {
   window._planGridGroups = groups || [];
   ensurePlanGridDefaultPeriod();
@@ -64467,26 +64644,56 @@ function planWorkspaceHtml(groups, vehicleMode) {
   const g = open ? (groups.find(x => x.key === view.selectedPlanGroupKey) || null) : null;
   if (open && !g) view.planPanelOpen = false;
   const nSel = planCheckedKeys().length;
+  const kpi = planWorkspaceKpi(groups);
+  const updatedAt = new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   return `
   <div class="plan-workspace ${view.planPanelOpen ? 'is-open' : ''}">
     <div class="plan-grid-pane">
-      <div id="planGridToolbar" class="plan-grid-toolbar ${nSel ? 'has-sel' : ''}">
-        <div class="plan-plate-wrap">
-          <span class="mdi mdi-magnify"></span>
-          <input id="planPlateSearch" class="plan-plate-search" type="search" placeholder="Tìm biển số xe / rơ-mooc / mã phương tiện  ( / )" value="${esc(view.planPlateQ || '')}" />
+      <div class="plan-period-bar">
+        <div class="flex items-center gap-2 flex-wrap min-w-0">
+          <span class="plan-period-label">Kỳ kế hoạch</span>
+          <span class="plan-period-range" data-plan-period-range>${esc(planWorkspacePeriodLabel())}</span>
+          <button type="button" class="plan-btn-change-period" id="btnPlanAllPeriods">${view.planShowAllPeriods ? 'Lọc kỳ mới nhất' : 'Đổi kỳ'}</button>
+          <div class="plan-plate-wrap ml-1">
+            <span class="mdi mdi-magnify"></span>
+            <input id="planPlateSearch" class="plan-plate-search" type="search" placeholder="Biển số / rơ-mooc / mã PT…" value="${esc(view.planPlateQ || '')}" />
+          </div>
         </div>
-        <button type="button" class="btn btn-outline btn-xs" id="btnPlanAllPeriods">${view.planShowAllPeriods ? 'Lọc kỳ mới nhất' : 'Tất cả kỳ'}</button>
-        <span data-plan-vis-count class="text-slate-500"></span>
-        <span class="ml-auto text-[11px] text-slate-400 hidden md:inline">Space tick · Enter hạng mục · C tạo phiếu</span>
-        <span data-plan-sel-count class="font-medium text-slate-700">${nSel ? ('Đã chọn ' + nSel) : ''}</span>
-        <div class="plan-grid-actions">
-          <button type="button" class="btn btn-primary btn-xs" id="btnPlanBulkOrder">Làm tháng này</button>
-          <button type="button" class="btn btn-outline btn-xs" id="btnPlanKeepSel">Giữ trên kế hoạch</button>
-          <button type="button" class="btn btn-outline btn-xs" id="btnPlanCopyNext">Dời tháng sau</button>
-          <button type="button" class="btn btn-outline btn-xs" id="btnPlanClearSel">Bỏ chọn</button>
+        <div class="plan-kpi-strip" aria-label="Tóm tắt lưới">
+          <div class="plan-kpi-chip" title="Số dòng"><span class="plan-kpi-ico">Σ</span><span class="plan-kpi-val" data-plan-vis-count>${kpi.total}</span></div>
+          <div class="plan-kpi-chip" title="Hạng mục BD"><span class="plan-kpi-ico">BD</span><span class="plan-kpi-val">${kpi.nBd}</span></div>
+          <div class="plan-kpi-chip" title="Hạng mục SC"><span class="plan-kpi-ico">SC</span><span class="plan-kpi-val">${kpi.nSc}</span></div>
         </div>
       </div>
-      <div id="plan-grid-container">
+      <div id="planGridToolbar" class="plan-grid-toolbar ${nSel ? 'has-sel' : ''}">
+        <div class="plan-grid-toolbar-left">
+          <button type="button" class="plan-tb-btn is-success" id="btnPlanBulkOrder" ${nSel ? '' : 'disabled'} title="Tạo phiếu từ dòng đã chọn">
+            <span class="mdi mdi-file-document-plus-outline"></span> Tạo phiếu
+          </button>
+          <button type="button" class="plan-tb-btn" id="btnPlanKeepSel" ${nSel ? '' : 'disabled'}>
+            <span class="mdi mdi-pin-outline"></span> Giữ kế hoạch
+          </button>
+          <button type="button" class="plan-tb-btn" id="btnPlanCopyNext" ${nSel ? '' : 'disabled'}>
+            <span class="mdi mdi-calendar-arrow-right"></span> Dời tháng sau
+          </button>
+          <button type="button" class="plan-tb-btn" id="btnPlanClearSel" ${nSel ? '' : 'disabled'}>
+            <span class="mdi mdi-close"></span> Xóa lựa chọn
+          </button>
+          <button type="button" class="plan-tb-btn" id="btnPlanReloadGrid" title="Tải lại">
+            <span class="mdi mdi-refresh"></span> Tải lại
+          </button>
+          <span class="plan-tb-updated hidden lg:inline">Cập nhật lần cuối lúc ${esc(updatedAt)}</span>
+        </div>
+        <div class="plan-grid-toolbar-right">
+          <span data-plan-sel-count class="text-xs font-medium text-slate-600 tabular-nums">${nSel ? ('Đã chọn ' + nSel) : ''}</span>
+          <span class="plan-tb-divider"></span>
+          <button type="button" class="plan-tb-btn is-ghost" title="Cột hiển thị" aria-label="Cột"><span class="mdi mdi-view-column-outline"></span></button>
+          <button type="button" class="plan-tb-btn is-ghost" title="Bọc chữ" aria-label="Bọc chữ"><span class="mdi mdi-wrap"></span></button>
+          <button type="button" class="plan-tb-btn is-ghost" title="Xóa lọc cột" id="btnPlanClearColFilters" aria-label="Xóa lọc"><span class="mdi mdi-filter-off-outline"></span></button>
+          <button type="button" class="plan-tb-btn is-ghost" title="Mật độ dòng" aria-label="Mật độ"><span class="mdi mdi-arrow-collapse-vertical"></span></button>
+        </div>
+      </div>
+      <div id="plan-grid-container" class="sg-has-group-header">
         <div id="planSlickHost" class="plan-slick-host slickgrid-container" data-plan-grid="${vehicleMode ? 'vehicle' : 'global'}"></div>
       </div>
     </div>
@@ -64551,18 +64758,34 @@ function mountPlanSlickGrid() {
   const checkFmt = (row, cell, val, col, item) =>
     `<div class="flex h-full items-center justify-center"><input type="checkbox" class="pg-row order-grid-row-checkbox" data-gkey="${esc(item.key)}" ${isPlanGroupChecked(item.key) ? 'checked' : ''} aria-label="Chọn dòng" /></div>`;
   const idxFmt = (row) => String(row + 1);
+  const statusFmt = (row, cell, val) => {
+    const t = String(val || '—');
+    let cls = 'is-muted';
+    if (/đang|xử lý|thực hiện|xếp lịch/i.test(t)) cls = '';
+    else if (/hoàn thành|đã duyệt|ok/i.test(t)) cls = 'is-ok';
+    return `<span class="plan-status-chip ${cls}" title="${esc(t)}"><span class="dot"></span><span>${esc(t)}</span></span>`;
+  };
+  const sourceFmt = (row, cell, val) => {
+    const t = String(val || '—');
+    const cls = /đánh giá/i.test(t) ? '' : /mẫu/i.test(t) ? 'is-ok' : 'is-muted';
+    return `<span class="plan-status-chip ${cls}" title="${esc(t)}"><span class="dot"></span><span>${esc(t)}</span></span>`;
+  };
+  const emptyDt = () => `<span class="plan-dt-empty">--:-- --/--/----</span>`;
   const cols = [
     { id: '_ck', field: 'checked', name: '', width: 36, minWidth: 36, maxWidth: 40, cssClass: 'c', formatter: checkFmt, sortable: false, resizable: false, columnGroup: ' ' },
     { id: '_idx', field: 'idx', name: '#', width: 42, minWidth: 36, cssClass: 'c', formatter: idxFmt, sortable: false, columnGroup: ' ' },
-    { id: 'year', field: 'year', name: 'Năm', width: 72, cssClass: 'c', columnGroup: 'Kỳ' },
-    { id: 'month', field: 'month', name: 'Tháng', width: 72, cssClass: 'c', columnGroup: 'Kỳ' },
+    { id: 'statusText', field: 'statusText', name: 'Tình trạng', width: 130, formatter: statusFmt, columnGroup: 'Kế hoạch' },
+    { id: 'sourceLabel', field: 'sourceLabel', name: 'Nguồn', width: 120, formatter: sourceFmt, columnGroup: 'Kế hoạch' },
+    { id: 'year', field: 'year', name: 'Năm', width: 64, cssClass: 'c', columnGroup: 'Kỳ' },
+    { id: 'month', field: 'month', name: 'Tháng', width: 64, cssClass: 'c', columnGroup: 'Kỳ' },
     { id: 'soXe', field: 'soXe', name: 'Số xe', width: 120, formatter: soXeFmt, columnGroup: 'Phương tiện' },
-    { id: 'soMooc', field: 'soMooc', name: 'Số rơ-mooc', width: 130, columnGroup: 'Phương tiện' },
-    { id: 'applyTo', field: 'applyTo', name: 'Áp dụng cho', width: 140, columnGroup: 'Phương tiện' },
-    { id: 'ptId', field: 'ptId', name: 'Mã phương tiện', width: 150, columnGroup: 'Phương tiện' },
-    { id: 'totalText', field: 'totalText', name: 'Tổng tiền', width: 130, cssClass: 'r fw6', columnGroup: 'Chi phí' },
-    { id: 'pmhNote', field: 'pmhNote', name: 'Ghi chú cho phiếu mua hàng', width: 200, columnGroup: 'Chi phí' },
-    { id: '_act', field: 'act', name: 'Phân loại', width: 210, sortable: false, columnGroup: 'Thao tác', formatter: (row, cell, val, col, item) =>
+    { id: 'soMooc', field: 'soMooc', name: 'Số rơ-mooc', width: 120, columnGroup: 'Phương tiện' },
+    { id: 'applyTo', field: 'applyTo', name: 'Áp dụng cho', width: 120, columnGroup: 'Phương tiện' },
+    { id: 'ptId', field: 'ptId', name: 'Mã phương tiện', width: 140, columnGroup: 'Phương tiện' },
+    { id: 'totalText', field: 'totalText', name: 'Tổng tiền', width: 120, cssClass: 'r fw6', columnGroup: 'Chi phí' },
+    { id: 'pmhNote', field: 'pmhNote', name: 'Ghi chú PMH', width: 160, columnGroup: 'Chi phí' },
+    { id: 'lastTouch', field: 'lastTouch', name: 'Cập nhật gần nhất', width: 150, columnGroup: 'Tiến độ', formatter: emptyDt },
+    { id: '_act', field: 'act', name: 'Phân loại', width: 200, sortable: false, columnGroup: 'Thao tác', formatter: (row, cell, val, col, item) =>
       `<div class="flex h-full items-center justify-center gap-1 px-1">
         <button type="button" class="btn btn-primary btn-xs whitespace-nowrap" data-plan-do-now="${esc(item.key)}">Tháng này</button>
         <button type="button" class="btn btn-outline btn-xs whitespace-nowrap" data-plan-defer="${esc(item.key)}">Tháng sau</button>
@@ -64576,12 +64799,12 @@ function mountPlanSlickGrid() {
     forceFitColumns: false,
     fullWidthRows: true,
     frozenColumn: 1,
-    rowHeight: 36,
+    rowHeight: 32,
     headerRowHeight: 40,
     showHeaderRow: true,
     createPreHeaderPanel: true,
     showPreHeaderPanel: true,
-    preHeaderPanelHeight: 24,
+    preHeaderPanelHeight: 26,
     explicitInitialization: false,
     enableTextSelectionOnCells: true,
     sanitizer: (dirty) => dirty,
@@ -64617,26 +64840,32 @@ function mountPlanSlickGrid() {
       if (!includes(r.ptId, f.ptId)) return false;
       if (!includes(r.totalText, f.totalText)) return false;
       if (!includes(r.pmhNote, f.pmhNote)) return false;
+      if (!includes(r.statusText, f.statusText)) return false;
+      if (!includes(r.sourceLabel, f.sourceLabel)) return false;
       return true;
     });
     window._planGridData = filtered;
     try { grid.invalidate(); grid.render(); } catch (e) {}
     refreshPlanGridChecks();
+    const visEl = document.querySelector('[data-plan-vis-count]');
+    if (visEl) visEl.textContent = String(filtered.length);
   };
   window._planApplyColFilters = applyColFilters;
   applyColFilters();
   const uniq = (field) => [...new Set(rows.map(r => r[field]).filter(v => v != null && v !== ''))].sort((a, b) => String(a).localeCompare(String(b), 'vi'));
-  const selectFields = { year: true, month: true, applyTo: true };
+  const selectFields = { year: true, month: true, applyTo: true, statusText: true, sourceLabel: true };
   if (grid.onHeaderRowCellRendered) {
     grid.onHeaderRowCellRendered.subscribe((_e, args) => {
       const node = args.node;
       const col = args.column;
       node.innerHTML = '';
-      if (!col || col.id === '_ck' || col.id === '_idx' || col.id === '_act') return;
+      if (!col || col.id === '_ck' || col.id === '_idx' || col.id === '_act' || col.id === 'lastTouch') return;
       const wrap = document.createElement('div');
       wrap.className = 'slick-filter';
       const cur = (view.planGridColFilters || {})[col.id] || '';
       if (selectFields[col.id]) {
+        const chev = document.createElement('span');
+        chev.className = 'mdi mdi-chevron-down plan-hdr-chevron';
         const sel = document.createElement('select');
         sel.className = 'search-filter';
         sel.innerHTML = `<option value="">Tất cả</option>` + uniq(col.field).map(v => `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(v)}</option>`).join('');
@@ -64645,19 +64874,24 @@ function mountPlanSlickGrid() {
           applyColFilters();
         });
         wrap.appendChild(sel);
+        wrap.appendChild(chev);
       } else {
         const icon = document.createElement('span');
         icon.className = 'mdi mdi-magnify plan-hdr-search-icon';
+        const chev = document.createElement('span');
+        chev.className = 'mdi mdi-chevron-down plan-hdr-chevron';
         const input = document.createElement('input');
         input.type = 'text';
         input.className = 'search-filter';
         input.value = cur;
+        input.style.paddingRight = '22px';
         input.addEventListener('input', () => {
           view.planGridColFilters[col.id] = input.value;
           applyColFilters();
         });
         wrap.appendChild(icon);
         wrap.appendChild(input);
+        wrap.appendChild(chev);
       }
       node.appendChild(wrap);
     });
@@ -64823,6 +65057,20 @@ function bindPlanGridToolbar() {
   $('#btnPlanClearSel')?.addEventListener('click', () => {
     view.checkedPlanGroupKeys = [];
     refreshPlanGridChecks();
+  });
+  $('#btnPlanReloadGrid')?.addEventListener('click', () => {
+    toast('Đã tải lại lưới kế hoạch');
+    render();
+  });
+  $('#btnPlanClearColFilters')?.addEventListener('click', () => {
+    view.planGridColFilters = {};
+    view.planPlateQ = '';
+    const plate = $('#planPlateSearch');
+    if (plate) plate.value = '';
+    ensurePlanGridDefaultPeriod();
+    if (typeof window._planApplyColFilters === 'function') window._planApplyColFilters();
+    else render();
+    toast('Đã xóa lọc cột');
   });
   if (!window._planKeysBound) {
     window._planKeysBound = true;
