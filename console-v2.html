@@ -50,6 +50,7 @@
       --heroui-default-200: #dedee0;
     }
     .plan-workspace {
+      position: relative;
       display: flex;
       min-height: 0;
       height: min(720px, calc(100vh - 170px));
@@ -64,8 +65,9 @@
       min-width: 0;
       min-height: 0;
       flex: 1;
+      width: 100%;
     }
-    .plan-workspace.is-open .plan-grid-pane { min-width: 0; }
+    /* Grid luôn full width — panel đè lên (không bóp nhỏ) */
     /* Period strip (trucking-like date bar) */
     .plan-period-bar {
       display: flex;
@@ -302,21 +304,48 @@
       border-color: #3b82f6;
     }
     .plan-slick-host { width: 100%; height: 100%; }
+    .plan-side-backdrop {
+      display: none;
+      position: absolute;
+      inset: 0;
+      z-index: 35;
+      background: rgba(15, 23, 42, .18);
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+    }
+    .plan-workspace.is-open .plan-side-backdrop { display: block; }
     .plan-side {
       display: none;
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 40;
       flex-direction: column;
       min-width: 0;
       min-height: 0;
       overflow: hidden;
-      border-left: 1px solid #e2e8e0;
+      border-left: 1px solid #e2e8f0;
       background: #fff;
-      box-shadow: -12px 0 40px -20px rgba(15,23,42,.28);
+      box-shadow: -12px 0 40px -12px rgba(15,23,42,.35);
       width: min(100%, 28rem);
       max-width: 28rem;
+      animation: planSideIn .18s ease-out;
     }
     .plan-workspace.is-open .plan-side { display: flex; }
     @media (min-width: 1024px) {
-      .plan-side { width: 50%; max-width: min(50vw, 960px); min-width: 320px; }
+      .plan-side {
+        width: min(50%, 960px);
+        max-width: min(50vw, 960px);
+        min-width: min(360px, 100%);
+      }
+      /* Desktop: không che tối toàn grid — chỉ panel đè cạnh phải */
+      .plan-side-backdrop { background: transparent; pointer-events: none; }
+    }
+    @keyframes planSideIn {
+      from { transform: translateX(12px); opacity: .85; }
+      to { transform: translateX(0); opacity: 1; }
     }
     .plan-side-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; padding: .75rem 1rem .5rem; border-bottom: 1px solid #f1f5f9; }
     .plan-side-tabs { display: flex; gap: .25rem; padding: 0 .75rem; border-bottom: 1px solid #e2e8f0; }
@@ -360,9 +389,14 @@
     .plan-fallback tr:hover td { background: #f8fafc; }
     .plan-fallback tr.is-on td { background: #eff6ff; }
     @media (max-width: 1023px) {
-      .plan-workspace, .plan-workspace.is-open { flex-direction: column; height: auto; }
       .plan-slick-host, #plan-grid-container { height: 360px; }
-      .plan-side { width: 100%; max-width: none; max-height: 480px; border-left: 0; border-top: 1px solid #e2e8f0; }
+      .plan-side {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+        border-left: 0;
+      }
+      .plan-side-backdrop { pointer-events: auto; }
     }
 
     /* Form fields (modal / settings) — native input style Quản lý xe */
@@ -64697,7 +64731,8 @@ function planWorkspaceHtml(groups, vehicleMode) {
         <div id="planSlickHost" class="plan-slick-host slickgrid-container" data-plan-grid="${vehicleMode ? 'vehicle' : 'global'}"></div>
       </div>
     </div>
-    <aside id="planSidePanel" class="plan-side">${view.planPanelOpen ? planSidePanelHtml(g) : ''}</aside>
+    <button type="button" class="plan-side-backdrop" id="planSideBackdrop" aria-label="Đóng chi tiết" tabindex="-1"></button>
+    <aside id="planSidePanel" class="plan-side" role="dialog" aria-modal="true">${view.planPanelOpen ? planSidePanelHtml(g) : ''}</aside>
   </div>`;
 }
 function destroyPlanSlickGrid() {
@@ -65039,6 +65074,7 @@ function bindPlanSidePanel() {
   });
 }
 function bindPlanGridToolbar() {
+  $('#planSideBackdrop')?.addEventListener('click', () => closePlanPanel());
   const plate = $('#planPlateSearch');
   if (plate) {
     plate.addEventListener('input', () => {
