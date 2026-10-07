@@ -145,7 +145,11 @@
     .plan-period-bar .plan-plate-wrap,
     .plan-grid-toolbar .plan-plate-wrap { position: relative; display: flex; align-items: center; flex-shrink: 0; }
     .plan-period-bar .plan-plate-wrap .mdi,
-    .plan-grid-toolbar .plan-plate-wrap .mdi { position: absolute; left: 8px; color: #94a3b8; font-size: 15px; pointer-events: none; }
+    .plan-grid-toolbar .plan-plate-wrap .mdi,
+    .plan-period-bar .plan-plate-wrap .plan-tb-ico,
+    .plan-grid-toolbar .plan-plate-wrap .plan-tb-ico {
+      position: absolute; left: 8px; color: #94a3b8; pointer-events: none; z-index: 1;
+    }
     .plan-tb-updated { font-size: 11px; color: #94a3b8; white-space: nowrap; }
     .plan-tb-divider { width: 1px; height: 20px; background: #e4e4e7; flex-shrink: 0; }
     /* KPI glass pills (OrderGridDispatchSummaryStrip) */
@@ -405,7 +409,12 @@
       height: 28px; padding: 2px 8px; cursor: pointer; white-space: nowrap;
     }
     .slick-context-menu .slick-menu-item:hover { background: #fafafa; border: 1px solid #d5d5d5; padding: 1px 7px; }
-    .slick-context-menu .slick-menu-icon { width: 18px; text-align: center; color: #475569; font-size: 16px; }
+    .slick-context-menu .slick-menu-icon {
+      width: 18px; display: inline-flex; align-items: center; justify-content: center;
+      color: #475569; flex-shrink: 0;
+    }
+    .slick-context-menu .slick-menu-icon .plan-tb-ico,
+    .slick-context-menu .slick-menu-icon .plan-tb-ico svg { width: 16px; height: 16px; }
     .slick-context-menu .slick-menu-content { flex: 1; }
     .slick-context-menu .slick-menu-item-divider {
       height: 1px; margin: 4px 8px; background: #e5e5e5; padding: 0; cursor: default;
@@ -64528,9 +64537,9 @@ function hidePlanCtx() {
   el.classList.add('hidden');
   el.innerHTML = '';
 }
-function slickMenuItem(act, icon, title, extra) {
+function slickMenuItem(act, icoName, title, extra) {
   return `<div class="slick-menu-item ${extra || ''}" data-act="${act}" role="menuitem">
-    <div class="slick-menu-icon"><span class="${icon}"></span></div>
+    <div class="slick-menu-icon">${planTbIco(icoName)}</div>
     <span class="slick-menu-content">${title}</span>
   </div>`;
 }
@@ -64547,19 +64556,19 @@ function showPlanCtx(ev, item) {
   if (!el) return;
   el.classList.remove('hidden');
   const bits = [
-    slickMenuItem('detail', 'mdi mdi-file-document-outline', 'Xem hạng mục'),
+    slickMenuItem('detail', 'file', 'Xem hạng mục'),
     unlinked.length
-      ? slickMenuItem('do-now', 'mdi mdi-calendar-check', 'Làm tháng này (tạo phiếu)')
-      : `<div class="slick-menu-item disabled"><div class="slick-menu-icon"><span class="mdi mdi-calendar-check"></span></div><span class="slick-menu-content">Không còn hạng mục tháng này</span></div>`,
-    slickMenuItem('defer', 'mdi mdi-calendar-export', 'Dời sang tháng sau'),
-    existing.length ? slickMenuItem('view-order', 'mdi mdi-eye-outline', 'Xem phiếu ' + existing.map(o => o.code).join(', ')) : '',
-    slickMenuItem('vehicle', 'mdi mdi-truck-outline', 'Mở xe ' + (item.plate || '')),
-    slickMenuItem('copy', 'mdi mdi-content-copy', 'Sao chép dòng'),
+      ? slickMenuItem('do-now', 'calCheck', 'Làm tháng này (tạo phiếu)')
+      : `<div class="slick-menu-item disabled"><div class="slick-menu-icon">${planTbIco('calCheck')}</div><span class="slick-menu-content">Không còn hạng mục tháng này</span></div>`,
+    slickMenuItem('defer', 'cal', 'Dời sang tháng sau'),
+    existing.length ? slickMenuItem('view-order', 'eye', 'Xem phiếu ' + existing.map(o => o.code).join(', ')) : '',
+    slickMenuItem('vehicle', 'truck', 'Mở xe ' + (item.plate || '')),
+    slickMenuItem('copy', 'copy', 'Sao chép dòng'),
     `<div class="slick-menu-item slick-menu-item-divider"></div>`,
-    slickMenuItem('toggle', isPlanGroupChecked(g.key) ? 'mdi mdi-checkbox-marked-outline' : 'mdi mdi-checkbox-blank-outline', isPlanGroupChecked(g.key) ? 'Bỏ chọn dòng này' : 'Chọn dòng này'),
-    checked.length > 1 ? slickMenuItem('bulk-order', 'mdi mdi-file-multiple-outline', 'Tạo phiếu ' + checked.length + ' dòng đã chọn') : '',
-    checked.length ? slickMenuItem('keep', 'mdi mdi-pin-outline', 'Giữ trên kế hoạch') : '',
-    checked.length ? slickMenuItem('copy-next', 'mdi mdi-calendar-export', 'Sao chép sang tháng sau') : '',
+    slickMenuItem('toggle', isPlanGroupChecked(g.key) ? 'checkOn' : 'checkOff', isPlanGroupChecked(g.key) ? 'Bỏ chọn dòng này' : 'Chọn dòng này'),
+    checked.length > 1 ? slickMenuItem('bulk-order', 'files', 'Tạo phiếu ' + checked.length + ' dòng đã chọn') : '',
+    checked.length ? slickMenuItem('keep', 'pin', 'Giữ trên kế hoạch') : '',
+    checked.length ? slickMenuItem('copy-next', 'cal', 'Sao chép sang tháng sau') : '',
   ];
   el.innerHTML = bits.filter(Boolean).join('');
   const x = Math.min(ev.clientX, window.innerWidth - 280);
@@ -64688,6 +64697,7 @@ const PLAN_TB_SVG = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   pin: '<path d="M12 17v5"/><path d="M9 3h6l1 7a4 4 0 1 1-8 0L9 3z"/>',
   cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M14 15h4"/>',
+  calCheck: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/><path d="M9 16l2 2 4-4"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
   refresh: '<path d="M21 12a9 9 0 1 0-3.2 6.7"/><path d="M21 3v7h-7"/>',
   cols: '<rect x="3" y="4" width="5" height="16" rx="1"/><rect x="10" y="4" width="5" height="16" rx="1"/><rect x="17" y="4" width="4" height="16" rx="1"/>',
@@ -64696,6 +64706,13 @@ const PLAN_TB_SVG = {
   dens: '<path d="M8 9l4-4 4 4M8 15l4 4 4-4"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   chev: '<path d="M6 9l6 6 6-6"/>',
+  file: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+  files: '<path d="M15 3H8a2 2 0 0 0-2 2v12"/><path d="M10 7h7a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/>',
+  eye: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.5"/>',
+  truck: '<path d="M3 7h11v10H3z"/><path d="M14 10h4l3 3v4h-7z"/><circle cx="7" cy="18" r="1.5"/><circle cx="17" cy="18" r="1.5"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M5 15V6.5A1.5 1.5 0 0 1 6.5 5H15"/>',
+  checkOff: '<rect x="4" y="4" width="16" height="16" rx="2"/>',
+  checkOn: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 12l3 3 5-5"/>',
 };
 function planTbIco(name, extraClass) {
   const body = PLAN_TB_SVG[name] || PLAN_TB_SVG.plus;
@@ -64744,7 +64761,7 @@ function planWorkspaceHtml(groups, vehicleMode) {
           <span class="plan-period-range" data-plan-period-range>${esc(planWorkspacePeriodLabel())}</span>
           <button type="button" class="plan-btn-change-period" id="btnPlanAllPeriods">${view.planShowAllPeriods ? 'Lọc kỳ mới nhất' : 'Đổi kỳ'}</button>
           <div class="plan-plate-wrap ml-1">
-            <span class="mdi mdi-magnify"></span>
+            ${planTbIco('search')}
             <input id="planPlateSearch" class="plan-plate-search" type="search" placeholder="Biển số / rơ-mooc / mã PT…" value="${esc(view.planPlateQ || '')}" />
           </div>
         </div>
