@@ -66563,12 +66563,12 @@ function createDraftOrdersFromVehicleCatalogs(vid, catalogIds) {
       content: c.name, cost: 0, system: c.system || '—', mh: 'NONE',
       base: { status: 'NONE', code: null, baseStatus: null },
       mats: [], workItems: [{ content: c.name, system: c.system || '—', kind: 'MAINT', catalogId: Number(cid) }],
-      log: [{ at: 'Vừa xong', action: 'CREATE', by: 'Kỹ thuật', note: 'Đăng ký BD từ danh mục xe · chu kỳ ' + catalogCycleMeta(c).label }],
+      log: [{ at: 'Vừa xong', action: 'CREATE', by: 'Kỹ thuật', note: 'Đăng ký bảo dưỡng từ danh mục xe · chu kỳ ' + catalogCycleMeta(c).label }],
       approvalLog: [{ at: nowStamp?.() || today, action: 'CREATE', by: 'Kỹ thuật', note: 'Nháp từ danh mục gắn xe' }],
     });
     n++;
   });
-  if (n) { if (typeof save === 'function') save(); toast('Đã tạo ' + n + ' phiếu BD nháp'); }
+  if (n) { if (typeof save === 'function') save(); toast('Đã tạo ' + n + ' phiếu bảo dưỡng nháp'); }
   else toast('Không có danh mục hợp lệ để tạo phiếu');
   return n;
 }
@@ -67279,8 +67279,8 @@ function renderVehicleCatalog(v) {
       </td>
       <td class="td py-2 whitespace-nowrap">
         <div class="flex flex-wrap items-center gap-1 justify-end">
-          <button type="button" data-vc-cycle-plan="${esc(cycleKey)}" data-cids="${esc(cidsCsv)}" class="btn btn-primary btn-xs" ${canBulk ? '' : 'disabled'} title="Lên kế hoạch cả chu kỳ">KH chu kỳ</button>
-          <button type="button" data-vc-cycle-order="${esc(cycleKey)}" data-cids="${esc(cidsCsv)}" class="btn btn-outline btn-xs" ${canBulk ? '' : 'disabled'} title="Đăng ký BD/SC cả chu kỳ">Đăng ký BD</button>
+          <button type="button" data-vc-cycle-plan="${esc(cycleKey)}" data-cids="${esc(cidsCsv)}" class="btn btn-primary btn-xs" ${canBulk ? '' : 'disabled'} title="Thêm tất cả danh mục đã gắn trong chu kỳ ${esc(cycleLabel)} vào kế hoạch bảo dưỡng / sửa chữa">Lên kế hoạch cả chu kỳ</button>
+          <button type="button" data-vc-cycle-order="${esc(cycleKey)}" data-cids="${esc(cidsCsv)}" class="btn btn-outline btn-xs" ${canBulk ? '' : 'disabled'} title="Tạo phiếu bảo dưỡng / sửa chữa nháp cho tất cả danh mục đã gắn trong chu kỳ ${esc(cycleLabel)}">Đăng ký bảo dưỡng / sửa chữa cả chu kỳ</button>
         </div>
       </td>
     </tr>`;
@@ -67308,7 +67308,7 @@ function renderVehicleCatalog(v) {
       const dis = assigned ? '' : 'disabled';
       return `<tr class="row-h ${assigned ? '' : 'opacity-60'}" data-vc-cycle="${esc(cycleKey)}">
         <td class="td text-center w-10">
-          <input type="checkbox" class="vc-plan-row" data-cid="${c.id}" data-cycle-key="${esc(cycleKey)}" ${assigned ? '' : 'disabled'} aria-label="Chọn ${esc(c.code)}" />
+          <input type="checkbox" class="vc-plan-row" data-cid="${c.id}" data-cycle-key="${esc(cycleKey)}" ${assigned ? '' : 'disabled'} aria-label="Chọn ${esc(c.code)}" title="Chọn dòng này để lên kế hoạch hoặc đăng ký bảo dưỡng / sửa chữa hàng loạt" />
         </td>
         <td class="td min-w-[12rem]">
           <div class="font-medium text-slate-900">${esc(c.code)}</div>
@@ -67317,8 +67317,8 @@ function renderVehicleCatalog(v) {
         </td>
         <td class="td text-sm text-slate-700 whitespace-nowrap">${esc(c.system || '—')}</td>
         <td class="td text-sm tabular-nums whitespace-nowrap">
-          <div>${st.occurrence || 0} lần BD</div>
-          <div class="text-xs text-slate-500">${hist.length} phiếu LS</div>
+          <div>${st.occurrence || 0} lần bảo dưỡng</div>
+          <div class="text-xs text-slate-500">${hist.length} phiếu lịch sử</div>
         </td>
         <td class="td text-sm tabular-nums whitespace-nowrap">${esc(lastTxt)}</td>
         <td class="td text-sm whitespace-nowrap">
@@ -67330,12 +67330,12 @@ function renderVehicleCatalog(v) {
         </td>
         <td class="td whitespace-nowrap">
           <div class="flex flex-wrap items-center gap-1 justify-end">
-            <button type="button" data-toggle-assign-cat="${c.id}" class="btn btn-outline btn-xs">${assigned ? 'Bỏ gắn' : 'Gắn'}</button>
-            <button type="button" data-create-plan-one="${c.id}" class="btn btn-primary btn-xs" ${dis}>Kế hoạch</button>
-            <button type="button" data-create-order-from-due="${v.id}" data-cid="${c.id}" class="btn btn-outline btn-xs" ${dis}>Phiếu</button>
-            <button type="button" data-cat-history="${c.id}" class="btn btn-outline btn-xs">LS</button>
-            <button type="button" data-edit-due="${c.id}" class="btn btn-outline btn-xs" title="Sửa mốc tiếp theo">Mốc</button>
-            <button type="button" data-apply-rule="${c.id}" class="btn btn-outline btn-xs !border-blue-300 !bg-blue-50 text-blue-800" title="Áp dụng chu kỳ định mức">Chu kỳ</button>
+            <button type="button" data-toggle-assign-cat="${c.id}" class="btn btn-outline btn-xs" title="${assigned ? 'Gỡ danh mục này khỏi xe (không theo dõi mốc trên xe nữa)' : 'Gắn danh mục master này vào xe để theo dõi mốc và nhắc hạn'}">${assigned ? 'Bỏ gắn khỏi xe' : 'Gắn vào xe'}</button>
+            <button type="button" data-create-plan-one="${c.id}" class="btn btn-primary btn-xs" ${dis} title="Thêm danh mục này vào kế hoạch bảo dưỡng / sửa chữa">Lên kế hoạch</button>
+            <button type="button" data-create-order-from-due="${v.id}" data-cid="${c.id}" class="btn btn-outline btn-xs" ${dis} title="Mở form tạo phiếu bảo dưỡng / sửa chữa gắn danh mục này">Tạo phiếu</button>
+            <button type="button" data-cat-history="${c.id}" class="btn btn-outline btn-xs" title="Xem các phiếu bảo dưỡng / sửa chữa đã thực hiện cho danh mục này trên xe">Xem lịch sử</button>
+            <button type="button" data-edit-due="${c.id}" class="btn btn-outline btn-xs" title="Chỉnh tay mốc km / ngày lần bảo dưỡng tiếp theo">Sửa mốc tiếp theo</button>
+            <button type="button" data-apply-rule="${c.id}" class="btn btn-outline btn-xs !border-blue-300 !bg-blue-50 text-blue-800" title="Tính lại mốc tiếp theo theo định mức chu kỳ của danh mục">Áp dụng chu kỳ định mức</button>
           </div>
         </td>
       </tr>`;
@@ -67343,14 +67343,32 @@ function renderVehicleCatalog(v) {
     return header + body;
   }).join('');
   return `
-  <p class="mb-2 text-sm text-slate-600">Danh mục gắn xe — gom theo chu kỳ (km / ngày). Chọn cả nhóm để lên kế hoạch hoặc đăng ký BD/SC.</p>
+  <p class="mb-2 text-sm text-slate-600">Danh mục gắn xe — gom theo chu kỳ (km hoặc ngày). Chọn cả nhóm chu kỳ để lên kế hoạch hoặc đăng ký bảo dưỡng / sửa chữa hàng loạt.</p>
   ${tireAlertBannerHtml(tireAlerts, { plate: v.plate, vid: v.id, tab: tireAlerts.some(a => a.kind === 'BATTERY') && !tireAlerts.some(a => a.kind === 'TIRE') ? 'BATTERY' : 'TIRE' })}
   <div class="mb-3 flex flex-wrap gap-2">
-    <button type="button" id="btnAssignCatalogs" class="btn btn-outline btn-sm">+ Gắn danh mục</button>
-    <button type="button" id="btnCreatePlanFromDueCats" class="btn btn-primary btn-sm">Tạo KH từ sắp/đã đến hạn</button>
-    <button type="button" id="btnCreatePlanFromVehicleCats" class="btn btn-outline btn-sm">Tạo KH từ dòng đã chọn</button>
-    <button type="button" id="btnCreateOrderFromVehicleCats" class="btn btn-outline btn-sm">Đăng ký BD từ dòng đã chọn</button>
+    <button type="button" id="btnAssignCatalogs" class="btn btn-outline btn-sm" title="Chọn thêm danh mục bảo dưỡng từ master để gắn vào xe này">+ Gắn danh mục vào xe</button>
+    <button type="button" id="btnCreatePlanFromDueCats" class="btn btn-primary btn-sm" title="Tự động thêm vào kế hoạch các danh mục đang sắp đến hạn hoặc đã quá hạn trên xe">Tạo kế hoạch từ sắp / đã đến hạn</button>
+    <button type="button" id="btnCreatePlanFromVehicleCats" class="btn btn-outline btn-sm" title="Thêm vào kế hoạch các dòng đang được tích chọn trong bảng">Tạo kế hoạch từ dòng đã chọn</button>
+    <button type="button" id="btnCreateOrderFromVehicleCats" class="btn btn-outline btn-sm" title="Tạo phiếu bảo dưỡng / sửa chữa nháp cho các dòng đang được tích chọn">Đăng ký bảo dưỡng / sửa chữa từ dòng đã chọn</button>
   </div>
+  <details class="mb-3 rounded-md border border-slate-200 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
+    <summary class="cursor-pointer select-none font-medium text-slate-700">Giải thích các nút trên màn này</summary>
+    <ul class="mt-2 list-disc space-y-1 pl-5 leading-relaxed">
+      <li><strong>Gắn danh mục vào xe</strong> — chọn danh mục master để theo dõi mốc / nhắc hạn trên xe.</li>
+      <li><strong>Tạo kế hoạch từ sắp / đã đến hạn</strong> — đẩy các hạng mục sắp hoặc đã đến hạn vào tab Kế hoạch.</li>
+      <li><strong>Tạo kế hoạch từ dòng đã chọn</strong> — chỉ đẩy các dòng đang tích chọn vào kế hoạch.</li>
+      <li><strong>Đăng ký bảo dưỡng / sửa chữa từ dòng đã chọn</strong> — tạo phiếu nháp cho các dòng đã chọn.</li>
+      <li><strong>Ô chọn ở dòng nhóm chu kỳ</strong> — chọn hoặc bỏ chọn tất cả danh mục đã gắn trong chu kỳ đó.</li>
+      <li><strong>Lên kế hoạch cả chu kỳ</strong> — đưa hết danh mục đã gắn trong nhóm chu kỳ vào kế hoạch.</li>
+      <li><strong>Đăng ký bảo dưỡng / sửa chữa cả chu kỳ</strong> — tạo phiếu nháp cho hết danh mục đã gắn trong nhóm chu kỳ.</li>
+      <li><strong>Gắn vào xe / Bỏ gắn khỏi xe</strong> — gắn hoặc gỡ một danh mục khỏi xe.</li>
+      <li><strong>Lên kế hoạch</strong> — thêm một danh mục vào kế hoạch.</li>
+      <li><strong>Tạo phiếu</strong> — mở form tạo phiếu bảo dưỡng / sửa chữa cho danh mục đó.</li>
+      <li><strong>Xem lịch sử</strong> — xem các phiếu đã thực hiện của danh mục trên xe.</li>
+      <li><strong>Sửa mốc tiếp theo</strong> — chỉnh tay mốc km / ngày lần tiếp theo.</li>
+      <li><strong>Áp dụng chu kỳ định mức</strong> — tính lại mốc tiếp theo theo quy tắc chu kỳ của danh mục.</li>
+    </ul>
+  </details>
   ${filterBarShell([
     filterSearch('flt-search', 'Mã / tên danh mục…', f.search),
     filterSelect('flt-system', 'Hệ thống', f.system, [['ALL','Tất cả'], ...systems().map(s => [s, s])]),
@@ -67361,10 +67379,10 @@ function renderVehicleCatalog(v) {
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-slate-600">
           <tr>
-            <th class="th text-center w-10"></th>
+            <th class="th text-center w-10" title="Chọn dòng để thao tác hàng loạt"></th>
             <th class="th text-left">Danh mục</th>
             <th class="th text-left">Hệ thống</th>
-            <th class="th text-left">BD / LS</th>
+            <th class="th text-left" title="Số lần bảo dưỡng đã ghi nhận và số phiếu lịch sử">Bảo dưỡng / Lịch sử</th>
             <th class="th text-left">Lần gần nhất</th>
             <th class="th text-left">Mốc tiếp theo</th>
             <th class="th text-left">Chu kỳ</th>
@@ -67372,7 +67390,7 @@ function renderVehicleCatalog(v) {
           </tr>
         </thead>
         <tbody>
-          ${rowsHtml || `<tr><td colspan="8" class="px-5 py-10 text-center text-slate-500">Chưa gắn danh mục. Bấm «Gắn danh mục» hoặc chọn «Tất cả danh mục master».</td></tr>`}
+          ${rowsHtml || `<tr><td colspan="8" class="px-5 py-10 text-center text-slate-500">Chưa gắn danh mục. Bấm «Gắn danh mục vào xe» hoặc chọn «Tất cả danh mục master».</td></tr>`}
         </tbody>
       </table>
     </div>
