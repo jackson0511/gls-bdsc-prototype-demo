@@ -64486,7 +64486,7 @@ function showPlanCtx(ev, item) {
     unlinked.length
       ? slickMenuItem('do-now', 'mdi mdi-calendar-check', 'Làm tháng này (tạo phiếu)')
       : `<div class="slick-menu-item disabled"><div class="slick-menu-icon"><span class="mdi mdi-calendar-check"></span></div><span class="slick-menu-content">Không còn hạng mục tháng này</span></div>`,
-    slickMenuItem('defer', 'mdi mdi-calendar-arrow-right', 'Dời sang tháng sau'),
+    slickMenuItem('defer', 'mdi mdi-calendar-export', 'Dời sang tháng sau'),
     existing.length ? slickMenuItem('view-order', 'mdi mdi-eye-outline', 'Xem phiếu ' + existing.map(o => o.code).join(', ')) : '',
     slickMenuItem('vehicle', 'mdi mdi-truck-outline', 'Mở xe ' + (item.plate || '')),
     slickMenuItem('copy', 'mdi mdi-content-copy', 'Sao chép dòng'),
@@ -64494,7 +64494,7 @@ function showPlanCtx(ev, item) {
     slickMenuItem('toggle', isPlanGroupChecked(g.key) ? 'mdi mdi-checkbox-marked-outline' : 'mdi mdi-checkbox-blank-outline', isPlanGroupChecked(g.key) ? 'Bỏ chọn dòng này' : 'Chọn dòng này'),
     checked.length > 1 ? slickMenuItem('bulk-order', 'mdi mdi-file-multiple-outline', 'Tạo phiếu ' + checked.length + ' dòng đã chọn') : '',
     checked.length ? slickMenuItem('keep', 'mdi mdi-pin-outline', 'Giữ trên kế hoạch') : '',
-    checked.length ? slickMenuItem('copy-next', 'mdi mdi-calendar-arrow-right', 'Sao chép sang tháng sau') : '',
+    checked.length ? slickMenuItem('copy-next', 'mdi mdi-calendar-export', 'Sao chép sang tháng sau') : '',
   ];
   el.innerHTML = bits.filter(Boolean).join('');
   const x = Math.min(ev.clientX, window.innerWidth - 280);
@@ -64668,13 +64668,13 @@ function planWorkspaceHtml(groups, vehicleMode) {
       <div id="planGridToolbar" class="plan-grid-toolbar ${nSel ? 'has-sel' : ''}">
         <div class="plan-grid-toolbar-left">
           <button type="button" class="plan-tb-btn is-success" id="btnPlanBulkOrder" ${nSel ? '' : 'disabled'} title="Tạo phiếu từ dòng đã chọn">
-            <span class="mdi mdi-file-document-plus-outline"></span> Tạo phiếu
+            <span class="mdi mdi-file-plus-outline"></span> Tạo phiếu
           </button>
           <button type="button" class="plan-tb-btn" id="btnPlanKeepSel" ${nSel ? '' : 'disabled'}>
             <span class="mdi mdi-pin-outline"></span> Giữ kế hoạch
           </button>
           <button type="button" class="plan-tb-btn" id="btnPlanCopyNext" ${nSel ? '' : 'disabled'}>
-            <span class="mdi mdi-calendar-arrow-right"></span> Dời tháng sau
+            <span class="mdi mdi-calendar-export"></span> Dời tháng sau
           </button>
           <button type="button" class="plan-tb-btn" id="btnPlanClearSel" ${nSel ? '' : 'disabled'}>
             <span class="mdi mdi-close"></span> Xóa lựa chọn
@@ -64687,9 +64687,9 @@ function planWorkspaceHtml(groups, vehicleMode) {
         <div class="plan-grid-toolbar-right">
           <span data-plan-sel-count class="text-xs font-medium text-slate-600 tabular-nums">${nSel ? ('Đã chọn ' + nSel) : ''}</span>
           <span class="plan-tb-divider"></span>
-          <button type="button" class="plan-tb-btn is-ghost" title="Cột hiển thị" aria-label="Cột"><span class="mdi mdi-view-column-outline"></span></button>
-          <button type="button" class="plan-tb-btn is-ghost" title="Bọc chữ" aria-label="Bọc chữ"><span class="mdi mdi-wrap"></span></button>
-          <button type="button" class="plan-tb-btn is-ghost" title="Xóa lọc cột" id="btnPlanClearColFilters" aria-label="Xóa lọc"><span class="mdi mdi-filter-off-outline"></span></button>
+          <button type="button" class="plan-tb-btn is-ghost" title="Cột hiển thị" aria-label="Cột"><span class="mdi mdi-view-column"></span></button>
+          <button type="button" class="plan-tb-btn is-ghost" title="Bọc chữ" aria-label="Bọc chữ"><span class="mdi mdi-format-text-wrapping-wrap"></span></button>
+          <button type="button" class="plan-tb-btn is-ghost" title="Xóa lọc cột" id="btnPlanClearColFilters" aria-label="Xóa lọc"><span class="mdi mdi-filter-remove-outline"></span></button>
           <button type="button" class="plan-tb-btn is-ghost" title="Mật độ dòng" aria-label="Mật độ"><span class="mdi mdi-arrow-collapse-vertical"></span></button>
         </div>
       </div>
