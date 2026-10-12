@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>Mobile KTV · v3 · Thợ máy</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','system-ui','sans-serif']}}}};</script>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    body{margin:0;font-family:Inter,system-ui,sans-serif;background:#f1f5f9;color:#0f172a;min-height:100dvh}
+    .shell{min-height:100dvh;display:flex;position:relative}
+    .sidebar-backdrop{display:none;position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:40}
+    .shell.nav-open .sidebar-backdrop{display:block}
+    .sidebar{
+      position:fixed;top:0;left:0;bottom:0;width:min(280px,86vw);z-index:50;
+      background:#fff;border-right:1px solid #e2e8f0;
+      transform:translateX(-105%);transition:transform .2s ease;
+      display:flex;flex-direction:column;padding:16px 12px;
+      box-shadow:8px 0 24px rgba(15,23,42,.08);
+    }
+    .shell.nav-open .sidebar{transform:translateX(0)}
+    .sidebar-brand{padding:4px 8px 14px;border-bottom:1px solid #e2e8f0;margin-bottom:12px}
+    .sidebar-brand .brand{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#059669}
+    .sidebar-brand .sub{font-size:12px;color:#64748b;margin-top:4px;line-height:1.35}
+    .sidenav{display:flex;flex-direction:column;gap:4px;flex:1;overflow:auto}
+    .sidenav button{
+      display:flex;align-items:center;gap:10px;width:100%;text-align:left;
+      border:0;background:transparent;border-radius:.375rem;padding:11px 12px;
+      font-size:14px;font-weight:600;color:#475569;font-family:inherit;cursor:pointer;
+    }
+    .sidenav button:hover{background:#f8fafc}
+    .sidenav button.on{background:#eff6ff;color:#1d4ed8}
+    .sidenav .ico{width:1.5rem;text-align:center;font-size:16px;line-height:1}
+    .main-col{flex:1;min-width:0;display:flex;flex-direction:column;min-height:100dvh}
+    .topbar{background:#fff;border-bottom:1px solid #e2e8f0;padding:10px 16px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:30}
+    .btn-menu{
+      width:40px;height:40px;border:1px solid #e2e8f0;border-radius:.375rem;background:#fff;
+      display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;padding:0;flex-shrink:0;
+    }
+    .btn-menu span{display:block;width:18px;height:2px;background:#334155;border-radius:1px}
+    .topbar .brand{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#059669}
+    .topbar .page-title{font-size:15px;font-weight:700;color:#0f172a;margin-top:1px}
+    .wrap{width:100%;max-width:1100px;margin:0 auto;padding:16px;flex:1}
+    .main{min-width:0}
+    .list-grid{display:grid;grid-template-columns:1fr;gap:10px}
+    .kpi-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    @media(min-width:768px){
+      .list-grid{grid-template-columns:1fr 1fr}
+      .kpi-grid{grid-template-columns:repeat(4,1fr)!important}
+    }
+    @media(min-width:1024px){
+      .sidebar{position:sticky;transform:none;box-shadow:none;width:240px;flex-shrink:0}
+      .sidebar-backdrop,.btn-menu{display:none!important}
+      .shell.nav-open .sidebar-backdrop{display:none}
+      .wrap{padding:20px 24px 32px}
+      .list-grid{grid-template-columns:1fr 1fr 1fr}
+    }
+    .surface{border:1px solid #e2e8f0;background:#fff;border-radius:.375rem;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;min-height:36px;border-radius:.375rem;border:1px solid #cbd5e1;padding:0 14px;font-size:14px;font-weight:500;box-shadow:0 1px 2px rgba(15,23,42,.05);font-family:inherit;cursor:pointer;background:#fff;color:#334155;box-sizing:border-box}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+    .btn:hover{background:#f8fafc;border-color:#94a3b8}
+    .btn-primary{background:#2563eb;border-color:#1d4ed8;color:#fff}
+    .btn-primary:hover{background:#1d4ed8;border-color:#1e40af;color:#fff}
+    .btn-emerald{background:#059669;border-color:#047857;color:#fff}
+    .btn-emerald:hover{background:#047857;border-color:#065f46;color:#fff}
+    .btn-outline{background:#fff;border-color:#cbd5e1;color:#334155}
+    .btn-orange{background:#ea580c;border-color:#c2410c;color:#fff}
+    .btn-orange:hover{background:#c2410c;color:#fff}
+    .btn-touch{min-height:40px;height:auto;padding:8px 12px}
+    .btn-block{width:100%}
+    .btn-sm{height:32px;min-height:32px;padding:0 10px;font-size:13px}
+    .badge{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;border:1px solid;padding:2px 8px;font-size:11px;font-weight:500;white-space:nowrap;flex-shrink:0;line-height:1.25}
+    .b-ns{border-color:#cbd5e1;background:#f1f5f9;color:#334155}
+    .b-ip,.b-sky{border-color:#7dd3fc;background:#e0f2fe;color:#075985}
+    .b-ok{border-color:#6ee7b7;background:#d1fae5;color:#065f46}
+    .b-warn{border-color:#fcd34d;background:#fef3c7;color:#92400e}
+    .b-bad{border-color:#fda4af;background:#ffe4e6;color:#9f1239}
+    .b-orange{border-color:#fdba74;background:#ffedd5;color:#9a3412}
+    .chip-row{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+    .chip{flex:0 0 auto;border:1px solid #cbd5e1;background:#fff;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;color:#475569;font-family:inherit;cursor:pointer}
+    .chip.on{background:#eff6ff;border-color:#93c5fd;color:#1d4ed8}
+    .search{width:100%;min-height:40px;border:1px solid #cbd5e1;border-radius:.375rem;padding:8px 12px;font-size:16px;background:#fff;font-family:inherit}
+    .search:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.25)}
+    .assess{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+    .assess button{min-height:40px;border-radius:.375rem;border:1px solid #e2e8f0;background:#fff;color:#475569;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer}
+    .assess .g{border-color:#059669;background:#059669;color:#fff}
+    .assess .r{border-color:#f59e0b;background:#f59e0b;color:#fff}
+    .assess .p{border-color:#dc2626;background:#dc2626;color:#fff}
+    .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 14px;border-radius:10px;font-size:13px;z-index:70;display:none;max-width:90%}
+    .toast.on{display:block}
+    .group{background:#f8fafc;padding:8px 12px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#64748b;border-bottom:1px solid #e2e8f0}
+    .shell-ftr{background:#fff;border:1px solid #e2e8f0;padding:12px 16px;display:grid;gap:8px;margin-top:12px;border-radius:.375rem}
+    .empty{text-align:center;color:#94a3b8;font-size:13px;padding:28px 12px}
+    .linkish{color:#2563eb;font-weight:600;background:none;border:0;padding:0;cursor:pointer;font-family:inherit;font-size:13px}
+  </style>
+</head>
+<body>
+<div class="shell" id="shell">
+  <div class="sidebar-backdrop" id="sidebarBackdrop" hidden></div>
+  <aside class="sidebar" id="sidebar" aria-label="Menu chính">
+    <div class="sidebar-brand">
+      <div class="brand">GLS · Mobile KTV v3</div>
+      <div class="sub">Thợ máy · dữ liệu mẫu sẵn · đồng bộ Console v3 nếu có</div>
+    </div>
+    <nav class="sidenav" id="sidenav">
+      <button type="button" data-tab="home" class="on"><span class="ico">⚡</span>Hàng đợi</button>
+      <button type="button" data-tab="eval"><span class="ico">📋</span>Đánh giá</button>
+      <button type="button" data-tab="repair"><span class="ico">🔧</span>Sửa chữa</button>
+      <button type="button" data-tab="maint"><span class="ico">🛢</span>Bảo dưỡng</button>
+      <button type="button" data-tab="vehicle"><span class="ico">🚛</span>Theo xe</button>
+    </nav>
+  </aside>
+  <div class="main-col">
+    <header class="topbar">
+      <button type="button" class="btn-menu" id="btnMenu" aria-label="Mở menu" aria-controls="sidebar" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <div>
+        <div class="brand">Mobile KTV v3</div>
+        <div class="page-title" id="pageTitle">Hàng đợi</div>
+      </div>
+    </header>
+    <div class="wrap"><div class="main" id="main"></div></div>
+  </div>
+  <div class="toast" id="toast"></div>
+</div>
+<script>
+
+const STORAGE_KEY = 'fleet-bdsc-proto-v3-01';
+const DRIVER_INBOX_KEY = 'fleet-bdsc-driver-inbox-v3';
+const PRETRIP_KEY = 'fleet-bdsc-pretrip-inbox-v3';
+const TECH = 'Nguyễn Văn Kỹ thuật';
+const SEED = {"vehicles":[{"id":101,"plate":"51C-29273","type":"Đầu kéo","brand":"Freightliner","model":"Freightliner","year":2007,"km":1158402,"garage":"Bảo dưỡng nội bộ","area":"HCM","evalStatus":"ok","isTrailer":false,"gps":"Bình Anh","gpsVendor":"Bình Anh"},{"id":102,"plate":"50H-87033","type":"Đầu kéo","brand":"Freightliner","model":"Freightliner","year":2008,"km":1710613,"garage":"Bảo dưỡng nội bộ","area":"HCM","evalStatus":"soon","isTrailer":false,"gps":"Bình Anh","gpsVendor":"Bình Anh"},{"id":103,"plate":"51C-41767","type":"Đầu kéo","brand":"Cascadia","model":"Cascadia","year":2009,"km":1305486,"garage":"Bảo dưỡng nội bộ","area":"HCM","evalStatus":"ok","isTrailer":false,"gps":"Bình Anh","gpsVendor":"Bình Anh"},{"id":104,"plate":"50E-22295","type":"Đầu kéo","brand":"Freightliner","model":"Freightliner","year":2010,"km":1067785,"garage":"Bảo dưỡng nội bộ","area":"HCM","evalStatus":"ok","isTrailer":false,"gps":"Bình Anh","gpsVendor":"Bình Anh"},{"id":105,"plate":"50H-69138","type":"Đầu kéo","brand":"Cascadia","model":"Cascadia","year":2010,"km":54538,"garage":"Bảo dưỡng nội bộ","area":"HCM","evalStatus":"soon","isTrailer":false,"gps":"Bình Anh","gpsVendor":"Bình Anh"},{"id":106,"plate":"50E-21624","type":"Đầu kéo","brand":"HD1000","model":"HD1000","year":2015,"km":120000,"garage":"Bảo dưỡng nội bộ","area":"HCM","evalStatus":"ok","isTrailer":false,"gps":"Bình Anh","gpsVendor":"Bình Anh"},{"id":107,"plate":"50H-07940","type":"Đầu kéo","brand":"HD700","model":"HD700","year":2016,"km":377230,"garage":"Bảo dưỡng nội bộ","area":"HCM","evalStatus":"ok","isTrailer":false,"gps":"Bình Anh","gpsVendor":"Bình Anh"},{"id":108,"plate":"50LD-11615","type":"Đầu kéo","brand":"HD700","model":"HD700","year":2016,"km":173339,"garage":"Bảo dưỡng nội bộ","area":"HCM","evalStatus":"soon","isTrailer":false,"gps":"Bình Anh","gpsVendor":"Bình Anh"},{"id":109,"plate":"50E-36177","type":"Xe Đầu Kéo","brand":"CASCADIA","model":"CASCADIA","year":2015,"km":113171,"garage":"Xưởng Hải Phòng","area":"Hải Phòng","evalStatus":"soon","isTrailer":false,"gps":"Bình Anh","gpsVendor":"Bình Anh"},{"id":110,"plate":"50E-65517","type":"Xe Đầu Kéo","brand":"CASCADIA","model":"CASCADIA","year":2015,"km":121090,"garage":"Xưởng Hải Phòng","area":"Hải Phòng","evalStatus":"due","isTrailer":false,"gps":"Bình Anh","gpsVendor":"Bình Anh"}],"orders":[{"id":"drv-demo1","vehicleId":101,"code":"SC-TX-20260930-101","type":"INCIDENTAL","occurrence":1,"date":"2026-09-30","km":1158402,"garage":"Chưa xếp xưởng","source":"DRIVER_REQUEST","status":"NOT_STARTED","approvalStatus":"DRAFT","content":"Yêu cầu SC từ tài xế · Hệ Thống Phanh","cost":0,"system":"Hệ Thống Phanh","technicianName":"","materials":[],"workItems":[{"content":"Yêu cầu tài xế","system":"Hệ Thống Phanh","kind":"REPAIR"}],"images":[{"id":"img1","name":"anh-1.jpg","source":"DRIVER"},{"id":"img2","name":"anh-2.jpg","source":"DRIVER"},{"id":"img3","name":"anh-3.jpg","source":"DRIVER"},{"id":"img4","name":"anh-4.jpg","source":"DRIVER"}],"approvalLog":[{"at":"2026-09-30 07:10","action":"CREATE","by":"Tài xế","note":"4 ảnh"}]},{"id":"o1","vehicleId":115,"code":"RO-2026-1001","type":"INCIDENTAL","occurrence":1,"date":"2026-01-13","km":98000,"garage":"TRUNG ĐẠT BR-VT","source":"INCIDENT","status":"IN_PROGRESS","approvalStatus":"APPROVED","content":"Tán Bố Thắng Mooc","cost":4536000,"system":"Nhân Công Sửa Chữa","technicianName":"","materials":[],"workItems":[{"content":"Tán Bố Thắng Mooc","system":"Nhân Công Sửa Chữa","kind":"REPAIR"}],"images":[],"approvalLog":[{"at":"2026-01-13 08:00","action":"CREATE","by":"Kỹ thuật GLS","note":"Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]},{"id":"o2","vehicleId":101,"code":"RO-2026-1002","type":"INCIDENTAL","occurrence":2,"date":"2026-01-13","km":1158402,"garage":"BÌNH ANH","source":"INCIDENT","status":"NOT_STARTED","approvalStatus":"REJECTED","content":"Thay cảm biến tương đương tương đương + dây nguồn cảm biến","cost":324000,"system":"Hệ Thống Điện","technicianName":"","materials":[{"name":"Thay cảm biến tương đương tương đương + dây nguồn cảm biến","qty":1,"price":300000,"uom":"Cái"}],"workItems":[{"content":"Thay cảm biến tương đương tương đương + dây nguồn cảm biến","system":"Hệ Thống Điện","kind":"REPAIR"}],"images":[],"approvalLog":[{"at":"2026-01-13 08:00","action":"CREATE","by":"Kỹ thuật GLS","note":"Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]},{"id":"o3","vehicleId":105,"code":"RO-2026-1003","type":"INCIDENTAL","occurrence":3,"date":"2026-01-13","km":54538,"garage":"BÌNH ANH","source":"INCIDENT","status":"COMPLETED","approvalStatus":"APPROVED","content":"Thay cam mới","cost":594000,"system":"Hệ Thống Điện","technicianName":"","materials":[{"name":"Thay cam mới","qty":1,"price":550000,"uom":"Cái"}],"workItems":[{"content":"Thay cam mới","system":"Hệ Thống Điện","kind":"REPAIR"}],"images":[],"approvalLog":[{"at":"2026-01-13 08:00","action":"CREATE","by":"Kỹ thuật GLS","note":"Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]},{"id":"o4","vehicleId":101,"code":"RO-2026-1004","type":"INCIDENTAL","occurrence":4,"date":"2026-01-08","km":1158402,"garage":"HYUNDAI VIỆT NHÂN","source":"INCIDENT","status":"IN_PROGRESS","approvalStatus":"APPROVED","content":"Công sạc gas lạnh · Công kiểm tra · Bấm ống gas lạnh · Hàn giàn nóng · Gas lạnh điều hòa Sinochem Jincool · Dầu máy lạnh","cost":1765800,"system":"Hệ Thống Máy Lạnh","technicianName":"","materials":[{"name":"Gas lạnh điều hòa Sinochem Jincool","qty":0.7,"price":250000,"uom":"Cái"},{"name":"Dầu máy lạnh","qty":0.4,"price":400000,"uom":"Cái"}],"workItems":[{"content":"Công sạc gas lạnh · Công kiểm tra · Bấm ống gas lạnh · Hàn giàn nóng · Gas lạnh điều hòa Sinochem Jincool · Dầu máy lạnh","system":"Hệ Thống Máy Lạnh","kind":"REPAIR"}],"images":[],"approvalLog":[{"at":"2026-01-08 08:00","action":"CREATE","by":"Kỹ thuật GLS","note":"Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]},{"id":"o5","vehicleId":101,"code":"RO-2026-1005","type":"INCIDENTAL","occurrence":5,"date":"2026-01-07","km":1158402,"garage":"HYUNDAI VIỆT NHÂN","source":"INCIDENT","status":"NOT_STARTED","approvalStatus":"REJECTED","content":"Công sạc gas lạnh · Công kiểm tra · Bấm ống gas lạnh · Vệ sinh giàn lạnh (Phương pháp nội soi) · Gas lạnh điều hòa Sinochem Jincool · Dầu máy lạnh","cost":2089800,"system":"Hệ Thống Máy Lạnh","technicianName":"","materials":[{"name":"Gas lạnh điều hòa Sinochem Jincool","qty":0.7,"price":250000,"uom":"Cái"},{"name":"Dầu máy lạnh","qty":0.4,"price":400000,"uom":"Cái"}],"workItems":[{"content":"Công sạc gas lạnh · Công kiểm tra · Bấm ống gas lạnh · Vệ sinh giàn lạnh (Phương pháp nội soi) · Gas lạnh điều hòa Sinochem Jincool · Dầu máy lạnh","system":"Hệ Thống Máy Lạnh","kind":"REPAIR"}],"images":[],"approvalLog":[{"at":"2026-01-07 08:00","action":"CREATE","by":"Kỹ thuật GLS","note":"Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]},{"id":"o6","vehicleId":101,"code":"RO-2026-1006","type":"INCIDENTAL","occurrence":6,"date":"2026-01-05","km":1158402,"garage":"TRUNG ĐẠT BR-VT","source":"INCIDENT","status":"COMPLETED","approvalStatus":"APPROVED","content":"Tán Bố Thắng Mooc · Gia Công Ron · Tiện cấy ren cổ pô","cost":5400000,"system":"Nhân Công Sửa Chữa","technicianName":"","materials":[],"workItems":[{"content":"Tán Bố Thắng Mooc · Gia Công Ron · Tiện cấy ren cổ pô","system":"Nhân Công Sửa Chữa","kind":"REPAIR"}],"images":[],"approvalLog":[{"at":"2026-01-05 08:00","action":"CREATE","by":"Kỹ thuật GLS","note":"Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]},{"id":"o7","vehicleId":103,"code":"RO-2026-1007","type":"INCIDENTAL","occurrence":7,"date":"2026-01-14","km":1305486,"garage":"HYUNDAI PHÚ LÂM","source":"INCIDENT","status":"IN_PROGRESS","approvalStatus":"APPROVED","content":"Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)","cost":918000,"system":"Phí Phát Sinh Khác","technicianName":"","materials":[],"workItems":[{"content":"Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)","system":"Phí Phát Sinh Khác","kind":"REPAIR"}],"images":[],"approvalLog":[{"at":"2026-01-14 08:00","action":"CREATE","by":"Kỹ thuật GLS","note":"Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]},{"id":"o8","vehicleId":101,"code":"RO-2026-1008","type":"INCIDENTAL","occurrence":8,"date":"2026-01-14","km":1158402,"garage":"HYUNDAI PHÚ LÂM","source":"INCIDENT","status":"NOT_STARTED","approvalStatus":"REJECTED","content":"Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)","cost":918000,"system":"Phí Phát Sinh Khác","technicianName":"","materials":[],"workItems":[{"content":"Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)","system":"Phí Phát Sinh Khác","kind":"REPAIR"}],"images":[],"approvalLog":[{"at":"2026-01-14 08:00","action":"CREATE","by":"Kỹ thuật GLS","note":"Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]},{"id":"o9","vehicleId":101,"code":"RO-2026-1009","type":"INCIDENTAL","occurrence":9,"date":"2026-01-14","km":1158402,"garage":"HYUNDAI PHÚ LÂM","source":"INCIDENT","status":"COMPLETED","approvalStatus":"APPROVED","content":"Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)","cost":918000,"system":"Phí Phát Sinh Khác","technicianName":"","materials":[],"workItems":[{"content":"Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)","system":"Phí Phát Sinh Khác","kind":"REPAIR"}],"images":[],"approvalLog":[{"at":"2026-01-14 08:00","action":"CREATE","by":"Kỹ thuật GLS","note":"Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]},{"id":"o10","vehicleId":101,"code":"RO-2026-1010","type":"INCIDENTAL","occurrence":10,"date":"2026-01-14","km":1158402,"garage":"HYUNDAI PHÚ LÂM","source":"INCIDENT","status":"IN_PROGRESS","approvalStatus":"APPROVED","content":"Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)","cost":918000,"system":"Phí Phát Sinh Khác","technicianName":"","materials":[],"workItems":[{"content":"Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)","system":"Phí Phát Sinh Khác","kind":"REPAIR"}],"images":[],"approvalLog":[{"at":"2026-01-14 08:00","action":"CREATE","by":"Kỹ thuật GLS","note":"Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]},{"id":"o11","vehicleId":101,"code":"RO-2026-1011","type":"INCIDENTAL","occurrence":11,"date":"2026-01-14","km":1158402,"garage":"HYUNDAI PHÚ LÂM","source":"INCIDENT","status":"NOT_STARTED","approvalStatus":"REJECTED","content":"Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)","cost":918000,"system":"Phí Phát Sinh Khác","technicianName":"","materials":[],"workItems":[{"content":"Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)","system":"Phí Phát Sinh Khác","kind":"REPAIR"}],"images":[],"approvalLog":[{"at":"2026-01-14 08:00","action":"CREATE","by":"Kỹ thuật GLS","note":"Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]},{"id":"o12","vehicleId":101,"code":"RO-2026-1012","type":"INCIDENTAL","occurrence":12,"date":"2026-01-14","km":1158402,"garage":"HYUNDAI PHÚ LÂM","source":"INCIDENT","status":"COMPLETED","approvalStatus":"APPROVED","content":"Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)","cost":918000,"system":"Phí Phát Sinh Khác","technicianName":"","materials":[],"workItems":[{"content":"Kiểm tra đánh giá tình trạng xe (Đầu kéo 600k + Mooc 250k)","system":"Phí Phát Sinh Khác","kind":"REPAIR"}],"images":[],"approvalLog":[{"at":"2026-01-14 08:00","action":"CREATE","by":"Kỹ thuật GLS","note":"Từ Excel Dự toán / SC thực tế HCM (bản mẫu khách)"}]},{"id":"pbd-101-1","vehicleId":101,"code":"PBD-2026-3011","type":"PERIODIC","occurrence":1,"date":"2026-05-11","km":1146402,"garage":"Bảo dưỡng nội bộ","source":"PLAN","status":"COMPLETED","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 1","cost":3200000,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":"2026-09-01 10:00","startedAt":null}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-101-2","vehicleId":101,"code":"PBD-2026-3012","type":"PERIODIC","occurrence":2,"date":"2026-07-12","km":1134402,"garage":"Kho phụ tùng Lớp","source":"PLAN","status":"COMPLETED","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 2","cost":4651600,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":"2026-09-01 10:00","startedAt":null}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-101-3","vehicleId":101,"code":"PBD-2026-3013","type":"PERIODIC","occurrence":3,"date":"2026-09-13","km":1122402,"garage":"Bảo dưỡng nội bộ","source":"PLAN","status":"IN_PROGRESS","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 3","cost":5120000,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":null,"startedAt":"2026-09-29 08:00"}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-102-1","vehicleId":102,"code":"PBD-2026-3021","type":"PERIODIC","occurrence":1,"date":"2026-05-11","km":1698613,"garage":"Bảo dưỡng nội bộ","source":"PLAN","status":"COMPLETED","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 1","cost":3200000,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":"2026-09-01 10:00","startedAt":null}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-102-2","vehicleId":102,"code":"PBD-2026-3022","type":"PERIODIC","occurrence":2,"date":"2026-07-12","km":1686613,"garage":"Kho phụ tùng Lớp","source":"PLAN","status":"COMPLETED","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 2","cost":4651600,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":"2026-09-01 10:00","startedAt":null}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-102-3","vehicleId":102,"code":"PBD-2026-3023","type":"PERIODIC","occurrence":3,"date":"2026-09-13","km":1674613,"garage":"Bảo dưỡng nội bộ","source":"PLAN","status":"IN_PROGRESS","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 3","cost":5120000,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":null,"startedAt":"2026-09-29 08:00"}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-103-1","vehicleId":103,"code":"PBD-2026-3031","type":"PERIODIC","occurrence":1,"date":"2026-05-11","km":1293486,"garage":"Bảo dưỡng nội bộ","source":"PLAN","status":"COMPLETED","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 1","cost":3200000,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":"2026-09-01 10:00","startedAt":null}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-103-2","vehicleId":103,"code":"PBD-2026-3032","type":"PERIODIC","occurrence":2,"date":"2026-07-12","km":1281486,"garage":"Kho phụ tùng Lớp","source":"PLAN","status":"COMPLETED","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 2","cost":4651600,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":"2026-09-01 10:00","startedAt":null}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-103-3","vehicleId":103,"code":"PBD-2026-3033","type":"PERIODIC","occurrence":3,"date":"2026-09-13","km":1269486,"garage":"Bảo dưỡng nội bộ","source":"PLAN","status":"IN_PROGRESS","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 3","cost":5120000,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":null,"startedAt":"2026-09-29 08:00"}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-105-1","vehicleId":105,"code":"PBD-2026-3051","type":"PERIODIC","occurrence":1,"date":"2026-05-11","km":42538,"garage":"Bảo dưỡng nội bộ","source":"PLAN","status":"COMPLETED","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 1","cost":3200000,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":"2026-09-01 10:00","startedAt":null}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-105-2","vehicleId":105,"code":"PBD-2026-3052","type":"PERIODIC","occurrence":2,"date":"2026-07-12","km":30538,"garage":"Kho phụ tùng Lớp","source":"PLAN","status":"COMPLETED","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 2","cost":4651600,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":"2026-09-01 10:00","startedAt":null}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-105-3","vehicleId":105,"code":"PBD-2026-3053","type":"PERIODIC","occurrence":3,"date":"2026-09-13","km":18538,"garage":"Bảo dưỡng nội bộ","source":"PLAN","status":"IN_PROGRESS","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 3","cost":5120000,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":null,"startedAt":"2026-09-29 08:00"}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-106-1","vehicleId":106,"code":"PBD-2026-3061","type":"PERIODIC","occurrence":1,"date":"2026-05-11","km":108000,"garage":"Bảo dưỡng nội bộ","source":"PLAN","status":"COMPLETED","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 1","cost":3200000,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":"2026-09-01 10:00","startedAt":null}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-106-2","vehicleId":106,"code":"PBD-2026-3062","type":"PERIODIC","occurrence":2,"date":"2026-07-12","km":96000,"garage":"Kho phụ tùng Lớp","source":"PLAN","status":"COMPLETED","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 2","cost":4651600,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":"2026-09-01 10:00","startedAt":null}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-106-3","vehicleId":106,"code":"PBD-2026-3063","type":"PERIODIC","occurrence":3,"date":"2026-09-13","km":84000,"garage":"Bảo dưỡng nội bộ","source":"PLAN","status":"IN_PROGRESS","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 3","cost":5120000,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":null,"startedAt":"2026-09-29 08:00"}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-107-1","vehicleId":107,"code":"PBD-2026-3071","type":"PERIODIC","occurrence":1,"date":"2026-05-11","km":365230,"garage":"Bảo dưỡng nội bộ","source":"PLAN","status":"COMPLETED","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 1","cost":3200000,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":"2026-09-01 10:00","startedAt":null}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-107-2","vehicleId":107,"code":"PBD-2026-3072","type":"PERIODIC","occurrence":2,"date":"2026-07-12","km":353230,"garage":"Kho phụ tùng Lớp","source":"PLAN","status":"COMPLETED","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 2","cost":4651600,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":"2026-09-01 10:00","startedAt":null}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]},{"id":"pbd-107-3","vehicleId":107,"code":"PBD-2026-3073","type":"PERIODIC","occurrence":3,"date":"2026-09-13","km":341230,"garage":"Bảo dưỡng nội bộ","source":"PLAN","status":"IN_PROGRESS","approvalStatus":"APPROVED","content":"Bảo dưỡng định kỳ · Lần 3","cost":5120000,"system":"Dầu Nhớt","technicianName":"Nguyễn Văn Kỹ thuật","materials":[],"workItems":[{"content":"Bảo dưỡng định kỳ","system":"Dầu Nhớt","kind":"MAINT","completedAt":null,"startedAt":"2026-09-29 08:00"}],"images":[],"approvalLog":[{"at":"2026-09-01 08:00","action":"CREATE","by":"Demo","note":"Seed"}]}],"evaluationHistory":[{"id":"ev-101-1","vehicleId":101,"date":"2026-09-20","status":"SUBMITTED","note":"Xe ổn","inspector":"Nguyễn Văn Kỹ thuật","goodCount":7,"failCount":0,"linkedOrderIds":[],"items":{"c1":"ok","c2":"ok","c8":"ok","c9":"ok","c11":"ok","c14":"ok","c16":"ok"}},{"id":"ev-101-2","vehicleId":101,"date":"2026-08-23","status":"SUBMITTED","note":"SC điện","inspector":"Trần KTV","goodCount":6,"failCount":1,"linkedOrderIds":["o2"],"items":{"c1":"ok","c2":"ok","c8":"ok","c9":"ok","c11":"ok","c14":"ok","c16":"replace"}},{"id":"ev-102-1","vehicleId":102,"date":"2026-09-22","status":"SUBMITTED","note":"Phanh yếu","inspector":"Trần KTV","goodCount":5,"failCount":2,"linkedOrderIds":[],"items":{"c1":"ok","c8":"ok","c9":"repair","c11":"ok","c14":"repair","c16":"ok"}},{"id":"ev-110-1","vehicleId":110,"date":"2026-09-25","status":"SUBMITTED","note":"Cần SC","inspector":"Phạm KTV","goodCount":4,"failCount":2,"linkedOrderIds":[],"items":{"c5":"ok","c11":"repair","c13":"repair"}}],"evaluations":{}};
+const $ = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => [...el.querySelectorAll(s)];
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const money = (n) => n == null ? '—' : Number(n).toLocaleString('vi-VN') + ' ₫';
+const kmFmt = (n) => n == null || n === '' ? '—' : Number(n).toLocaleString('vi-VN');
+const today = () => new Date().toISOString().slice(0, 10);
+const stamp = () => new Date().toISOString().slice(0, 16).replace('T', ' ');
+const uid = (p) => p + '-' + Date.now().toString(36) + Math.floor(Math.random()*99);
+const clone = (x) => (typeof structuredClone === 'function' ? structuredClone(x) : JSON.parse(JSON.stringify(x)));
+
+const FALLBACK_CRITERIA = [
+  { id:1, name:'TỔNG QUAN BÊN NGOÀI', items:[
+    {id:'c1',label:'Đèn chiếu sáng / tín hiệu'},{id:'c2',label:'Gương chiếu hậu'},{id:'c3',label:'Kính chắn gió / gạt mưa'},{id:'c4',label:'Thân vỏ / cửa / khóa'}]},
+  { id:2, name:'NỘI THẤT TRONG CABIN', items:[
+    {id:'c5',label:'Đồng hồ / cảnh báo'},{id:'c6',label:'Ghế / dây an toàn'},{id:'c7',label:'Điều hòa / quạt'}]},
+  { id:3, name:'LÁI & PHANH', items:[
+    {id:'c8',label:'Trợ lực lái'},{id:'c9',label:'Phanh chân / tay'},{id:'c10',label:'Áp suất khí nén'}]},
+  { id:4, name:'ĐỘNG CƠ', items:[
+    {id:'c11',label:'Mức dầu / rò rỉ'},{id:'c12',label:'Nước làm mát'},{id:'c13',label:'Tiếng kêu bất thường'}]},
+  { id:5, name:'VỎ LỐP & ĐIỆN', items:[
+    {id:'c14',label:'Áp suất / mòn lốp'},{id:'c15',label:'Đai ốc bánh'},{id:'c16',label:'Ắc quy'},{id:'c17',label:'Dây điện'}]},
+];
+
+let DB = { vehicles:[], orders:[], evaluationHistory:[], evaluations:{}, evalCriteria: FALLBACK_CRITERIA };
+let view = { tab:'home', screen:'list', id:null, vehicleId:null, histKind:'MAINT', q:'', filter:'ALL', evalDraft:null };
+let toastT = null;
+
+function loadDB() {
+  let fromConsole = null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      if ((p.vehicles || []).length) fromConsole = p;
+    }
+  } catch (e) { console.warn(e); }
+  if (fromConsole) {
+    DB.vehicles = fromConsole.vehicles || [];
+    DB.orders = fromConsole.orders || [];
+    DB.evaluationHistory = fromConsole.evaluationHistory || [];
+    DB.evaluations = fromConsole.evaluations || {};
+    DB.evalCriteria = (fromConsole.evalCriteria && fromConsole.evalCriteria.length) ? fromConsole.evalCriteria : FALLBACK_CRITERIA;
+  } else {
+    DB.vehicles = clone(SEED.vehicles);
+    DB.orders = clone(SEED.orders);
+    DB.evaluationHistory = clone(SEED.evaluationHistory);
+    DB.evaluations = clone(SEED.evaluations || {});
+    DB.evalCriteria = FALLBACK_CRITERIA;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const p = raw ? JSON.parse(raw) : {};
+      if (!(p.vehicles || []).length) {
+        p.vehicles = DB.vehicles;
+        p.orders = DB.orders;
+        p.evaluationHistory = DB.evaluationHistory;
+        p.evaluations = DB.evaluations;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+      }
+    } catch (_) {}
+  }
+  absorbDriverInbox();
+  ensurePretripSeed();
+}
+function saveDB() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const p = raw ? JSON.parse(raw) : {};
+    p.vehicles = DB.vehicles;
+    p.orders = DB.orders;
+    p.evaluationHistory = DB.evaluationHistory;
+    p.evaluations = DB.evaluations;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+  } catch (e) { toast('Không lưu được (quota).'); }
+}
+function absorbDriverInbox() {
+  try {
+    const inbox = JSON.parse(localStorage.getItem(DRIVER_INBOX_KEY) || '[]');
+    if (!Array.isArray(inbox) || !inbox.length) return;
+    inbox.forEach(item => {
+      if (!item || !item.id) return;
+      if (DB.orders.some(o => String(o.id) === String(item.id))) return;
+      DB.orders.unshift(item);
+    });
+    localStorage.setItem(DRIVER_INBOX_KEY, '[]');
+    saveDB();
+  } catch (_) {}
+}
+function ensurePretripSeed() {
+  try {
+    const cur = JSON.parse(localStorage.getItem(PRETRIP_KEY) || '[]');
+    if (Array.isArray(cur) && cur.length) return;
+    const list = [
+      { id:'pt1', vehicleId:101, plate:'51C-29273', driver:'Nguyễn TX', at:'2026-09-30 06:40', km:1158402, result:'FAIL', status:'NEW', note:'Phanh hơi yếu', items:[{label:'Phanh',ok:false},{label:'Đèn',ok:true},{label:'Lốp',ok:true}] },
+      { id:'pt2', vehicleId:105, plate:'50H-69138', driver:'Trần TX', at:'2026-09-29 18:10', km:54538, result:'PASS', status:'NEW', note:'OK', items:[{label:'Phanh',ok:true},{label:'Đèn',ok:true},{label:'Lốp',ok:true}] },
+    ];
+    localStorage.setItem(PRETRIP_KEY, JSON.stringify(list));
+  } catch (_) {}
+}
+function pretrips() { try { return JSON.parse(localStorage.getItem(PRETRIP_KEY) || '[]'); } catch { return []; } }
+function savePretrips(list) { localStorage.setItem(PRETRIP_KEY, JSON.stringify(list)); }
+function veh(id) { return DB.vehicles.find(v => Number(v.id) === Number(id)); }
+function order(id) { return DB.orders.find(o => String(o.id) === String(id)); }
+function isMaint(o) {
+  if (!o) return false;
+  if (o.type === 'PERIODIC') return true;
+  return (o.workItems || []).some(w => w.kind === 'MAINT' || /bảo dưỡng/i.test(w.service || w.content || ''));
+}
+function ordersMaint() {
+  return DB.orders.filter(o => o.type === 'PERIODIC' || isMaint(o))
+    .sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+}
+function ordersRepair() {
+  return DB.orders.filter(o => {
+    if (o.source === 'DRIVER_REQUEST' || o.source === 'INCIDENT' || o.source === 'PRE_TRIP' || o.source === 'PERIODIC_ASSESSMENT') return true;
+    if (o.type === 'INCIDENTAL') return true;
+    return (o.workItems || []).some(w => w.kind === 'REPAIR');
+  }).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+}
+function driverReports() { return DB.orders.filter(o => o.source === 'DRIVER_REQUEST').sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))); }
+function evalsOf(vid) { return (DB.evaluationHistory||[]).filter(e => Number(e.vehicleId)===Number(vid)).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))); }
+function vehiclesNeedEval() {
+  return DB.vehicles.filter(v => !v.isTrailer && (v.evalStatus === 'due' || v.evalStatus === 'overdue' || v.evalStatus === 'soon' || !evalsOf(v.id).length));
+}
+function toast(msg) {
+  const el = $('#toast'); if (!el) return;
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2200);
+}
+function statusBadge(st) {
+  if (st === 'COMPLETED') return '<span class="badge b-ok">Hoàn thành</span>';
+  if (st === 'IN_PROGRESS') return '<span class="badge b-ip">Đang làm</span>';
+  return '<span class="badge b-ns">Chưa bắt đầu</span>';
+}
+function evalBadge(s) {
+  if (s === 'ok') return '<span class="badge b-ok">Đúng hạn</span>';
+  if (s === 'soon') return '<span class="badge b-warn">Sắp hạn</span>';
+  if (s === 'due') return '<span class="badge b-orange">Đến hạn</span>';
+  if (s === 'overdue') return '<span class="badge b-bad">Quá hạn</span>';
+  return '<span class="badge b-ns">—</span>';
+}
+function matchQ(blob, q) {
+  if (!q) return true;
+  return String(blob||'').toLowerCase().includes(q.toLowerCase());
+}
+function criteriaFor(v) {
+  const all = DB.evalCriteria || FALLBACK_CRITERIA;
+  const scope = v && v.isTrailer ? 'TRAILER' : 'TRACTOR';
+  const filtered = all.filter(g => !g.scope || g.scope === scope || g.scope === 'BOTH');
+  return (filtered.length ? filtered : FALLBACK_CRITERIA).map(g => ({
+    name: g.name,
+    items: (g.items || []).filter(it => it.active !== false),
+  })).filter(g => g.items.length);
+}
+const TAB_TITLE = { home:'Hàng đợi', eval:'Đánh giá', repair:'Sửa chữa', maint:'Bảo dưỡng', vehicle:'Theo xe', inbox:'Từ tài xế' };
+function setNavOpen(open) {
+  const shell = document.getElementById('shell');
+  const btn = document.getElementById('btnMenu');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!shell) return;
+  shell.classList.toggle('nav-open', !!open);
+  if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (backdrop) {
+    if (open) backdrop.removeAttribute('hidden');
+    else backdrop.setAttribute('hidden', '');
+  }
+}
+function go(tab, screen='list', opts={}) {
+  view.tab = tab;
+  view.screen = screen;
+  if (opts.id != null) view.id = opts.id;
+  if (opts.vehicleId != null) view.vehicleId = opts.vehicleId;
+  if (opts.histKind) view.histKind = opts.histKind;
+  if (opts.filter) view.filter = opts.filter;
+  if (opts.resetQ) view.q = '';
+  render();
+}
+function render() {
+  try {
+    $$('#sidenav button').forEach(b => b.classList.toggle('on', b.dataset.tab === view.tab));
+    const title = document.getElementById('pageTitle');
+    if (title) title.textContent = TAB_TITLE[view.tab] || 'Mobile KTV';
+    const root = $('#main');
+    if (!root) return;
+    let html = '';
+    if (view.tab === 'home') html = screenHome();
+    else if (view.tab === 'eval') html = view.screen === 'detail' ? screenEvalDetail() : screenEvalList();
+    else if (view.tab === 'repair') html = view.screen === 'detail' ? screenOrderDetail('REPAIR') : screenOrderList('REPAIR');
+    else if (view.tab === 'maint') html = view.screen === 'detail' ? screenOrderDetail('MAINT') : screenOrderList('MAINT');
+    else if (view.tab === 'vehicle') html = view.screen === 'hist' ? screenVehicleHist() : screenVehicleList();
+    else if (view.tab === 'inbox') html = view.screen === 'pretrip' ? screenPretrip() : screenDriverInbox();
+    else html = screenHome();
+    root.innerHTML = html;
+    bind();
+    root.scrollTop = 0;
+  } catch (err) {
+    console.error(err);
+    const root = $('#main');
+    if (root) root.innerHTML = '<div class="surface m-4 p-4 empty">Lỗi hiển thị: ' + esc(err && err.message ? err.message : err) + '</div>';
+  }
+}
+function orderCard(o) {
+  const v = veh(o.vehicleId);
+  const kind = (o.type === 'PERIODIC' || isMaint(o)) ? 'BD' : 'SC';
+  const tab = kind === 'BD' ? 'maint' : 'repair';
+  return `<button type="button" class="surface w-full text-left p-3" data-open-order="${esc(o.id)}" data-order-tab="${tab}">
+    <div class="flex items-start justify-between gap-2">
+      <div class="min-w-0">
+        <div class="font-semibold text-slate-900 text-sm">${esc(o.code)}</div>
+        <div class="text-xs text-slate-500 mt-0.5">${esc(v?.plate || '—')} · ${esc(o.system || kind)}</div>
+        <div class="text-xs text-slate-500 mt-0.5">${esc(o.content || '')}</div>
+      </div>
+      <div class="shrink-0 text-right space-y-1">
+        <span class="badge ${kind==='BD'?'b-sky':'b-orange'}">${kind}</span>
+        <div>${statusBadge(o.status)}</div>
+      </div>
+    </div>
+  </button>`;
+}
+function screenHome() {
+  const need = vehiclesNeedEval().length;
+  const scOpen = ordersRepair().filter(o => o.status !== 'COMPLETED').length;
+  const bdOpen = ordersMaint().filter(o => o.status !== 'COMPLETED').length;
+  const drv = driverReports().filter(o => o.status !== 'COMPLETED').length;
+  const pt = pretrips().filter(p => p.status === 'NEW').length;
+  const urgent = [
+    ...ordersRepair().filter(o => o.status === 'IN_PROGRESS' || o.source === 'DRIVER_REQUEST').slice(0, 4),
+    ...ordersMaint().filter(o => o.status === 'IN_PROGRESS').slice(0, 2),
+  ].slice(0, 5);
+  return `
+  <div class="px-4 py-4 space-y-4">
+    <div>
+      <h1 class="text-xl font-bold text-slate-900 m-0">Hàng đợi KTV <span class="text-sm font-semibold text-emerald-700">v3</span></h1>
+      <p class="mt-0.5 text-xs text-slate-600 m-0">Thợ máy · thao tác nhanh · ${esc(TECH)}</p>
+    </div>
+    <div class="kpi-grid">
+      <button type="button" class="surface p-3 text-left" data-go-tab="eval"><p class="text-xs text-slate-500 m-0">Đánh giá</p><p class="text-xl font-bold text-amber-700 m-0">${need}</p></button>
+      <button type="button" class="surface p-3 text-left" data-go-tab="repair"><p class="text-xs text-slate-500 m-0">SC mở</p><p class="text-xl font-bold text-orange-700 m-0">${scOpen}</p></button>
+      <button type="button" class="surface p-3 text-left" data-go-tab="maint"><p class="text-xs text-slate-500 m-0">BD mở</p><p class="text-xl font-bold text-sky-700 m-0">${bdOpen}</p></button>
+      <button type="button" class="surface p-3 text-left" data-open-inbox="driver"><p class="text-xs text-slate-500 m-0">Từ tài xế</p><p class="text-xl font-bold text-rose-700 m-0">${drv+pt}</p></button>
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <button type="button" class="btn btn-orange btn-touch btn-block" data-open-inbox="driver">Báo cáo TX (${drv})</button>
+      <button type="button" class="btn btn-outline btn-touch btn-block" data-open-inbox="pretrip">Trước chuyến (${pt})</button>
+    </div>
+    <div class="surface overflow-hidden">
+      <div class="group">Ưu tiên xử lý</div>
+      <div class="list-grid p-3">${urgent.map(orderCard).join('') || '<div class="empty">Không có việc đang ưu tiên</div>'}</div>
+    </div>
+    <div class="grid grid-cols-2 gap-2">
+      <button type="button" class="btn btn-outline btn-touch btn-block" data-go-tab="vehicle" data-hist="MAINT">Lịch sử BD</button>
+      <button type="button" class="btn btn-outline btn-touch btn-block" data-go-tab="vehicle" data-hist="REPAIR">Lịch sử SC</button>
+    </div>
+  </div>`;
+}
+function screenEvalList() {
+  const mode = view.filter === 'ALL' ? 'ALL' : 'NEED';
+  const q = view.q;
+  let list = mode === 'ALL' ? DB.vehicles.filter(v => !v.isTrailer) : vehiclesNeedEval();
+  list = list.filter(v => matchQ([v.plate,v.type,v.garage].join(' '), q));
+  return `
+  <div class="px-4 py-4 space-y-3">
+    <div>
+      <h1 class="text-xl font-bold text-slate-900 m-0">Đánh giá định kỳ</h1>
+      <p class="mt-0.5 text-xs text-slate-600 m-0">Chạm xe → làm phiếu nhanh</p>
+    </div>
+    <input class="search" id="q" value="${esc(q)}" placeholder="Biển số…" />
+    <div class="chip-row">
+      <button type="button" class="chip ${mode==='NEED'?'on':''}" data-filter="NEED">Cần ĐG</button>
+      <button type="button" class="chip ${mode==='ALL'?'on':''}" data-filter="ALL">Tất cả xe</button>
+    </div>
+    <div class="surface overflow-hidden">
+      <div class="group">Danh sách xe</div>
+      <div class="list-grid p-3">${list.map(v => {
+        const last = evalsOf(v.id)[0];
+        return `<button type="button" class="surface w-full text-left p-3 !shadow-none" data-open-eval="${v.id}">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <div class="font-semibold text-sm">${esc(v.plate)}</div>
+              <div class="text-xs text-slate-500 mt-0.5">${esc(v.model||v.type)} · ${kmFmt(v.km)} km</div>
+              <div class="text-xs text-slate-500">Lần gần: ${esc(last?.date||'Chưa có')}</div>
+            </div>
+            ${evalBadge(v.evalStatus)}
+          </div>
+        </button>`;
+      }).join('') || '<div class="empty">Không có xe</div>'}</div>
+    </div>
+  </div>`;
+}
+function screenEvalDetail() {
+  const v = veh(view.vehicleId);
+  if (!v) return '<div class="p-4 empty">Không tìm thấy xe</div>';
+  if (!view.evalDraft || Number(view.evalDraft.vehicleId) !== Number(v.id)) {
+    const items = {};
+    criteriaFor(v).forEach(g => g.items.forEach(it => { items[it.id] = 'ok'; }));
+    view.evalDraft = { vehicleId:v.id, items, note:'' };
+  }
+  const draft = view.evalDraft;
+  const hist = evalsOf(v.id);
+  const groups = criteriaFor(v);
+  const fail = Object.values(draft.items).filter(a => a === 'repair' || a === 'replace').length;
+  return `
+  <div class="px-4 pt-3 pb-2">
+    <button type="button" class="linkish mb-2" data-back-eval>← Danh sách ĐG</button>
+    <div class="text-base font-bold">${esc(v.plate)}</div>
+    <div class="text-xs text-slate-500 mt-0.5">Đánh giá định kỳ · ${fail ? fail + ' hạng mục lỗi' : 'đang đạt'}</div>
+  </div>
+  <div class="px-4 pb-4 space-y-3">
+    <div class="surface p-3">
+      <div class="flex items-start justify-between gap-2">
+        <div><div class="font-semibold text-sm">${esc(v.model||v.type)}</div><div class="text-xs text-slate-500 mt-0.5">Odo ${kmFmt(v.km)} · ${evalBadge(v.evalStatus)}</div></div>
+        <button type="button" class="btn btn-outline btn-sm" data-mark-all-ok>Tất cả Tốt</button>
+      </div>
+    </div>
+    ${groups.map(g => `
+      <div class="surface overflow-hidden">
+        <div class="group">${esc(g.name)}</div>
+        <div class="p-3 space-y-2">${g.items.map(it => {
+          const a = draft.items[it.id] || '';
+          return `<div class="surface p-3 !shadow-none">
+            <div class="text-sm font-semibold mb-2">${esc(it.label)}</div>
+            <div class="assess">
+              <button type="button" class="${a==='ok'?'g':''}" data-assess="${it.id}" data-val="ok">Tốt</button>
+              <button type="button" class="${a==='repair'?'r':''}" data-assess="${it.id}" data-val="repair">SC</button>
+              <button type="button" class="${a==='replace'?'p':''}" data-assess="${it.id}" data-val="replace">Thay</button>
+            </div>
+          </div>`;
+        }).join('')}</div>
+      </div>`).join('')}
+    <label class="block text-sm font-medium text-slate-700">Ghi chú
+      <textarea id="evalNote" class="search mt-1" style="min-height:72px" placeholder="Tuỳ chọn…">${esc(draft.note)}</textarea>
+    </label>
+    <div class="surface overflow-hidden">
+      <div class="group">Lịch sử ĐG · ${hist.length}</div>
+      <div class="p-3 space-y-2">${hist.slice(0,5).map(h => `<div class="surface p-3 !shadow-none"><div class="flex justify-between gap-2"><div><b class="text-sm">${esc(h.date)}</b><div class="text-xs text-slate-500">${esc(h.inspector||'—')} · ${h.failCount||0} lỗi</div></div>${(h.failCount||0)?'<span class="badge b-warn">Có SC</span>':'<span class="badge b-ok">Đạt</span>'}</div></div>`).join('') || '<div class="empty">Chưa có</div>'}</div>
+    </div>
+  </div>
+  <div class="shell-ftr" style="grid-template-columns:1fr 1fr;position:sticky;bottom:0">
+    <button type="button" class="btn btn-outline btn-touch" data-back-eval>Huỷ</button>
+    <button type="button" class="btn btn-emerald btn-touch" data-submit-eval>Nộp ĐG</button>
+  </div>`;
+}
+function screenOrderList(kind) {
+  const isM = kind === 'MAINT';
+  const q = view.q;
+  const f = view.filter || 'OPEN';
+  let list = isM ? ordersMaint() : ordersRepair();
+  if (f === 'OPEN') list = list.filter(o => o.status !== 'COMPLETED');
+  if (f === 'DONE') list = list.filter(o => o.status === 'COMPLETED');
+  if (f === 'DRIVER') list = list.filter(o => o.source === 'DRIVER_REQUEST');
+  list = list.filter(o => {
+    const v = veh(o.vehicleId);
+    return matchQ([o.code, v?.plate, o.system, o.content, o.garage].join(' '), q);
+  });
+  return `
+  <div class="px-4 py-4 space-y-3">
+    <div>
+      <h1 class="text-xl font-bold text-slate-900 m-0">${isM ? 'Phiếu bảo dưỡng' : 'Phiếu sửa chữa'}</h1>
+      <p class="mt-0.5 text-xs text-slate-600 m-0">${list.length} phiếu · chạm để xử lý</p>
+    </div>
+    <input class="search" id="q" value="${esc(q)}" placeholder="Mã phiếu / biển số…" />
+    <div class="chip-row">
+      <button type="button" class="chip ${f==='OPEN'?'on':''}" data-filter="OPEN">Đang mở</button>
+      <button type="button" class="chip ${f==='DONE'?'on':''}" data-filter="DONE">Xong</button>
+      ${!isM ? `<button type="button" class="chip ${f==='DRIVER'?'on':''}" data-filter="DRIVER">Từ TX</button>` : ''}
+      <button type="button" class="chip ${f==='ALL'?'on':''}" data-filter="ALL">Tất cả</button>
+    </div>
+    <div class="list-grid">${list.map(orderCard).join('') || '<div class="empty">Không có phiếu</div>'}</div>
+  </div>`;
+}
+function screenOrderDetail(kind) {
+  const o = order(view.id);
+  if (!o) return '<div class="p-4 empty">Không có phiếu</div>';
+  const v = veh(o.vehicleId);
+  const back = kind === 'MAINT' ? 'maint' : 'repair';
+  const wis = o.workItems || [];
+  return `
+  <div class="px-4 pt-3 pb-2">
+    <button type="button" class="linkish mb-2" data-back-orders="${back}">← Danh sách</button>
+    <div class="text-base font-bold">${esc(o.code)}</div>
+    <div class="text-xs text-slate-500 mt-0.5">${esc(v?.plate || '—')} · ${esc(o.date || '')} · ${statusBadge(o.status)}</div>
+  </div>
+  <div class="px-4 pb-4 space-y-3">
+    <div class="surface p-3 space-y-1.5 text-sm">
+      <div class="flex justify-between gap-2"><span class="text-slate-500">Nội dung</span><span class="text-right font-medium">${esc(o.content||'—')}</span></div>
+      <div class="flex justify-between gap-2"><span class="text-slate-500">Hệ thống</span><span>${esc(o.system||'—')}</span></div>
+      <div class="flex justify-between gap-2"><span class="text-slate-500">Xưởng</span><span>${esc(o.garage||'—')}</span></div>
+      <div class="flex justify-between gap-2"><span class="text-slate-500">KTV</span><span>${esc(o.technicianName||'Chưa nhận')}</span></div>
+      <div class="flex justify-between gap-2"><span class="text-slate-500">Chi phí</span><span class="tabular-nums">${money(o.cost)}</span></div>
+    </div>
+    ${!o.technicianName ? `<button type="button" class="btn btn-primary btn-touch btn-block" data-claim-order="${esc(o.id)}">Nhận việc</button>` : ''}
+    <div class="grid grid-cols-2 gap-2">
+      <button type="button" class="btn btn-outline btn-touch" data-order-start ${o.status!=='NOT_STARTED'?'disabled':''}>Bắt đầu</button>
+      <button type="button" class="btn btn-emerald btn-touch" data-order-done ${o.status==='COMPLETED'?'disabled':''}>Hoàn thành</button>
+    </div>
+    <div class="surface overflow-hidden">
+      <div class="group">Hạng mục · ${wis.length}</div>
+      <div class="p-3 space-y-2">${wis.map((w,i) => `
+        <div class="surface p-3 !shadow-none">
+          <div class="text-sm font-semibold">${esc(w.content||w.service||'—')}</div>
+          <div class="text-xs text-slate-500 mt-0.5">${esc(w.system||'')} ${w.completedAt ? '· xong '+esc(w.completedAt) : (w.startedAt ? '· đang làm' : '')}</div>
+          <div class="flex gap-2 mt-2">
+            <button type="button" class="btn btn-outline btn-sm" data-wi-start="${i}" ${w.startedAt||w.completedAt?'disabled':''}>Bắt đầu</button>
+            <button type="button" class="btn btn-emerald btn-sm" data-wi-done="${i}" ${w.completedAt?'disabled':''}>Xong</button>
+            <button type="button" class="btn btn-outline btn-sm" data-wi-skip="${i}" ${w.completedAt?'disabled':''}>Bỏ qua</button>
+          </div>
+        </div>`).join('') || '<div class="empty">Chưa có hạng mục</div>'}
+      </div>
+    </div>
+  </div>`;
+}
+function screenVehicleList() {
+  const q = view.q;
+  const list = DB.vehicles.filter(v => !v.isTrailer && matchQ([v.plate,v.type,v.model].join(' '), q));
+  return `
+  <div class="px-4 py-4 space-y-3">
+    <div>
+      <h1 class="text-xl font-bold text-slate-900 m-0">Theo xe</h1>
+      <p class="mt-0.5 text-xs text-slate-600 m-0">Chọn xe → lịch sử BD / SC</p>
+    </div>
+    <input class="search" id="q" value="${esc(q)}" placeholder="Biển số…" />
+    <div class="chip-row">
+      <button type="button" class="chip ${view.histKind==='MAINT'?'on':''}" data-hist-kind="MAINT">Xem BD</button>
+      <button type="button" class="chip ${view.histKind==='REPAIR'?'on':''}" data-hist-kind="REPAIR">Xem SC</button>
+    </div>
+    <div class="surface overflow-hidden">
+      <div class="group">Danh sách xe</div>
+      <div class="list-grid p-3">${list.map(v => `<button type="button" class="surface w-full text-left p-3 !shadow-none" data-open-veh="${v.id}">
+        <div class="flex justify-between gap-2">
+          <div><div class="font-semibold text-sm">${esc(v.plate)}</div><div class="text-xs text-slate-500">${esc(v.model||v.type)} · ${kmFmt(v.km)} km</div></div>
+          <span class="badge b-sky">${view.histKind==='MAINT'?'BD':'SC'}</span>
+        </div>
+      </button>`).join('') || '<div class="empty">Không có xe</div>'}</div>
+    </div>
+  </div>`;
+}
+function screenVehicleHist() {
+  const v = veh(view.vehicleId);
+  if (!v) return '<div class="empty p-4">Không có xe</div>';
+  const kind = view.histKind || 'MAINT';
+  const list = (kind === 'MAINT' ? ordersMaint() : ordersRepair()).filter(o => Number(o.vehicleId) === Number(v.id));
+  return `
+  <div class="px-4 pt-3 pb-2">
+    <button type="button" class="linkish mb-2" data-back-veh>← Chọn xe</button>
+    <div class="text-base font-bold">${esc(v.plate)}</div>
+    <div class="text-xs text-slate-500 mt-0.5">Lịch sử ${kind==='MAINT'?'bảo dưỡng':'sửa chữa'} · ${list.length} phiếu</div>
+  </div>
+  <div class="px-4 pb-4 space-y-2.5">
+    <div class="chip-row mb-1">
+      <button type="button" class="chip ${kind==='MAINT'?'on':''}" data-hist-kind="MAINT">BD</button>
+      <button type="button" class="chip ${kind==='REPAIR'?'on':''}" data-hist-kind="REPAIR">SC</button>
+    </div>
+    ${list.map(o => orderCard(o)).join('') || '<div class="empty">Chưa có lịch sử</div>'}
+  </div>`;
+}
+function screenDriverInbox() {
+  const list = driverReports();
+  return `
+  <div class="px-4 py-4 space-y-3">
+    <button type="button" class="linkish" data-go-tab="home">← Hàng đợi</button>
+    <div>
+      <h1 class="text-xl font-bold text-slate-900 m-0">Báo cáo từ tài xế</h1>
+      <p class="mt-0.5 text-xs text-slate-600 m-0">Nhận việc / mở phiếu SC</p>
+    </div>
+    <div class="chip-row">
+      <button type="button" class="chip on" data-open-inbox="driver">Báo cáo SC</button>
+      <button type="button" class="chip" data-open-inbox="pretrip">Trước chuyến</button>
+    </div>
+    <div class="space-y-2.5">${list.map(o => {
+      const v = veh(o.vehicleId);
+      return `<div class="surface p-3">
+        <div class="flex justify-between gap-2">
+          <div><div class="font-semibold text-sm">${esc(o.code)}</div><div class="text-xs text-slate-500">${esc(v?.plate||'—')} · ${esc(o.date||'')}</div><div class="text-xs text-slate-600 mt-1">${esc(o.content||'')}</div></div>
+          ${statusBadge(o.status)}
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-2">
+          <button type="button" class="btn btn-primary btn-sm" data-claim-order="${esc(o.id)}">Nhận việc</button>
+          <button type="button" class="btn btn-outline btn-sm" data-open-order="${esc(o.id)}" data-order-tab="repair">Mở phiếu</button>
+        </div>
+      </div>`;
+    }).join('') || '<div class="empty">Chưa có báo cáo từ app tài xế</div>'}</div>
+  </div>`;
+}
+function screenPretrip() {
+  const list = pretrips();
+  return `
+  <div class="px-4 py-4 space-y-3">
+    <button type="button" class="linkish" data-go-tab="home">← Hàng đợi</button>
+    <div>
+      <h1 class="text-xl font-bold text-slate-900 m-0">Đánh giá trước chuyến</h1>
+      <p class="mt-0.5 text-xs text-slate-600 m-0">Từ app tài xế · xác nhận / tạo SC</p>
+    </div>
+    <div class="chip-row">
+      <button type="button" class="chip" data-open-inbox="driver">Báo cáo SC</button>
+      <button type="button" class="chip on" data-open-inbox="pretrip">Trước chuyến</button>
+    </div>
+    <div class="space-y-2.5">${list.map(p => `
+      <div class="surface p-3">
+        <div class="flex justify-between gap-2">
+          <div>
+            <div class="font-semibold text-sm">${esc(p.plate)}</div>
+            <div class="text-xs text-slate-500">${esc(p.driver)} · ${esc(p.at)}</div>
+            <div class="text-xs text-slate-600 mt-1">${esc(p.note||'')}</div>
+          </div>
+          <span class="badge ${p.result==='PASS'?'b-ok':'b-bad'}">${p.result==='PASS'?'Đạt':'Lỗi'}</span>
+        </div>
+        <div class="flex flex-wrap gap-1 mt-2">${(p.items||[]).map(it=>`<span class="badge ${it.ok?'b-ok':'b-bad'}">${esc(it.label)}</span>`).join('')}</div>
+        ${p.status==='NEW' && p.result==='FAIL' ? `<div class="grid grid-cols-2 gap-2 mt-2">
+          <button type="button" class="btn btn-orange btn-sm" data-pretrip-sc="${esc(p.id)}">Tạo phiếu SC</button>
+          <button type="button" class="btn btn-outline btn-sm" data-pretrip-ack="${esc(p.id)}">Đã xem</button>
+        </div>` : (p.status==='NEW' ? `<button type="button" class="btn btn-outline btn-sm btn-block mt-2" data-pretrip-ack="${esc(p.id)}">Xác nhận đạt</button>` : `<div class="text-xs text-slate-500 mt-2">Đã xử lý</div>`)}
+      </div>`).join('') || '<div class="empty">Chưa có phiếu trước chuyến</div>'}</div>
+  </div>`;
+}
+function bind() {
+  $$('#sidenav button').forEach(b => b.onclick = () => {
+    view.filter = b.dataset.tab === 'eval' ? 'NEED' : 'OPEN';
+    view.q = '';
+    setNavOpen(false);
+    go(b.dataset.tab, 'list', { resetQ:true });
+  });
+  $$('[data-go-tab]').forEach(b => b.onclick = () => {
+    const tab = b.dataset.goTab;
+    if (b.dataset.hist) view.histKind = b.dataset.hist;
+    view.filter = tab === 'eval' ? 'NEED' : 'OPEN';
+    go(tab, 'list');
+  });
+  $$('[data-open-inbox]').forEach(b => b.onclick = () => {
+    view.tab = 'inbox';
+    view.screen = b.dataset.openInbox === 'pretrip' ? 'pretrip' : 'driver';
+    render();
+  });
+  const q = $('#q');
+  if (q) q.oninput = () => { view.q = q.value; render(); };
+  $$('[data-filter]').forEach(b => b.onclick = () => { view.filter = b.dataset.filter; render(); });
+  $$('[data-open-order]').forEach(b => b.onclick = () => {
+    const tab = b.dataset.orderTab || (isMaint(order(b.dataset.openOrder)) ? 'maint' : 'repair');
+    go(tab, 'detail', { id: b.dataset.openOrder });
+  });
+  $$('[data-open-eval]').forEach(b => b.onclick = () => { view.evalDraft = null; go('eval', 'detail', { vehicleId: Number(b.dataset.openEval) }); });
+  $$('[data-back-eval]').forEach(b => b.onclick = () => { view.evalDraft = null; go('eval', 'list'); });
+  $$('[data-back-orders]').forEach(b => b.onclick = () => go(b.dataset.backOrders, 'list'));
+  $$('[data-open-veh]').forEach(b => b.onclick = () => go('vehicle', 'hist', { vehicleId: Number(b.dataset.openVeh) }));
+  $$('[data-back-veh]').forEach(b => b.onclick = () => go('vehicle', 'list'));
+  $$('[data-hist-kind]').forEach(b => b.onclick = () => { view.histKind = b.dataset.histKind; render(); });
+  $$('[data-assess]').forEach(b => b.onclick = () => {
+    if (!view.evalDraft) return;
+    const id = b.dataset.assess, val = b.dataset.val;
+    view.evalDraft.items[id] = view.evalDraft.items[id] === val ? '' : val;
+    const note = $('#evalNote');
+    if (note) view.evalDraft.note = note.value;
+    render();
+  });
+  $$('[data-mark-all-ok]').forEach(b => b.onclick = () => {
+    if (!view.evalDraft) return;
+    Object.keys(view.evalDraft.items).forEach(k => { view.evalDraft.items[k] = 'ok'; });
+    render(); toast('Đã chọn Tất cả Tốt');
+  });
+  $$('[data-submit-eval]').forEach(b => b.onclick = () => submitEval());
+  $$('[data-order-start]').forEach(b => b.onclick = () => {
+    const o = order(view.id); if (!o) return;
+    o.status = 'IN_PROGRESS'; o.technicianName = TECH;
+    o.approvalLog = o.approvalLog || [];
+    o.approvalLog.push({ at: stamp(), action: 'START', by: TECH, note: 'KTV bắt đầu trên mobile' });
+    saveDB(); toast('Đã bắt đầu'); render();
+  });
+  $$('[data-order-done]').forEach(b => b.onclick = () => {
+    const o = order(view.id); if (!o) return;
+    o.status = 'COMPLETED';
+    (o.workItems || []).forEach(w => { if (!w.completedAt) w.completedAt = stamp(); });
+    o.approvalLog = o.approvalLog || [];
+    o.approvalLog.push({ at: stamp(), action: 'COMPLETE', by: TECH, note: 'Hoàn thành trên mobile' });
+    saveDB(); toast('Đã hoàn thành phiếu'); render();
+  });
+  $$('[data-wi-start]').forEach(b => b.onclick = () => {
+    const o = order(view.id); const w = o && o.workItems && o.workItems[Number(b.dataset.wiStart)];
+    if (!w) return;
+    if (o.status === 'NOT_STARTED') o.status = 'IN_PROGRESS';
+    w.startedAt = stamp(); o.technicianName = o.technicianName || TECH;
+    saveDB(); render();
+  });
+  $$('[data-wi-done]').forEach(b => b.onclick = () => {
+    const o = order(view.id); const w = o && o.workItems && o.workItems[Number(b.dataset.wiDone)];
+    if (!w) return;
+    w.completedAt = stamp();
+    if (!(o.workItems || []).some(x => !x.completedAt)) o.status = 'COMPLETED';
+    saveDB(); toast('Đã xong hạng mục'); render();
+  });
+  $$('[data-wi-skip]').forEach(b => b.onclick = () => {
+    const o = order(view.id); const w = o && o.workItems && o.workItems[Number(b.dataset.wiSkip)];
+    if (!w) return;
+    w.completedAt = stamp(); w.skipped = true;
+    saveDB(); render();
+  });
+  $$('[data-claim-order]').forEach(b => b.onclick = () => {
+    const o = order(b.dataset.claimOrder); if (!o) return;
+    o.technicianName = TECH;
+    o.status = o.status === 'NOT_STARTED' ? 'IN_PROGRESS' : o.status;
+    saveDB(); toast('Đã nhận việc'); go('repair', 'detail', { id: o.id });
+  });
+  $$('[data-pretrip-ack]').forEach(b => b.onclick = () => {
+    const list = pretrips();
+    const p = list.find(x => x.id === b.dataset.pretripAck);
+    if (p) { p.status = 'DONE'; savePretrips(list); toast('Đã xác nhận'); render(); }
+  });
+  $$('[data-pretrip-sc]').forEach(b => b.onclick = () => {
+    const list = pretrips();
+    const p = list.find(x => x.id === b.dataset.pretripSc);
+    if (!p) return;
+    const id = uid('o');
+    const o = {
+      id, code: 'SC-TC-' + today().replace(/-/g,'') + '-' + Math.floor(100+Math.random()*900),
+      vehicleId: p.vehicleId, type: 'INCIDENTAL', date: today(), km: p.km || 0,
+      garage: (veh(p.vehicleId) && veh(p.vehicleId).garage) || 'Xưởng', source: 'PRE_TRIP', status: 'NOT_STARTED',
+      approvalStatus: 'DRAFT', content: 'Từ ĐG trước chuyến · ' + (p.note || ''), system: 'Tổng quát',
+      cost: 0, materials: [], workItems: [{ content: p.note || 'Kiểm tra sau trước chuyến', system: 'Tổng quát', kind: 'REPAIR' }],
+      approvalLog: [{ at: stamp(), action: 'CREATE', by: TECH, note: 'Tạo từ ĐG trước chuyến TX' }],
+    };
+    DB.orders.unshift(o);
+    p.status = 'DONE'; p.linkedOrderId = id;
+    savePretrips(list); saveDB();
+    toast('Đã tạo ' + o.code);
+    go('repair', 'detail', { id });
+  });
+}
+function submitEval() {
+  const v = veh(view.vehicleId);
+  const draft = view.evalDraft;
+  if (!v || !draft) return;
+  const noteEl = $('#evalNote');
+  if (noteEl) draft.note = noteEl.value;
+  const items = draft.items;
+  const fail = Object.values(items).filter(a => a === 'repair' || a === 'replace').length;
+  const good = Object.values(items).filter(a => a === 'ok').length;
+  const ev = {
+    id: uid('ev'), vehicleId: v.id, date: today(), status: 'SUBMITTED', note: draft.note || '',
+    inspector: TECH, goodCount: good, failCount: fail, linkedOrderIds: [], items: { ...items },
+  };
+  DB.evaluationHistory = DB.evaluationHistory || [];
+  DB.evaluationHistory.unshift(ev);
+  DB.evaluations = DB.evaluations || {};
+  DB.evaluations[v.id] = { status: 'SUBMITTED', date: today(), items };
+  v.evalStatus = 'ok';
+  v.lastEval = today();
+  if (fail) {
+    const id = uid('o');
+    const o = {
+      id, code: 'SC-DG-' + today().replace(/-/g,'') + '-' + Math.floor(100+Math.random()*900),
+      vehicleId: v.id, type: 'INCIDENTAL', date: today(), km: v.km || 0, garage: v.garage || 'Xưởng',
+      source: 'PERIODIC_ASSESSMENT', status: 'NOT_STARTED', approvalStatus: 'DRAFT',
+      content: 'Từ đánh giá định kỳ · ' + fail + ' hạng mục', system: 'Tổng quát', cost: 0,
+      materials: [], workItems: Object.entries(items).filter(([,a])=>a==='repair'||a==='replace').map(([cid])=>{
+        const it = criteriaFor(v).flatMap(g=>g.items).find(x=>x.id===cid);
+        return { content: (it && it.label) || cid, system: 'Đánh giá', kind: 'REPAIR' };
+      }),
+      approvalLog: [{ at: stamp(), action: 'CREATE', by: TECH, note: 'Tự tạo từ ĐG mobile' }],
+    };
+    DB.orders.unshift(o);
+    ev.linkedOrderIds = [id];
+    saveDB();
+    view.evalDraft = null;
+    toast('Đã nộp ĐG · tạo phiếu SC');
+    go('repair', 'detail', { id });
+    return;
+  }
+  saveDB();
+  view.evalDraft = null;
+  toast('Đã nộp đánh giá');
+  go('eval', 'list');
+}
+try {
+  const btn = document.getElementById('btnMenu');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (btn) btn.onclick = () => setNavOpen(!document.getElementById('shell')?.classList.contains('nav-open'));
+  if (backdrop) backdrop.onclick = () => setNavOpen(false);
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape') setNavOpen(false); });
+  loadDB();
+  render();
+} catch (err) {
+  console.error(err);
+  const root = document.getElementById('main');
+  if (root) root.innerHTML = '<div class="surface m-4 p-4 empty">Không khởi tạo được: ' + String(err && err.message || err) + '</div>';
+}
+
+
+</script>
+</body>
+</html>
