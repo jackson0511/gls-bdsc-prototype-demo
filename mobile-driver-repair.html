@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Tài xế · Yêu cầu sửa chữa</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; background: #f1f5f9; margin: 0; }
+    .app { max-width: 430px; margin: 0 auto; min-height: 100vh; background: #fff; box-shadow: 0 0 0 1px #e2e8f0; }
+    .field { display: block; margin-bottom: 14px; }
+    .field > span { display: block; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 6px; }
+    .field input[type="search"], .field input[type="text"] {
+      width: 100%; height: 44px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0 12px; font: inherit;
+    }
+    .field input:focus { outline: 2px solid #93c5fd; border-color: #3b82f6; }
+    .ac-wrap { position: relative; }
+    .ac-dropdown {
+      position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20;
+      max-height: 220px; overflow: auto; background: #fff; border: 1px solid #cbd5e1;
+      border-radius: 8px; box-shadow: 0 8px 24px rgba(15,23,42,.12);
+    }
+    .ac-item { padding: 10px 12px; font-size: 14px; cursor: pointer; border-bottom: 1px solid #f1f5f9; }
+    .ac-item:hover, .ac-item.on { background: #eff6ff; }
+    .btn { height: 48px; border-radius: 10px; font-weight: 600; font-size: 15px; border: 0; cursor: pointer; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-outline { background: #fff; color: #334155; border: 1px solid #cbd5e1; }
+    .btn-sm { height: 40px; font-size: 13px; padding: 0 12px; }
+    .toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+      background: #0f172a; color: #fff; padding: 10px 16px; border-radius: 8px;
+      font-size: 13px; z-index: 50; display: none; max-width: 90vw;
+    }
+    .desk-hint { text-align: center; font-size: 12px; color: #64748b; padding: 8px; }
+    .photo-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    }
+    .photo-slot {
+      position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden;
+      border: 1px solid #e2e8f0; background: #f8fafc;
+    }
+    .photo-slot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .photo-slot .rm {
+      position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border: 0;
+      border-radius: 999px; background: rgba(15,23,42,.72); color: #fff; font-size: 14px;
+      line-height: 22px; cursor: pointer;
+    }
+    .photo-add {
+      aspect-ratio: 1; border-radius: 10px; border: 1.5px dashed #94a3b8;
+      background: #f8fafc; color: #475569; font-size: 12px; font-weight: 600;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px; cursor: pointer;
+    }
+    .photo-add:disabled { opacity: .4; cursor: not-allowed; }
+    .photo-meta { font-size: 12px; color: #64748b; margin-top: 8px; }
+    .photo-meta.bad { color: #be123c; font-weight: 600; }
+    .photo-meta.ok { color: #15803d; }
+  </style>
+</head>
+<body>
+  <p class="desk-hint">Mobile tài xế · gửi yêu cầu SC → hiện trên Console v3 » Sửa chữa</p>
+  <div class="app">
+    <header class="px-4 pt-5 pb-3 border-b border-slate-200">
+      <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">GLS · Tài xế</div>
+      <h1 class="text-xl font-bold text-slate-900 m-0 mt-1">Yêu cầu sửa chữa</h1>
+      <p class="text-sm text-slate-600 m-0 mt-1">Biển số · hệ thống xe · chụp ảnh hiện trường (4–8 tấm).</p>
+    </header>
+
+    <form id="driverRepairForm" class="px-4 py-5">
+      <label class="field">
+        <span>Biển số xe <span class="text-rose-600">*</span></span>
+        <div class="ac-wrap">
+          <input id="plate" type="search" autocomplete="off" required placeholder="Gõ biển số…" />
+          <div id="plateDd" class="ac-dropdown hidden"></div>
+        </div>
+        <input type="hidden" id="vehicleId" />
+      </label>
+
+      <label class="field">
+        <span>Hệ thống xe <span class="text-rose-600">*</span></span>
+        <div class="ac-wrap">
+          <input id="system" type="search" autocomplete="off" required placeholder="Gõ / chọn hệ thống…" />
+          <div id="systemDd" class="ac-dropdown hidden"></div>
+        </div>
+      </label>
+
+      <div class="field mb-4">
+        <span>Ảnh hiện trường <span class="text-rose-600">*</span>
+          <span class="font-normal text-slate-500">· tối thiểu 4 · tối đa 8</span>
+        </span>
+        <div class="flex gap-2 mb-2">
+          <button type="button" id="btnCamera" class="btn btn-outline btn-sm flex-1">📷 Chụp ảnh</button>
+          <button type="button" id="btnGallery" class="btn btn-outline btn-sm flex-1">🖼 Thư viện</button>
+        </div>
+        <input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden" />
+        <input id="galleryInput" type="file" accept="image/*" multiple class="hidden" />
+        <div id="photoGrid" class="photo-grid"></div>
+        <div id="photoMeta" class="photo-meta">Chưa có ảnh · cần ít nhất 4 tấm</div>
+      </div>
+
+      <p class="text-xs text-slate-500 mb-4 m-0">Sau khi gửi, phiếu nháp + ảnh xuất hiện ở menu <strong>Sửa chữa</strong> trên console (cùng trình duyệt).</p>
+
+      <div class="grid grid-cols-2 gap-3">
+        <button type="button" id="btnCancel" class="btn btn-outline">Huỷ</button>
+        <button type="submit" id="btnSubmit" class="btn btn-primary" disabled>Gửi yêu cầu</button>
+      </div>
+    </form>
+
+    <div class="px-4 pb-8">
+      <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div class="text-xs font-semibold text-slate-700 mb-2">Đã gửi gần đây (máy này)</div>
+        <ul id="sentList" class="space-y-2 text-sm text-slate-600"></ul>
+      </div>
+    </div>
+  </div>
+  <div id="toast" class="toast"></div>
+
+<script>
+const INBOX_KEY = 'fleet-bdsc-driver-inbox-v3';
+const CONSOLE_KEY = 'fleet-bdsc-proto-v3-01';
+const SENT_KEY = 'fleet-bdsc-driver-sent-v3';
+const PHOTO_MIN = 4;
+const PHOTO_MAX = 8;
+const PHOTO_MAX_DIM = 960;
+const PHOTO_QUALITY = 0.55;
+const IMAGE_IDB_NAME = 'fleet-bdsc-images-v3';
+const IMAGE_IDB_STORE = 'images';
+
+function openImageIdb() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IMAGE_IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IMAGE_IDB_STORE)) db.createObjectStore(IMAGE_IDB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error || new Error('idb'));
+  });
+}
+async function idbPutImages(entries) {
+  if (!entries?.length) return;
+  const db = await openImageIdb();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction(IMAGE_IDB_STORE, 'readwrite');
+    const store = tx.objectStore(IMAGE_IDB_STORE);
+    entries.forEach((e) => store.put(e.dataUrl, e.key));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+}
+
+const SEED_VEHICLES = [
+  { id: 101, plate: '51C-29273', type: 'Đầu kéo', km: 1158402, garage: 'BÌNH ANH', area: 'HCM' },
+  { id: 102, plate: '51C-41767', type: 'Đầu kéo', km: 1305486, garage: 'Xưởng Tân Cảng', area: 'HCM' },
+  { id: 103, plate: '50H-69138', type: 'Đầu kéo', km: 54538, garage: 'Xưởng Hải Phòng', area: 'HP' },
+  { id: 104, plate: '50H-87033', type: 'Đầu kéo', km: 1710613, garage: 'TRUNG ĐẠT BR-VT', area: 'HCM' },
+  { id: 105, plate: '51C-55821', type: 'Đầu kéo', km: 890120, garage: 'HYUNDAI VIỆT NHÂN', area: 'HCM' },
+  { id: 201, plate: '51R-11234', type: 'Rơ-mooc', km: 420000, garage: 'BÌNH ANH', area: 'HCM', isTrailer: true },
+];
+
+const SEED_SYSTEMS = [
+  'Hệ Thống Máy Xe', 'Hệ Thống Gầm', 'Hệ Thống Lái', 'Hệ Thống Điện',
+  'Hệ Thống Phanh', 'Dầu Nhớt', 'Mỡ', 'Ắc Quy', 'Vỏ Lốp', 'Nhân Công Sửa Chữa',
+];
+
+const $ = (s, el = document) => el.querySelector(s);
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { t.style.display = 'none'; }, 2200);
+}
+function loadVehicles() {
+  try {
+    const raw = localStorage.getItem(CONSOLE_KEY);
+    if (!raw) return SEED_VEHICLES;
+    const db = JSON.parse(raw);
+    if (Array.isArray(db.vehicles) && db.vehicles.length) {
+      return db.vehicles.map(v => ({
+        id: v.id, plate: v.plate, type: v.type, km: v.km, garage: v.garage, area: v.area, isTrailer: !!v.isTrailer,
+      }));
+    }
+  } catch (_) {}
+  return SEED_VEHICLES;
+}
+function loadSystems() {
+  try {
+    const raw = localStorage.getItem(CONSOLE_KEY);
+    if (!raw) return SEED_SYSTEMS;
+    const db = JSON.parse(raw);
+    const fromMaster = (db.vehicleSystems || []).map(s => s.name).filter(Boolean);
+    if (fromMaster.length) return [...new Set(fromMaster)];
+  } catch (_) {}
+  return SEED_SYSTEMS;
+}
+
+let vehicles = loadVehicles();
+let systems = loadSystems();
+let pickedVehicle = null;
+/** @type {{ id: string, dataUrl: string, name: string }[]} */
+let photos = [];
+
+function bindAc(input, dd, getOptions, onPick) {
+  const render = () => {
+    const q = (input.value || '').trim().toLowerCase();
+    const opts = getOptions().filter(o => !q || String(o.label).toLowerCase().includes(q)).slice(0, 12);
+    if (!opts.length) { dd.classList.add('hidden'); dd.innerHTML = ''; return; }
+    dd.innerHTML = opts.map((o, i) => `<div class="ac-item ${i === 0 ? 'on' : ''}" data-i="${i}">${o.label}</div>`).join('');
+    dd.classList.remove('hidden');
+    [...dd.querySelectorAll('.ac-item')].forEach((el, i) => {
+      el.onmousedown = (e) => { e.preventDefault(); onPick(opts[i]); dd.classList.add('hidden'); };
+    });
+  };
+  input.addEventListener('focus', render);
+  input.addEventListener('input', render);
+  input.addEventListener('blur', () => setTimeout(() => dd.classList.add('hidden'), 150));
+}
+
+bindAc($('#plate'), $('#plateDd'),
+  () => vehicles.map(v => ({ label: `${v.plate} · ${v.type}`, value: v })),
+  (o) => {
+    pickedVehicle = o.value;
+    $('#plate').value = o.value.plate;
+    $('#vehicleId').value = String(o.value.id);
+  }
+);
+
+bindAc($('#system'), $('#systemDd'),
+  () => systems.map(s => ({ label: s, value: s })),
+  (o) => { $('#system').value = o.value; }
+);
+
+function readInbox() {
+  try { return JSON.parse(localStorage.getItem(INBOX_KEY) || '[]'); } catch { return []; }
+}
+function writeInbox(list) {
+  localStorage.setItem(INBOX_KEY, JSON.stringify(list));
+}
+function readSent() {
+  try { return JSON.parse(localStorage.getItem(SENT_KEY) || '[]'); } catch { return []; }
+}
+function renderSent() {
+  const list = readSent().slice(0, 8);
+  $('#sentList').innerHTML = list.length
+    ? list.map(x => `<li class="border-b border-slate-200 pb-2"><strong class="text-slate-800">${x.code}</strong> · ${x.plate}<br/><span class="text-xs">${x.system} · ${x.photoCount || 0} ảnh · ${x.at}</span></li>`).join('')
+    : '<li class="text-slate-400">Chưa gửi yêu cầu nào.</li>';
+}
+
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Không đọc được ảnh'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Ảnh không hợp lệ'));
+      img.onload = () => {
+        let { width, height } = img;
+        const scale = Math.min(1, PHOTO_MAX_DIM / Math.max(width, height));
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', PHOTO_QUALITY);
+        resolve({
+          id: 'ph-' + Date.now().toString(36) + Math.floor(Math.random() * 99),
+          dataUrl,
+          name: file.name || ('photo-' + (photos.length + 1) + '.jpg'),
+        });
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderPhotos() {
+  const grid = $('#photoGrid');
+  const n = photos.length;
+  const canAdd = n < PHOTO_MAX;
+  grid.innerHTML = photos.map((p, i) => `
+    <div class="photo-slot">
+      <img src="${p.dataUrl}" alt="Ảnh ${i + 1}" />
+      <button type="button" class="rm" data-rm="${p.id}" aria-label="Xóa ảnh">×</button>
+    </div>
+  `).join('') + (canAdd
+    ? `<button type="button" class="photo-add" id="btnAddPhotoSlot" ${canAdd ? '' : 'disabled'}>
+        <span style="font-size:22px;line-height:1">+</span>
+        <span>Thêm</span>
+      </button>`
+    : '');
+
+  const meta = $('#photoMeta');
+  if (n < PHOTO_MIN) {
+    meta.className = 'photo-meta bad';
+    meta.textContent = `Đã có ${n}/${PHOTO_MAX} · còn thiếu ${PHOTO_MIN - n} tấm (tối thiểu ${PHOTO_MIN})`;
+  } else {
+    meta.className = 'photo-meta ok';
+    meta.textContent = `Đã có ${n}/${PHOTO_MAX} tấm · đủ điều kiện gửi`;
+  }
+  $('#btnSubmit').disabled = n < PHOTO_MIN;
+  $('#btnCamera').disabled = !canAdd;
+  $('#btnGallery').disabled = !canAdd;
+
+  grid.querySelectorAll('[data-rm]').forEach((b) => {
+    b.onclick = () => {
+      photos = photos.filter((p) => p.id !== b.getAttribute('data-rm'));
+      renderPhotos();
+    };
+  });
+  $('#btnAddPhotoSlot')?.addEventListener('click', () => $('#cameraInput').click());
+}
+
+async function addFiles(fileList) {
+  const files = [...(fileList || [])].filter((f) => f && f.type.startsWith('image/'));
+  if (!files.length) { toast('Chọn file ảnh'); return; }
+  const room = PHOTO_MAX - photos.length;
+  if (room <= 0) { toast('Đã đủ tối đa ' + PHOTO_MAX + ' ảnh'); return; }
+  const take = files.slice(0, room);
+  try {
+    for (const f of take) {
+      const item = await compressImage(f);
+      photos.push(item);
+    }
+    if (files.length > room) toast('Chỉ thêm được ' + room + ' ảnh (tối đa ' + PHOTO_MAX + ')');
+    else toast('Đã thêm ' + take.length + ' ảnh');
+  } catch (err) {
+    toast(String(err.message || err));
+  }
+  renderPhotos();
+}
+
+$('#btnCamera').onclick = () => $('#cameraInput').click();
+$('#btnGallery').onclick = () => $('#galleryInput').click();
+$('#cameraInput').onchange = (e) => {
+  addFiles(e.target.files);
+  e.target.value = '';
+};
+$('#galleryInput').onchange = (e) => {
+  addFiles(e.target.files);
+  e.target.value = '';
+};
+
+function resetForm() {
+  $('#driverRepairForm').reset();
+  pickedVehicle = null;
+  $('#vehicleId').value = '';
+  photos = [];
+  renderPhotos();
+}
+
+$('#btnCancel').onclick = () => {
+  resetForm();
+  toast('Đã huỷ');
+};
+
+$('#driverRepairForm').onsubmit = async (e) => {
+  e.preventDefault();
+  const plate = ($('#plate').value || '').trim().toUpperCase();
+  const system = ($('#system').value || '').trim();
+  if (!plate) { toast('Chọn biển số'); return; }
+  if (!system) { toast('Chọn hệ thống xe'); return; }
+  if (photos.length < PHOTO_MIN) {
+    toast('Cần chụp/đính kèm tối thiểu ' + PHOTO_MIN + ' ảnh');
+    return;
+  }
+  if (photos.length > PHOTO_MAX) {
+    toast('Tối đa ' + PHOTO_MAX + ' ảnh');
+    return;
+  }
+  let v = pickedVehicle || vehicles.find(x => String(x.plate).toUpperCase() === plate);
+  if (!v) {
+    v = vehicles.find(x => String(x.plate).toUpperCase().includes(plate.replace(/\s/g, '')));
+  }
+  if (!v) { toast('Không tìm thấy xe — chọn từ gợi ý'); return; }
+
+  const now = new Date();
+  const stamp = now.toISOString().slice(0, 16).replace('T', ' ');
+  const id = 'drv-' + Date.now().toString(36);
+  const code = 'SC-TX-' + now.toISOString().slice(0, 10).replace(/-/g, '') + '-' + String(Math.floor(Math.random() * 900) + 100);
+  // Ảnh lưu IndexedDB — localStorage chỉ giữ metadata (tránh vượt quota)
+  const imageEntries = photos.map((p, i) => ({
+    key: p.id,
+    dataUrl: p.dataUrl,
+    meta: {
+      id: p.id,
+      name: p.name || ('anh-' + (i + 1) + '.jpg'),
+      source: 'DRIVER',
+      at: stamp,
+      storageKey: p.id,
+      url: '',
+      dataUrl: '',
+    },
+  }));
+  try {
+    await idbPutImages(imageEntries.map((e) => ({ key: e.key, dataUrl: e.dataUrl })));
+  } catch (err) {
+    toast('Không lưu được ảnh (IndexedDB). Thử lại hoặc giảm số ảnh.');
+    console.warn(err);
+    return;
+  }
+  const images = imageEntries.map((e) => e.meta);
+  const order = {
+    id,
+    vehicleId: v.id,
+    code,
+    type: 'INCIDENTAL',
+    occurrence: 1,
+    date: now.toISOString().slice(0, 10),
+    km: v.km || 0,
+    garage: v.garage || 'Chưa xếp xưởng',
+    source: 'DRIVER_REQUEST',
+    status: 'NOT_STARTED',
+    approvalStatus: 'DRAFT',
+    approval: 'DRAFT',
+    content: 'Yêu cầu SC từ tài xế · ' + system,
+    cost: 0,
+    system,
+    technicianName: '',
+    mh: 'NONE',
+    base: { status: 'NONE', code: null, baseStatus: null },
+    materials: [],
+    workItems: [{ content: 'Yêu cầu tài xế', system, kind: 'REPAIR' }],
+    images,
+    approvalLog: [{ at: stamp, action: 'CREATE', by: 'Tài xế', note: 'Yêu cầu SC từ mobile · ' + images.length + ' ảnh' }],
+    log: [{ at: stamp, action: 'CREATE', by: 'Tài xế', note: 'Driver repair request · ' + images.length + ' photos' }],
+  };
+
+  const inbox = readInbox();
+  inbox.unshift(order);
+  try {
+    writeInbox(inbox);
+  } catch (err) {
+    toast('Không lưu được yêu cầu (quota). Bấm Làm mới dữ liệu trên console rồi thử lại.');
+    console.warn(err);
+    return;
+  }
+
+  // Không ghi base64 vào CONSOLE_KEY — console absorb inbox + đọc ảnh từ IndexedDB
+  try {
+    const raw = localStorage.getItem(CONSOLE_KEY);
+    if (raw) {
+      const db = JSON.parse(raw);
+      db.orders = db.orders || [];
+      if (!db.orders.some(o => o.id === order.id)) {
+        db.orders.unshift(order);
+        localStorage.setItem(CONSOLE_KEY, JSON.stringify(db));
+      }
+    }
+  } catch (err) {
+    console.warn('console merge skipped (quota ok — inbox đã lưu)', err);
+  }
+
+  const sent = readSent();
+  sent.unshift({ code, plate: v.plate, system, at: stamp, photoCount: images.length });
+  localStorage.setItem(SENT_KEY, JSON.stringify(sent.slice(0, 20)));
+
+  toast('Đã gửi ' + code + ' · ' + images.length + ' ảnh');
+  resetForm();
+  renderSent();
+};
+
+renderPhotos();
+renderSent();
+</script>
+</body>
+</html>
