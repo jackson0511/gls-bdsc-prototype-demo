@@ -80,6 +80,31 @@
       text-overflow: ellipsis;
       max-width: 0; /* force fixed-layout clip */
     }
+    .assess-fail-workspace .slick-row.assess-group-row .slick-cell {
+      background: #f1f5f9 !important;
+      font-weight: 600;
+      color: #0f172a;
+      border-top: 1px solid #cbd5e1 !important;
+      cursor: pointer;
+    }
+    .assess-fail-workspace .slick-row.assess-group-row:hover .slick-cell { background: #e2e8f0 !important; }
+    .assess-fail-workspace .slick-row.assess-fail-row .slick-cell { background: #fff7f7; }
+    .assess-fail-workspace .slick-row.assess-fail-row:hover .slick-cell { background: #ffe4e6 !important; }
+    .assess-fail-workspace .slick-row.list-row-sel .slick-cell,
+    .assess-fail-workspace .slick-row.plan-row-sel .slick-cell { background: #eff6ff !important; }
+    .assess-fail-workspace .slick-row.assess-group-row.list-row-sel .slick-cell,
+    .assess-fail-workspace .slick-row.assess-group-row.plan-row-sel .slick-cell {
+      background: #dbeafe !important;
+      box-shadow: inset 0 0 0 2px #0078d4;
+    }
+    .assess-fail-item-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      max-width: 100%; border-radius: 4px; border: 1px solid #fb7185;
+      background: #ffe4e6; color: #9f1239; padding: 1px 6px;
+      font-size: 11px; font-weight: 600; line-height: 1.3;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .assess-fail-item-chip.is-replace { border-color: #38bdf8; background: #e0f2fe; color: #075985; }
     .row-h { transition: background .15s; }
     .row-h:hover { background: #f8fafc; }
     .row-h:hover > .td,
@@ -178,13 +203,39 @@
     .list-slick-workspace.plan-workspace {
       height: min(720px, calc(100vh - 170px));
     }
+    .list-slick-workspace.plan-workspace.assess-fail-workspace {
+      height: min(780px, calc(100vh - 200px));
+    }
+    .assess-fail-workspace .plan-side {
+      width: min(100%, 40rem);
+      max-width: min(100%, 40rem);
+    }
+    @media (min-width: 1024px) {
+      .assess-fail-workspace .plan-side {
+        width: min(52%, 860px);
+        max-width: min(52vw, 860px);
+        min-width: min(420px, 100%);
+      }
+    }
+    @media (max-width: 1023px) {
+      .assess-fail-workspace .plan-side {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+      }
+    }
+    .assess-fail-workspace .slick-viewport .slick-row .slick-cell:has(.assess-fail-ck) {
+      display: flex; align-items: center; justify-content: center;
+    }
     .list-slick-workspace.is-compact {
       height: min(640px, calc(100vh - 240px));
     }
     .list-slick-workspace .list-grid-container {
-      position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden;
+      position: relative; flex: 1; min-height: 0; min-width: 0; width: 100%; overflow: hidden;
       --sg-divider-color: rgba(17, 17, 17, 0.15);
       --slick-cell-padding: 2px 6px;
+      --order-grid-selection-border: #0078d4;
+      --order-grid-selection-fill: rgba(0, 120, 212, 0.12);
     }
     .list-slick-workspace .list-slick-host {
       width: 100%; height: 100%; min-height: 0;
@@ -4724,8 +4775,8 @@ const DEFAULT = {
     "km": 0,
     "hours": 0,
     "lastEval": "2026-09-20",
-    "nextEval": "2026-10-05",
-    "evalStatus": "soon",
+    "nextEval": "2026-10-20",
+    "evalStatus": "ok",
     "pwmsCode": "51C29273",
     "trailerPlate": "51R-06610",
     "inspectionDue": "2026-10-14"
@@ -4743,9 +4794,9 @@ const DEFAULT = {
     "garage": "Xưởng / đối tác HCM",
     "km": 0,
     "hours": 0,
-    "lastEval": "2026-09-20",
-    "nextEval": "2026-10-05",
-    "evalStatus": "soon",
+    "lastEval": "2026-09-22",
+    "nextEval": "2026-10-22",
+    "evalStatus": "ok",
     "pwmsCode": "50H87033",
     "trailerPlate": "15R-03753",
     "inspectionDue": "2026-11-10"
@@ -4763,9 +4814,10 @@ const DEFAULT = {
     "garage": "Xưởng / đối tác HCM",
     "km": 0,
     "hours": 0,
-    "lastEval": "2026-09-20",
-    "nextEval": "2026-10-05",
-    "evalStatus": "soon",
+    "lastEval": "2026-08-17",
+    "nextEval": "2026-09-15",
+    "evalStatus": "overdue",
+    "evalLocked": true,
     "pwmsCode": "51C41767",
     "trailerPlate": "50R-02568",
     "inspectionDue": "2026-09-08"
@@ -4783,7 +4835,7 @@ const DEFAULT = {
     "garage": "Xưởng / đối tác HCM",
     "km": 0,
     "hours": 0,
-    "lastEval": "2026-09-20",
+    "lastEval": "2026-08-28",
     "nextEval": "2026-10-05",
     "evalStatus": "soon",
     "pwmsCode": "50E22295",
@@ -4803,9 +4855,9 @@ const DEFAULT = {
     "garage": "Xưởng / đối tác HCM",
     "km": 0,
     "hours": 0,
-    "lastEval": "2026-09-20",
-    "nextEval": "2026-10-05",
-    "evalStatus": "soon",
+    "lastEval": "2026-09-22",
+    "nextEval": "2026-10-22",
+    "evalStatus": "ok",
     "pwmsCode": "50LD17734",
     "trailerPlate": "50RM-07680",
     "inspectionDue": "2026-08-24"
@@ -4823,9 +4875,9 @@ const DEFAULT = {
     "garage": "Xưởng / đối tác HCM",
     "km": 0,
     "hours": 0,
-    "lastEval": "2026-09-20",
-    "nextEval": "2026-10-05",
-    "evalStatus": "soon",
+    "lastEval": "2026-08-10",
+    "nextEval": "2026-09-10",
+    "evalStatus": "due",
     "pwmsCode": "50E21624",
     "trailerPlate": "51R-06914",
     "inspectionDue": "2027-01-19"
@@ -4883,7 +4935,7 @@ const DEFAULT = {
     "garage": "Xưởng Hải Phòng",
     "km": 0,
     "hours": 0,
-    "lastEval": "2026-09-20",
+    "lastEval": "2026-09-01",
     "nextEval": "2026-10-05",
     "evalStatus": "soon",
     "pwmsCode": "50H07420",
@@ -4903,9 +4955,9 @@ const DEFAULT = {
     "garage": "Xưởng Hải Phòng",
     "km": 0,
     "hours": 0,
-    "lastEval": "2026-09-20",
-    "nextEval": "2026-10-05",
-    "evalStatus": "soon",
+    "lastEval": "2026-09-25",
+    "nextEval": "2026-10-25",
+    "evalStatus": "ok",
     "pwmsCode": "50H07444",
     "trailerPlate": "",
     "inspectionDue": "2027-01-02"
@@ -10260,6 +10312,8 @@ const DEFAULT = {
     "cost": 2200000,
     "catalogId": null,
     "primaryKind": "REPAIR",
+    "fromEvalId": "ev-105-20260922",
+    "fromEvalItemIds": ["c16"],
     "content": "SC từ đánh giá định kỳ · thay ắc quy",
     "createdAt": "2026-09-22",
     "materials": [
@@ -10318,6 +10372,149 @@ const DEFAULT = {
         "at": "2026-09-22 09:00",
         "action": "START",
         "by": "Nguyễn Văn Kỹ thuật",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "o25",
+    "code": "RO-2026-2008",
+    "vehicleId": 101,
+    "type": "WORK",
+    "occurrence": 3,
+    "date": "2026-08-23",
+    "km": 1149200,
+    "garage": "Bảo dưỡng nội bộ",
+    "source": "PERIODIC_ASSESSMENT",
+    "system": "Ắc Quy",
+    "status": "COMPLETED",
+    "approvalStatus": "APPROVED",
+    "revision": 1,
+    "cost": 1950000,
+    "catalogId": null,
+    "primaryKind": "REPAIR",
+    "fromEvalId": "ev-101-20260823",
+    "fromEvalItemIds": ["c16"],
+    "content": "SC từ ĐG 2026-08-23 · thay ắc Bi Nhê",
+    "createdAt": "2026-08-23",
+    "materials": [
+      {
+        "source": "PWMS",
+        "code": "VTU-342-1000002",
+        "name": "Ắc Bi Nhê",
+        "qty": 1,
+        "uom": "Cái",
+        "price": 1850000
+      }
+    ],
+    "workItems": [
+      {
+        "system": "Ắc Quy",
+        "content": "Thay ắc quy",
+        "service": "Sửa chữa",
+        "kind": "REPAIR",
+        "performer": "Trần KTV",
+        "hours": 1.0,
+        "fromCheck": "Ắc quy / cực cột"
+      }
+    ],
+    "purchaseSync": {
+      "status": "NONE",
+      "lastSyncedAt": null,
+      "issueDocCode": null,
+      "note": "Phiếu SC từ ĐG định kỳ (seed)"
+    },
+    "baseSync": {
+      "status": "NONE",
+      "code": null,
+      "baseStatus": null,
+      "lastSyncedAt": null,
+      "note": ""
+    },
+    "approvalLog": [
+      {
+        "at": "2026-08-23 10:00",
+        "action": "CREATE",
+        "by": "Trần KTV",
+        "note": "Từ đánh giá định kỳ 2026-08-23"
+      },
+      {
+        "at": "2026-08-23 15:00",
+        "action": "APPROVE",
+        "by": "Trần Quản lý",
+        "note": ""
+      },
+      {
+        "at": "2026-08-24 09:00",
+        "action": "COMPLETE",
+        "by": "Trần KTV",
+        "note": "Đã thay ắc"
+      }
+    ]
+  },
+  {
+    "id": "o26",
+    "code": "RO-2026-2009",
+    "vehicleId": 103,
+    "type": "WORK",
+    "occurrence": 2,
+    "date": "2026-08-17",
+    "km": 1298000,
+    "garage": "HYUNDAI PHÚ LÂM",
+    "source": "PERIODIC_ASSESSMENT",
+    "system": "Hệ Thống Máy Xe",
+    "status": "COMPLETED",
+    "approvalStatus": "APPROVED",
+    "revision": 1,
+    "cost": 850000,
+    "catalogId": null,
+    "primaryKind": "REPAIR",
+    "fromEvalId": "ev-103-20260817",
+    "fromEvalItemIds": ["c11"],
+    "content": "SC từ ĐG 2026-08-17 · công kiểm tra động cơ",
+    "createdAt": "2026-08-17",
+    "materials": [],
+    "workItems": [
+      {
+        "system": "Hệ Thống Máy Xe",
+        "content": "Công kiểm tra",
+        "service": "Sửa chữa",
+        "kind": "REPAIR",
+        "performer": "Vũ KTV",
+        "hours": 2.0,
+        "fromCheck": "Mức dầu động cơ / rò rỉ"
+      }
+    ],
+    "purchaseSync": {
+      "status": "NONE",
+      "lastSyncedAt": null,
+      "issueDocCode": null,
+      "note": "Phiếu SC từ ĐG định kỳ (seed)"
+    },
+    "baseSync": {
+      "status": "NONE",
+      "code": null,
+      "baseStatus": null,
+      "lastSyncedAt": null,
+      "note": ""
+    },
+    "approvalLog": [
+      {
+        "at": "2026-08-17 11:00",
+        "action": "CREATE",
+        "by": "Vũ KTV",
+        "note": "Từ đánh giá định kỳ 2026-08-17"
+      },
+      {
+        "at": "2026-08-18 09:00",
+        "action": "APPROVE",
+        "by": "Trần Quản lý",
+        "note": ""
+      },
+      {
+        "at": "2026-08-19 16:00",
+        "action": "COMPLETE",
+        "by": "Vũ KTV",
         "note": ""
       }
     ]
@@ -63548,8 +63745,9 @@ const DEFAULT = {
     '104:3': { occurrence: 3, lastKm: 208000, lastDate: '2026-08-30', nextKm: null, nextDate: '2027-08-30' },
   },
   evaluations: {
-    /* Case A · nộp bình thường (tất cả Tốt) — không tạo KH / phiếu */
+    /* Case A · nộp bình thường (tất cả Tốt) — không tạo phiếu SC */
     101: {
+      id: 'ev-101-20260920',
       date: '2026-09-20', status: 'SUBMITTED', note: 'Xe ổn định',
       inspector: 'Nguyễn Văn Kỹ thuật',
       dateStart: '2026-09-01', dateEnd: '2026-09-30',
@@ -63574,8 +63772,9 @@ const DEFAULT = {
       itemNotes: {},
       details: {},
     },
-    /* Case B · nộp có SC · chưa tạo phiếu (nút tạo phiếu ở cột Phiếu SC) */
+    /* Case B · nộp có SC · chưa tạo phiếu (demo tạo phiếu theo xe) */
     102: {
+      id: 'ev-102-20260922',
       date: '2026-09-22', status: 'SUBMITTED', note: 'Có SC phanh · chỉ nộp, tạo phiếu SC sau',
       inspector: 'Trần KTV',
       dateStart: '2026-09-01', dateEnd: '2026-09-30',
@@ -63595,15 +63794,16 @@ const DEFAULT = {
         driverRemedies: '',
         driverOpinion: 'Phanh hơi yếu',
       },
-      items: { c1: 'ok', c8: 'ok', c9: 'repair', c11: 'ok', c14: 'ok', c16: 'repair' },
+      items: { c1: 'ok', c2: 'ok', c5: 'ok', c8: 'ok', c9: 'repair', c11: 'ok', c12: 'ok', c13: 'ok', c14: 'ok', c15: 'ok', c16: 'repair', c17: 'ok' },
       itemNotes: { c9: 'Bố thắng mòn', c16: 'Cực ắc quy oxy hóa' },
       details: {
         c9: { repairs: [{ id: 'ri1', name: 'Tán Bố Thắng Mooc', system: 'Nhân Công Sửa Chữa' }], materials: [] },
         c16: { repairs: [{ id: 'ri5', name: 'Công kiểm tra', system: 'Hệ Thống Máy Xe' }], materials: [] },
       },
     },
-    /* Case C · nộp + tạo phiếu SC ngay */
+    /* Case C · nộp + đã tạo phiếu SC */
     105: {
+      id: 'ev-105-20260922',
       date: '2026-09-22', status: 'SUBMITTED', note: 'Ắc quy yếu · tạo phiếu SC ngay',
       inspector: 'Phạm KTV',
       dateStart: '2026-09-01', dateEnd: '2026-09-30',
@@ -63623,14 +63823,15 @@ const DEFAULT = {
         driverRemedies: '',
         driverOpinion: 'Khó đề',
       },
-      items: { c1: 'ok', c16: 'replace' },
+      items: { c1: 'ok', c2: 'ok', c5: 'ok', c8: 'ok', c9: 'ok', c11: 'ok', c12: 'ok', c13: 'ok', c14: 'ok', c15: 'ok', c16: 'replace', c17: 'ok' },
       itemNotes: { c16: 'Thay ắc quy' },
       details: {
         c16: { repairs: [], materials: [{ id: 'm1', code: 'VTU-342-1000002', name: 'Ắc Bi Nhê', qty: 1, uom: 'Cái', price: 1850000 }] },
       },
     },
-    /* Case D · nộp có SC/Thay nhưng chưa tạo phiếu (hiện nút Tạo phiếu SC) */
+    /* Case D · nộp có lỗi · chưa tạo phiếu SC (Hải Phòng) */
     110: {
+      id: 'ev-110-20260925',
       date: '2026-09-25', status: 'SUBMITTED', note: 'Có hạng mục lỗi · chỉ nộp, tạo phiếu sau',
       inspector: 'Vũ KTV',
       dateStart: '2026-09-01', dateEnd: '2026-09-30',
@@ -63650,11 +63851,34 @@ const DEFAULT = {
         driverRemedies: '',
         driverOpinion: 'Đèn báo động cơ',
       },
-      items: { c5: 'ok', c11: 'repair', c13: 'repair' },
+      items: { c1: 'ok', c2: 'ok', c5: 'ok', c8: 'ok', c9: 'ok', c11: 'repair', c12: 'ok', c13: 'repair', c14: 'ok', c15: 'ok', c16: 'ok', c17: 'ok' },
       itemNotes: { c11: 'Rò dầu nhẹ', c13: 'Tiếng kêu bất thường' },
       details: {
         c11: { repairs: [{ id: 'ri5', name: 'Công kiểm tra', system: 'Hệ Thống Máy Xe' }], materials: [] },
         c13: { repairs: [{ id: 'ri5', name: 'Công kiểm tra', system: 'Hệ Thống Máy Xe' }], materials: [] },
+      },
+    },
+    /* Case E · nháp đang làm (demo tab Kết quả · trạng thái Nháp) */
+    104: {
+      id: 'ev-104-20260928-draft',
+      date: '2026-09-28', status: 'DRAFT', note: 'Đang kiểm tra — chưa nộp',
+      inspector: 'Lê KTV',
+      dateStart: '2026-09-01', dateEnd: '2026-09-30',
+      periodExempt: false, periodExemptReason: '',
+      postEvalAction: 'later',
+      goodCount: 8, failCount: 1,
+      linkedOrderIds: [], linkedPlanIds: [],
+      identity: {
+        inspectionDate: '2026-09-28', vehicleNumber: '50E-22295', chassisNumber: '—',
+        engineNumber: '—', operatingKm: '980120', trailerNumber: '',
+        driverName: 'Phan Tài', driverPhone: '0905 777 888', drivingLicense: 'B2',
+        tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
+      },
+      conclusion: { replacementRequest: '', mechanicManagerRemedies: '', driverRemedies: '', driverOpinion: '' },
+      items: { c1: 'ok', c2: 'ok', c5: 'ok', c8: 'ok', c9: 'ok', c11: 'repair', c14: 'ok', c16: 'ok' },
+      itemNotes: { c11: 'Nhớt hơi đục — đang xác nhận' },
+      details: {
+        c11: { repairs: [{ id: 'ri5', name: 'Công kiểm tra', system: 'Hệ Thống Máy Xe' }], materials: [] },
       },
     },
   },
@@ -63680,17 +63904,17 @@ const DEFAULT = {
       id: 'ev-101-20260823', vehicleId: 101, date: '2026-08-23', status: 'SUBMITTED', note: 'SC nhẹ hệ thống điện',
       inspector: 'Trần KTV', dateStart: '2026-08-01', dateEnd: '2026-08-31',
       periodExempt: false, periodExemptReason: '', postEvalAction: 'sc',
-      goodCount: 15, failCount: 1, linkedOrderIds: ['o2'], linkedPlanIds: [],
+      goodCount: 15, failCount: 1, linkedOrderIds: ['o25'], linkedPlanIds: [],
       identity: {
         inspectionDate: '2026-08-23', vehicleNumber: '51C-29273', chassisNumber: 'RLHBR90S0K1234567',
         engineNumber: 'D13K460-112233', operatingKm: '1149200', trailerNumber: '51R-338.21',
         driverName: 'Nguyễn Văn Tài', driverPhone: '0901 234 567', drivingLicense: 'B2',
         tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
       },
-      conclusion: { replacementRequest: 'Cảm biến', mechanicManagerRemedies: 'Thay cảm biến nguồn', driverRemedies: '', driverOpinion: 'Đèn báo điện' },
-      items: { c1: 'ok', c2: 'ok', c8: 'ok', c9: 'ok', c11: 'ok', c14: 'ok', c16: 'replace' },
+      conclusion: { replacementRequest: 'Ắc quy', mechanicManagerRemedies: 'Thay ắc Bi Nhê', driverRemedies: '', driverOpinion: 'Đèn báo điện' },
+      items: { c1: 'ok', c2: 'ok', c5: 'ok', c8: 'ok', c9: 'ok', c11: 'ok', c12: 'ok', c13: 'ok', c14: 'ok', c15: 'ok', c16: 'replace', c17: 'ok' },
       itemNotes: { c16: 'Cực ắc / cảm biến yếu' },
-      details: { c16: { repairs: [], materials: [{ id: 'm1', code: 'VTU-342-1000002', name: 'Ắc Bi Nhê', qty: 1, uom: 'Cái' }] } },
+      details: { c16: { repairs: [], materials: [{ id: 'm1', code: 'VTU-342-1000002', name: 'Ắc Bi Nhê', qty: 1, uom: 'Cái', price: 1850000 }] } },
     },
     {
       id: 'ev-101-20260719', vehicleId: 101, date: '2026-07-19', status: 'SUBMITTED', note: 'Tất cả hạng mục tốt',
@@ -63719,33 +63943,19 @@ const DEFAULT = {
         tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
       },
       conclusion: { replacementRequest: '', mechanicManagerRemedies: 'Cần tạo phiếu SC tán bố thắng', driverRemedies: '', driverOpinion: 'Phanh hơi yếu' },
-      items: { c1: 'ok', c8: 'ok', c9: 'repair', c11: 'ok', c14: 'ok', c16: 'repair' },
+      items: { c1: 'ok', c2: 'ok', c5: 'ok', c8: 'ok', c9: 'repair', c11: 'ok', c12: 'ok', c13: 'ok', c14: 'ok', c15: 'ok', c16: 'repair', c17: 'ok' },
       itemNotes: { c9: 'Bố thắng mòn', c16: 'Cực ắc quy oxy hóa' },
       details: {
         c9: { repairs: [{ id: 'ri1', name: 'Tán Bố Thắng Mooc', system: 'Nhân Công Sửa Chữa' }], materials: [] },
         c16: { repairs: [{ id: 'ri5', name: 'Công kiểm tra', system: 'Hệ Thống Máy Xe' }], materials: [] },
       },
     },
-    {
-      id: 'ev-103-20260921', vehicleId: 103, date: '2026-09-21', status: 'SUBMITTED', note: 'Đánh giá định kỳ tháng 9',
-      inspector: 'Nguyễn Văn Kỹ thuật', dateStart: '2026-09-01', dateEnd: '2026-09-30',
-      periodExempt: false, periodExemptReason: '', postEvalAction: 'later',
-      goodCount: 16, failCount: 0, linkedOrderIds: [], linkedPlanIds: [],
-      identity: {
-        inspectionDate: '2026-09-21', vehicleNumber: '51C-41767', chassisNumber: '—',
-        engineNumber: '—', operatingKm: '1305486', trailerNumber: '',
-        driverName: 'Trần Minh', driverPhone: '0901 234 567', drivingLicense: 'B2',
-        tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
-      },
-      conclusion: { replacementRequest: '', mechanicManagerRemedies: '', driverRemedies: '', driverOpinion: 'Xe ổn' },
-      items: { c1: 'ok', c2: 'ok', c8: 'ok', c9: 'ok', c11: 'ok', c14: 'ok', c16: 'ok' },
-      itemNotes: {}, details: {},
-    },
+    /* 51C-41767 · chỉ có ĐG tháng 8 + phiếu SC; tháng 9 chưa nộp → xe bị khóa (demo) */
     {
       id: 'ev-103-20260817', vehicleId: 103, date: '2026-08-17', status: 'SUBMITTED', note: 'SC phát sinh · kiểm tra tình trạng xe',
       inspector: 'Vũ KTV', dateStart: '2026-08-01', dateEnd: '2026-08-31',
       periodExempt: false, periodExemptReason: '', postEvalAction: 'sc',
-      goodCount: 14, failCount: 1, linkedOrderIds: ['o7'], linkedPlanIds: [],
+      goodCount: 14, failCount: 1, linkedOrderIds: ['o26'], linkedPlanIds: [],
       identity: {
         inspectionDate: '2026-08-17', vehicleNumber: '51C-41767', chassisNumber: '—',
         engineNumber: '—', operatingKm: '1298000', trailerNumber: '',
@@ -63753,7 +63963,7 @@ const DEFAULT = {
         tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
       },
       conclusion: { replacementRequest: '', mechanicManagerRemedies: 'Kiểm tra tổng quát đầu kéo + mooc', driverRemedies: '', driverOpinion: 'Có tiếng kêu' },
-      items: { c1: 'ok', c2: 'ok', c8: 'ok', c9: 'ok', c11: 'repair', c14: 'ok', c16: 'ok' },
+      items: { c1: 'ok', c2: 'ok', c5: 'ok', c8: 'ok', c9: 'ok', c11: 'repair', c12: 'ok', c13: 'ok', c14: 'ok', c15: 'ok', c16: 'ok', c17: 'ok' },
       itemNotes: { c11: 'Cần kiểm tra tổng quát' },
       details: { c11: { repairs: [{ id: 'ri5', name: 'Công kiểm tra', system: 'Hệ Thống Máy Xe' }], materials: [] } },
     },
@@ -63769,7 +63979,7 @@ const DEFAULT = {
         tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
       },
       conclusion: { replacementRequest: 'Ắc quy', mechanicManagerRemedies: 'Thay ắc ngay', driverRemedies: '', driverOpinion: 'Khó đề' },
-      items: { c1: 'ok', c8: 'ok', c9: 'ok', c11: 'ok', c14: 'ok', c16: 'replace' },
+      items: { c1: 'ok', c2: 'ok', c5: 'ok', c8: 'ok', c9: 'ok', c11: 'ok', c12: 'ok', c13: 'ok', c14: 'ok', c15: 'ok', c16: 'replace', c17: 'ok' },
       itemNotes: { c16: 'Ắc yếu' },
       details: { c16: { repairs: [], materials: [{ id: 'm1', code: 'VTU-342-1000002', name: 'Ắc Bi Nhê', qty: 1, uom: 'Cái', price: 1850000 }] } },
     },
@@ -63785,7 +63995,7 @@ const DEFAULT = {
         tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
       },
       conclusion: { replacementRequest: '', mechanicManagerRemedies: 'Cần tạo phiếu SC sau', driverRemedies: '', driverOpinion: 'Đèn báo động cơ' },
-      items: { c5: 'ok', c11: 'repair', c13: 'repair' },
+      items: { c1: 'ok', c2: 'ok', c5: 'ok', c8: 'ok', c9: 'ok', c11: 'repair', c12: 'ok', c13: 'repair', c14: 'ok', c15: 'ok', c16: 'ok', c17: 'ok' },
       itemNotes: { c11: 'Rò dầu nhẹ', c13: 'Tiếng kêu bất thường' },
       details: {
         c11: { repairs: [{ id: 'ri5', name: 'Công kiểm tra', system: 'Hệ Thống Máy Xe' }], materials: [] },
@@ -66528,6 +66738,12 @@ function showListCtx(ev, key, item) {
     bits.push(slickMenuItem('eval', 'file', 'Đánh giá'));
     bits.push(slickMenuItem('view-orders', 'files', 'Xem phiếu theo xe'));
     el._listCtx = { key, item, vehicleId: item.vehicleId != null ? item.vehicleId : item.id, plate: item.plate };
+  } else if (key === 'assessResults') {
+    const groupId = item.__group ? item.id : ('g-' + item.groupKey);
+    bits.push(slickMenuItem('assess-open', 'file', 'Xem chi tiết lần ĐG · ' + (item.plate || '')));
+    if (item.vehicleId != null) bits.push(slickMenuItem('open-vehicle', 'truck', 'Mở xe ' + (item.plate || '')));
+    bits.push(slickMenuItem('copy-code', 'copy', 'Sao chép biển số'));
+    el._listCtx = { key, item, assessGroupId: groupId, vehicleId: item.vehicleId, plate: item.plate, code: item.plate || '' };
   } else {
     bits.push(slickMenuItem('copy-code', 'copy', 'Sao chép'));
     el._listCtx = { key, item, code: item.code || item.plate || item.name || '' };
@@ -66552,6 +66768,11 @@ function showListCtx(ev, key, item) {
       if (act === 'eval' && ctx.vehicleId != null) { openEvalModal(Number(ctx.vehicleId)); return; }
       if (act === 'view-orders' && ctx.plate) {
         openOrdersByPlate(ctx.plate, view.name === 'fleet' ? 'fleet' : (view.from || null));
+        return;
+      }
+      if (act === 'assess-open' && ctx.assessGroupId) {
+        const g = findAssessFailRowById(ctx.assessGroupId);
+        if (g) openAssessFailPanel(g);
         return;
       }
       if (act === 'copy-code') {
@@ -66935,8 +67156,22 @@ function mountListSlickGrid(host, rows, cols, opts) {
     getItem: (i) => visibleRows[i],
     getItemMetadata: (i) => {
       const item = visibleRows[i];
-      return (view._listSelKey === key && item && String(item.id) === String(view._listSelId))
-        ? { cssClasses: 'list-row-sel' } : null;
+      if (!item) return null;
+      const sel = (view._listSelKey === key && String(item.id) === String(view._listSelId))
+        || (key === 'assessResults' && view.assessFailPanelOpen && String(item.id) === String(view.selectedAssessFailId));
+      if (item.__group) {
+        /* Dòng xe: title+ghi chú gộp; các cột Kết quả / Trạng thái / SC / Thao tác vẫn riêng */
+        return {
+          cssClasses: 'assess-group-row' + (sel ? ' list-row-sel plan-row-sel' : ''),
+          columns: {
+            1: { colspan: 2 }, /* itemLabel + itemNote */
+          },
+        };
+      }
+      const classes = [];
+      if (key === 'assessResults' && !item.isEmpty && item.failCount > 0) classes.push('assess-fail-row');
+      if (sel) classes.push('list-row-sel');
+      return classes.length ? { cssClasses: classes.join(' ') } : null;
     },
   };
   const options = Object.assign({
@@ -66989,7 +67224,8 @@ function mountListSlickGrid(host, rows, cols, opts) {
   const applyListColFilters = () => {
     const f = (view.listGridColFilters && view.listGridColFilters[key]) || {};
     const includes = (val, q) => !q || String(val ?? '').toLowerCase().includes(String(q).toLowerCase());
-    visibleRows = allRows.filter((r) => {
+    const rowMatches = (r) => {
+      if (r && r.__group) return true;
       for (const col of safeCols) {
         if (!col || col.id === '_act' || col.id === '_ck' || col.filterable === false) continue;
         const q = f[col.id];
@@ -66998,7 +67234,8 @@ function mountListSlickGrid(host, rows, cols, opts) {
         const isSelect = col.filterType === 'select'
           || ff === 'kindLabel' || ff === 'evalStatus' || ff === 'evalSortKey' || ff === 'evalHtml'
           || ff === 'approvalStatus' || ff === 'approvalHtml' || ff === 'approvalSortKey'
-          || ff === 'execStatus' || ff === 'execHtml' || ff === 'execSortKey';
+          || ff === 'execStatus' || ff === 'execHtml' || ff === 'execSortKey'
+          || ff === 'statusText';
         if (isSelect) {
           let cmpField = ff;
           if (ff === 'evalSortKey' || ff === 'evalHtml') cmpField = 'evalStatus';
@@ -67010,9 +67247,18 @@ function mountListSlickGrid(host, rows, cols, opts) {
         }
       }
       return true;
-    });
+    };
+    let matched = allRows.filter(rowMatches);
+    if (key === 'assessResults') {
+      const keepKeys = new Set(matched.filter(r => !r.__group).map(r => r.groupKey));
+      matched = allRows.filter(r => {
+        if (r.__group) return keepKeys.has(r.groupKey);
+        return keepKeys.has(r.groupKey) && rowMatches(r);
+      });
+    }
+    visibleRows = matched;
     const sortState = view.listGridSort[key];
-    if (sortState && sortState.field) {
+    if (sortState && sortState.field && key !== 'assessResults') {
       visibleRows.sort((a, b) => compareGridValues(a[sortState.field], b[sortState.field], sortState.asc !== false));
     }
     window._listGridRows[key] = visibleRows;
@@ -67196,6 +67442,41 @@ function mountListSlickGrid(host, rows, cols, opts) {
           if (typeof openEvalModal === 'function') openEvalModal(Number(evalBtn.getAttribute('data-eval')));
           return;
         }
+        const viewEval = t.closest('[data-view-eval]');
+        if (viewEval) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          if (typeof openEvalResultModal === 'function') openEvalResultModal(viewEval.getAttribute('data-view-eval'));
+          return;
+        }
+        const createSc = t.closest('[data-create-order-from-eval]');
+        if (createSc) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          const vid = Number(createSc.getAttribute('data-create-order-from-eval'));
+          const eid = createSc.getAttribute('data-create-order-eval-id');
+          const fromEv = eid && typeof evaluationById === 'function' ? evaluationById(eid) : null;
+          if (typeof openCreateOrderFromEval === 'function') openCreateOrderFromEval(vid, fromEv || undefined);
+          return;
+        }
+        const openFail = t.closest('[data-assess-fail-open]');
+        if (openFail) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          const row = findAssessFailRowById(openFail.getAttribute('data-assess-fail-open'));
+          const groupRow = row && (row.__group ? row : findAssessFailRowById('g-' + row.groupKey));
+          if (groupRow && typeof openAssessFailPanel === 'function') openAssessFailPanel(groupRow);
+          return;
+        }
+        const assessCk = t.closest('.assess-fail-ck, .assess-fail-group-ck, .order-grid-row-checkbox');
+        if (key === 'assessResults' && assessCk) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          if (assessCk.classList.contains('assess-fail-group-ck')) {
+            setAssessFailGroupChecked(assessCk.getAttribute('data-assess-group-key'), assessCk.checked, visibleRows);
+          } else if (assessCk.classList.contains('assess-fail-ck')) {
+            setAssessFailChecked(assessCk.getAttribute('data-assess-fail-id'), assessCk.checked);
+          }
+          try { grid.invalidate(); grid.render(); } catch (_) {}
+          refreshAssessFailChecks();
+          return;
+        }
         const viewOrders = t.closest('[data-view-orders-plate]');
         if (viewOrders) {
           if (native && native.stopPropagation) native.stopPropagation();
@@ -67208,7 +67489,49 @@ function mountListSlickGrid(host, rows, cols, opts) {
       view._listSelKey = key;
       view._listSelId = item.id;
       try { grid.invalidate(); grid.render(); } catch (_) {}
+      if (key === 'assessResults') {
+        try { if (typeof refreshAssessFailChecks === 'function') refreshAssessFailChecks(); } catch (_) {}
+        /* Chỉ mở panel khi bấm dòng nhóm xe / phiếu ĐG — giống dblclick mở panel kế hoạch */
+        if (item.__group && typeof openAssessFailPanel === 'function') openAssessFailPanel(item);
+      }
     });
+    if (key === 'assessResults' && grid.onDblClick) {
+      grid.onDblClick.subscribe((_e, args) => {
+        const row = visibleRows[args.row];
+        if (!row) return;
+        const groupRow = row.__group ? row : (typeof findAssessFailRowById === 'function' ? findAssessFailRowById('g-' + row.groupKey) : null);
+        if (groupRow && typeof openAssessFailPanel === 'function') openAssessFailPanel(groupRow);
+      });
+    }
+  }
+  if (key === 'assessResults') {
+    const bindAssessHeaderCheck = () => {
+      const headers = host.querySelectorAll('.slick-header:not(.slick-preheader-panel) .slick-header-column');
+      const ckHeader = [...headers].find(el => String(el.id || '').includes('_ck')) || headers[0];
+      if (!ckHeader) return;
+      if (!ckHeader.querySelector('#assessFailCheckAll')) {
+        ckHeader.innerHTML = '';
+        ckHeader.style.display = 'flex';
+        ckHeader.style.alignItems = 'center';
+        ckHeader.style.justifyContent = 'center';
+        const all = document.createElement('input');
+        all.type = 'checkbox';
+        all.id = 'assessFailCheckAll';
+        all.className = 'order-grid-select-all-checkbox';
+        all.setAttribute('aria-label', 'Chọn tất cả hạng mục lỗi');
+        all.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setAllAssessFailChecked(all.checked, visibleRows);
+          try { grid.invalidate(); grid.render(); } catch (_) {}
+          refreshAssessFailChecks();
+        });
+        ckHeader.appendChild(all);
+      }
+      refreshAssessFailChecks();
+    };
+    bindAssessHeaderCheck();
+    setTimeout(bindAssessHeaderCheck, 50);
+    setTimeout(bindAssessHeaderCheck, 200);
   }
   host.oncontextmenu = (e) => {
     const cell = grid.getCellFromEvent && grid.getCellFromEvent(e);
@@ -68204,6 +68527,10 @@ function defaultView(overrides = {}) {
     planSelectMode: 'LINE',
     remindTab: 'dashboard',
     assessTab: 'vehicles',
+    assessFailPanelOpen: false,
+    assessFailPanelTab: 'fails',
+    selectedAssessFailId: null,
+    checkedAssessFailIds: [],
     orderId: null, catalogId: null, criteriaGroupId: null, from: null,
     menuScope: null,
     page: 1, pageSize: 10,
@@ -70251,6 +70578,13 @@ function render() {
     mountPlanSlickGrid();
     mountAllListSlickGrids();
     bind();
+    try {
+      if (view.name === 'assessment' && view.assessTab === 'results') {
+        bindAssessFailToolbar();
+        refreshAssessFailChecks();
+      }
+      if (view.assessFailPanelOpen) bindAssessFailPanel();
+    } catch (_) {}
     saveViewState();
     if (focusId) {
       const el = document.getElementById(focusId);
@@ -73713,9 +74047,11 @@ function orderIsEvalRepair(o) {
 }
 function ordersLinkedToEval(ev, vehicleId) {
   const ids = new Set((ev?.linkedOrderIds || []).map(String));
+  const evalId = ev?.id != null ? String(ev.id) : '';
   return (DB.orders || []).filter(o =>
     orderIsEvalRepair(o) && (
       ids.has(String(o.id)) ||
+      (evalId && String(o.fromEvalId || '') === evalId) ||
       (Number(o.vehicleId) === Number(vehicleId) && o.source === 'PERIODIC_ASSESSMENT' && ev?.date && o.date === ev.date)
     )
   );
@@ -73802,10 +74138,15 @@ function evaluationsOfVehicle(vid) {
     return String(b.date || '').localeCompare(String(a.date || ''));
   });
 }
-function openCreateOrderFromEval(vid, fromEv) {
+function openCreateOrderFromEval(vid, fromEv, itemIds) {
   window._evalOrderSeed = fromEv || DB.evaluations[Number(vid)] || null;
+  window._evalOrderSeedItemIds = Array.isArray(itemIds) && itemIds.length
+    ? new Set(itemIds.map(String))
+    : null;
   openCreateOrderModal(Number(vid), 'INCIDENTAL', 'PERIODIC_ASSESSMENT');
-  toast('Nguồn «Đánh giá định kỳ» · chỉ tạo phiếu sửa chữa');
+  toast(window._evalOrderSeedItemIds
+    ? ('Nguồn «Đánh giá định kỳ» · ' + window._evalOrderSeedItemIds.size + ' hạng mục đã chọn')
+    : 'Nguồn «Đánh giá định kỳ» · chỉ tạo phiếu sửa chữa');
 }
 function findVehicleByPlate(plate) {
   const p = String(plate || '').trim().toLowerCase();
@@ -74095,12 +74436,26 @@ function evalFailItemsBrief(ev, opts) {
     .filter(([, a]) => a === 'repair' || a === 'replace')
     .map(([id, a]) => {
       const it = flat.find(x => x.id === id);
-      const label = (it?.label || id) + ' (' + (a === 'repair' ? 'SC' : 'Thay') + ')';
+      const baseLabel = it?.label || id;
+      const kindLabel = a === 'repair' ? 'SC' : 'Thay';
+      const label = baseLabel + ' (' + kindLabel + ')';
       const rawNote = (ev.itemNotes && ev.itemNotes[id]) ? String(ev.itemNotes[id]).trim() : '';
       const note = rawNote
         ? (rawNote.length > maxNote ? (rawNote.slice(0, maxNote).trimEnd() + '…') : rawNote)
         : '';
-      if (asObjects) return { label, note, full: note ? (label + ' · ' + rawNote) : label };
+      if (asObjects) {
+        return {
+          itemId: id,
+          kind: a,
+          kindLabel,
+          baseLabel,
+          label,
+          note,
+          rawNote,
+          full: note ? (label + ' · ' + rawNote) : label,
+          detail: (ev.details && ev.details[id]) ? ev.details[id] : null,
+        };
+      }
       return note ? (label + ' · ' + note) : label;
     });
 }
@@ -74119,6 +74474,670 @@ function formatAssessPeriodHtml(ev, v) {
   }
   if (start === end) return `<span class="block tabular-nums">${esc(start)}</span>`;
   return `<span class="block tabular-nums leading-tight">${esc(start)}<br><span class="text-slate-400">→</span> ${esc(end)}</span>`;
+}
+function formatAssessPeriodPlain(ev, v) {
+  let start = ev?.dateStart || '';
+  let end = ev?.dateEnd || '';
+  if (!start || !end) {
+    const raw = typeof formatEvalPeriodRange === 'function' ? formatEvalPeriodRange(v, ev) : '—';
+    return String(raw).replace(/<[^>]+>/g, '').replace(/\s*→\s*/g, ' → ').trim() || '—';
+  }
+  return start === end ? start : (start + ' → ' + end);
+}
+function findAssessFailRowById(id) {
+  const rows = (window._listGridPacks && window._listGridPacks.assessResults && window._listGridPacks.assessResults.rows) || [];
+  return rows.find(r => String(r.id) === String(id)) || null;
+}
+function assessSelectableFailRows(rows) {
+  return (rows || []).filter(r => r && !r.__group && !r.isEmpty && r.itemId && r.evalStatus === 'SUBMITTED' && !r.periodExempt);
+}
+function assessCheckedFailIds() {
+  if (!Array.isArray(view.checkedAssessFailIds)) view.checkedAssessFailIds = [];
+  return view.checkedAssessFailIds.map(String);
+}
+function isAssessFailChecked(id) {
+  return assessCheckedFailIds().includes(String(id));
+}
+function setAssessFailChecked(id, on) {
+  const sid = String(id || '');
+  if (!sid) return;
+  const cur = assessCheckedFailIds().filter(x => x !== sid);
+  view.checkedAssessFailIds = on ? cur.concat(sid) : cur;
+}
+function setAssessFailGroupChecked(groupKey, on, rows) {
+  const list = assessSelectableFailRows(rows || (window._listGridPacks?.assessResults?.rows) || [])
+    .filter(r => String(r.groupKey) === String(groupKey));
+  let set = new Set(assessCheckedFailIds());
+  list.forEach(r => { if (on) set.add(String(r.id)); else set.delete(String(r.id)); });
+  view.checkedAssessFailIds = [...set];
+}
+function setAllAssessFailChecked(on, rows) {
+  const list = assessSelectableFailRows(rows || (window._listGridRows?.assessResults) || (window._listGridPacks?.assessResults?.rows) || []);
+  if (!on) {
+    const drop = new Set(list.map(r => String(r.id)));
+    view.checkedAssessFailIds = assessCheckedFailIds().filter(id => !drop.has(id));
+    return;
+  }
+  const set = new Set(assessCheckedFailIds());
+  list.forEach(r => set.add(String(r.id)));
+  view.checkedAssessFailIds = [...set];
+}
+function assessCheckedFailRows() {
+  const ids = new Set(assessCheckedFailIds());
+  const rows = (window._listGridPacks?.assessResults?.rows) || [];
+  return assessSelectableFailRows(rows).filter(r => ids.has(String(r.id)));
+}
+function refreshAssessFailChecks() {
+  const host = document.querySelector('[data-list-slick="assessResults"]');
+  if (!host) return;
+  host.querySelectorAll('.assess-fail-ck[data-assess-fail-id]').forEach(cb => {
+    cb.checked = isAssessFailChecked(cb.getAttribute('data-assess-fail-id'));
+  });
+  host.querySelectorAll('.assess-fail-group-ck[data-assess-group-key]').forEach(cb => {
+    const key = cb.getAttribute('data-assess-group-key');
+    const kids = assessSelectableFailRows(window._listGridPacks?.assessResults?.rows || [])
+      .filter(r => String(r.groupKey) === String(key));
+    const n = kids.filter(r => isAssessFailChecked(r.id)).length;
+    cb.checked = kids.length > 0 && n === kids.length;
+    cb.indeterminate = n > 0 && n < kids.length;
+  });
+  const all = document.getElementById('assessFailCheckAll');
+  if (all) {
+    const vis = assessSelectableFailRows(window._listGridRows?.assessResults || []);
+    const n = vis.filter(r => isAssessFailChecked(r.id)).length;
+    all.checked = vis.length > 0 && n === vis.length;
+    all.indeterminate = n > 0 && n < vis.length;
+  }
+  const count = document.querySelector('[data-assess-sel-count]');
+  const nSel = assessCheckedFailIds().length;
+  if (count) count.textContent = nSel ? ('Đã chọn ' + nSel + ' hạng mục') : '';
+  ['btnAssessBulkCreateSc', 'btnAssessClearSel'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = nSel === 0;
+  });
+}
+function syncEvalLinkedOrders(ev, orderId) {
+  if (!ev || !orderId) return;
+  const ids = Array.isArray(ev.linkedOrderIds) ? ev.linkedOrderIds.map(String) : [];
+  if (!ids.includes(String(orderId))) ids.push(String(orderId));
+  ev.linkedOrderIds = ids;
+  const vid = Number(ev.vehicleId);
+  if (DB.evaluations && DB.evaluations[vid]) {
+    DB.evaluations[vid].linkedOrderIds = ids.slice();
+    if (ev.id) DB.evaluations[vid].id = ev.id;
+  }
+  ensureEvaluationHistory();
+  const h = (DB.evaluationHistory || []).find(x => String(x.id) === String(ev.id));
+  if (h) h.linkedOrderIds = ids.slice();
+}
+function createRepairOrdersFromAssessFailSelection() {
+  const picked = assessCheckedFailRows();
+  if (!picked.length) { toast('Tick hạng mục lỗi cần tạo phiếu SC'); return; }
+  const byEval = new Map();
+  picked.forEach(r => {
+    const key = String(r.evalId || r.groupKey);
+    if (!byEval.has(key)) byEval.set(key, []);
+    byEval.get(key).push(r);
+  });
+  const created = [];
+  byEval.forEach((items) => {
+    const sample = items[0];
+    const ev = evaluationById(sample.evalId) || DB.evaluations?.[sample.vehicleId];
+    if (!ev || ev.status !== 'SUBMITTED' || ev.periodExempt) return;
+    const veh = vehicleById(sample.vehicleId);
+    if (!veh) return;
+    const workItems = [];
+    const materialsOut = [];
+    items.forEach(row => {
+      const d = row.itemDetail || {};
+      if (row.assessKind === 'repair') {
+        (d.repairs || []).forEach(r => {
+          workItems.push({
+            system: r.system || 'Từ đánh giá', content: r.name, service: 'Sửa chữa', kind: 'REPAIR',
+            performer: sample.inspector || 'KTV', hours: null, fromCheck: row.itemBaseLabel || row.itemLabel,
+          });
+        });
+        if (!(d.repairs || []).length) {
+          workItems.push({
+            system: 'Từ đánh giá', content: row.itemBaseLabel || row.itemLabel, service: 'Sửa chữa', kind: 'REPAIR',
+            performer: sample.inspector || 'KTV', hours: null, fromCheck: row.itemBaseLabel || row.itemLabel,
+          });
+        }
+      } else if (row.assessKind === 'replace') {
+        workItems.push({
+          system: 'Từ đánh giá', content: 'Thay VT · ' + (row.itemBaseLabel || row.itemLabel),
+          service: 'Thay thế', kind: 'REPAIR', performer: sample.inspector || 'KTV', hours: null,
+          fromCheck: row.itemBaseLabel || row.itemLabel,
+        });
+        (d.materials || []).forEach(m => {
+          materialsOut.push({
+            source: m.source || 'PWMS', code: m.code, name: m.name, qty: m.qty || 1, uom: m.uom || 'Cái', price: m.price || 0,
+            serial: m.serial || '', unitId: m.unitId || null, position: m.position || '',
+          });
+        });
+      }
+    });
+    const o = {
+      id: uid('o'), code: 'RO-2026-' + (1100 + Math.floor(Math.random() * 800)),
+      vehicleId: Number(sample.vehicleId), type: 'WORK',
+      occurrence: ordersOf(sample.vehicleId).length + 1,
+      date: sample.date || (typeof todayDateKey === 'function' ? todayDateKey() : new Date().toISOString().slice(0, 10)),
+      km: veh.km, garage: veh.garage, source: 'PERIODIC_ASSESSMENT',
+      system: 'Từ đánh giá', status: 'NOT_STARTED', approvalStatus: 'DRAFT', revision: 0, cost: 0, catalogId: null,
+      content: 'SC từ đánh giá · ' + items.length + ' hạng mục đã chọn',
+      createdAt: sample.date || '',
+      primaryKind: 'REPAIR',
+      materials: materialsOut,
+      workItems: workItems.map(w => ({ ...w, kind: 'REPAIR', service: w.service === 'Thay thế' ? 'Thay thế' : 'Sửa chữa' })),
+      planIds: [],
+      fromEvalId: sample.evalId,
+      fromEvalItemIds: items.map(x => x.itemId),
+      approvalLog: [{ at: nowStamp(), action: 'CREATE', by: sample.inspector || 'KTV', note: 'Tạo phiếu SC từ hạng mục ĐG đã chọn · nháp' }],
+    };
+    DB.orders.unshift(o);
+    syncEvalLinkedOrders(ev, o.id);
+    created.push(o);
+  });
+  if (!created.length) { toast('Không tạo được phiếu — chỉ phiếu ĐG đã nộp mới tạo SC'); return; }
+  view.checkedAssessFailIds = [];
+  save();
+  toast('Đã tạo ' + created.length + ' phiếu SC từ ' + picked.length + ' hạng mục đã chọn');
+  view = { ...view, name: 'order', orderId: created[0].id, from: 'assessment' };
+  render();
+}
+function bindAssessFailToolbar() {
+  $('#btnAssessBulkCreateSc')?.addEventListener('click', () => createRepairOrdersFromAssessFailSelection());
+  $('#btnAssessClearSel')?.addEventListener('click', () => {
+    view.checkedAssessFailIds = [];
+    const grid = window._listGrids?.assessResults;
+    if (grid) { try { grid.invalidate(); grid.render(); } catch (_) {} }
+    refreshAssessFailChecks();
+  });
+  $('#btnAssessSelectAllFail')?.addEventListener('click', () => {
+    setAllAssessFailChecked(true);
+    const grid = window._listGrids?.assessResults;
+    if (grid) { try { grid.invalidate(); grid.render(); } catch (_) {} }
+    refreshAssessFailChecks();
+  });
+}
+function assessFailDetailLinesHtml(fail) {
+  const d = fail?.detail || {};
+  if (fail?.kind === 'repair') {
+    const list = d.repairs || [];
+    if (!list.length) return '<p class="text-xs text-slate-400 m-0">Chưa gắn hạng mục SC chi tiết</p>';
+    return `<ul class="m-0 space-y-1 list-none p-0">${list.map(r =>
+      `<li class="rounded border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-950">• ${esc(r.name || '—')}${r.system ? ' · ' + esc(r.system) : ''}</li>`
+    ).join('')}</ul>`;
+  }
+  if (fail?.kind === 'replace') {
+    const list = d.materials || [];
+    if (!list.length) return '<p class="text-xs text-slate-400 m-0">Chưa gắn vật tư thay thế</p>';
+    return `<ul class="m-0 space-y-1 list-none p-0">${list.map(m =>
+      `<li class="rounded border border-sky-200 bg-sky-50 px-2 py-1 text-xs text-sky-950">• ${m.code ? esc(m.code) + ' · ' : ''}${esc(m.name || '—')} × ${m.qty || 1}</li>`
+    ).join('')}</ul>`;
+  }
+  return '<p class="text-xs text-slate-400 m-0">—</p>';
+}
+function assessFailDetailBriefText(fail) {
+  const d = fail?.detail || {};
+  if (fail?.kind === 'repair') {
+    const list = d.repairs || [];
+    if (!list.length) return '—';
+    return list.map(r => (r.name || '—') + (r.system ? ' · ' + r.system : '')).join('; ');
+  }
+  if (fail?.kind === 'replace') {
+    const list = d.materials || [];
+    if (!list.length) return '—';
+    return list.map(m => (m.code ? m.code + ' · ' : '') + (m.name || '—') + ' × ' + (m.qty || 1)).join('; ');
+  }
+  return '—';
+}
+function assessFailPanelSelectableRows(groupKey) {
+  return assessSelectableFailRows(window._listGridPacks?.assessResults?.rows || [])
+    .filter(r => String(r.groupKey) === String(groupKey));
+}
+function assessFailPanelSelectedCount(groupKey) {
+  const ids = new Set(assessCheckedFailIds());
+  return assessFailPanelSelectableRows(groupKey).filter(r => ids.has(String(r.id))).length;
+}
+function syncAssessFailPanelSelectionUi() {
+  const panel = document.getElementById('assessSidePanel');
+  if (!panel) return;
+  const groupKey = panel.getAttribute('data-assess-group-key') || '';
+  const kids = assessFailPanelSelectableRows(groupKey);
+  const nSel = assessFailPanelSelectedCount(groupKey);
+  panel.querySelectorAll('.assess-panel-fail-ck[data-assess-fail-id]').forEach(cb => {
+    cb.checked = isAssessFailChecked(cb.getAttribute('data-assess-fail-id'));
+  });
+  const all = panel.querySelector('#assessPanelCheckAll');
+  if (all) {
+    all.checked = kids.length > 0 && nSel === kids.length;
+    all.indeterminate = nSel > 0 && nSel < kids.length;
+  }
+  const countEl = panel.querySelector('[data-assess-panel-sel-count]');
+  if (countEl) countEl.textContent = nSel ? ('Đã chọn ' + nSel + ' / ' + kids.length) : (kids.length + ' hạng mục');
+  const createBtn = panel.querySelector('#btnAssessPanelCreateSelected');
+  if (createBtn) createBtn.disabled = nSel === 0;
+  const footerBtn = panel.querySelector('#btnAssessPanelCreateSc');
+  if (footerBtn) footerBtn.disabled = nSel === 0 && !footerBtn.hasAttribute('data-allow-empty');
+  const grid = window._listGrids?.assessResults;
+  if (grid) { try { grid.invalidate(); grid.render(); } catch (_) {} }
+  try { refreshAssessFailChecks(); } catch (_) {}
+}
+function assessFailSidePanelHtml(row) {
+  if (!row) return '';
+  const groupRow = row.__group ? row : findAssessFailRowById('g-' + row.groupKey);
+  if (groupRow) row = groupRow;
+  const ev = row.evalId ? evaluationById(row.evalId) : (DB.evaluations && DB.evaluations[row.vehicleId]);
+  const v = vehicleById(row.vehicleId);
+  const plate = v?.plate || row.plate || '—';
+  const orders = ev && ev.status === 'SUBMITTED' ? ordersLinkedToEval(ev, row.vehicleId) : [];
+  const canCreateSc = !!(ev && ev.status === 'SUBMITTED' && !ev.periodExempt && evalFailCount(ev) > 0);
+  const fails = ev ? evalFailItemsBrief(ev, { asObjects: true, maxNote: 80 }) : [];
+  const tab = ['fails', 'orders', 'info'].includes(view.assessFailPanelTab) ? view.assessFailPanelTab : 'fails';
+  view.assessFailPanelTab = tab;
+  const groupKey = row.groupKey;
+  const selectable = canCreateSc;
+  const kids = assessFailPanelSelectableRows(groupKey);
+  const nSel = assessFailPanelSelectedCount(groupKey);
+  const failRowsHtml = fails.map((f) => {
+    const failId = String(groupKey) + '-' + String(f.itemId);
+    const detail = assessFailDetailBriefText(f);
+    const kindChip = f.kind === 'replace'
+      ? '<span class="chip border border-sky-300 bg-sky-50 text-sky-900">Thay</span>'
+      : '<span class="chip border border-rose-300 bg-rose-50 text-rose-900">SC</span>';
+    const ck = selectable
+      ? `<input type="checkbox" class="assess-panel-fail-ck order-grid-row-checkbox" data-assess-fail-id="${esc(failId)}" ${isAssessFailChecked(failId) ? 'checked' : ''} aria-label="Chọn hạng mục" />`
+      : '<span class="text-slate-300">—</span>';
+    return `<tr class="border-t border-slate-100 hover:bg-slate-50/80">
+      <td class="px-2 py-2 align-top text-center">${ck}</td>
+      <td class="px-2 py-2 align-top">
+        <div class="font-medium text-slate-900">${esc(f.baseLabel || f.label)}</div>
+        ${f.note ? `<div class="mt-0.5 text-[11px] text-slate-500" title="${esc(f.rawNote || f.note)}">${esc(f.note)}</div>` : ''}
+      </td>
+      <td class="px-2 py-2 align-top">${kindChip}</td>
+      <td class="px-2 py-2 align-top text-[11px] text-slate-600" title="${esc(detail)}">${esc(detail)}</td>
+    </tr>`;
+  }).join('');
+  const failsBody = fails.length
+    ? `<div class="border-b border-slate-100 px-4 py-2.5">
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          ${selectable ? `<label class="inline-flex items-center gap-1.5 font-medium text-slate-800">
+            <input type="checkbox" id="assessPanelCheckAll" class="order-grid-select-all-checkbox" ${kids.length && nSel === kids.length ? 'checked' : ''} /> Chọn tất cả
+          </label>
+          <button type="button" class="btn btn-primary btn-xs" id="btnAssessPanelCreateSelected" ${nSel ? '' : 'disabled'}>Tạo phiếu từ đã chọn</button>
+          <button type="button" class="btn btn-outline btn-xs" id="btnAssessPanelClearSel" ${nSel ? '' : 'disabled'}>Bỏ chọn</button>` : ''}
+          <span class="text-[11px] text-slate-500" data-assess-panel-sel-count>${nSel ? ('Đã chọn ' + nSel + ' / ' + kids.length) : (fails.length + ' hạng mục')}</span>
+        </div>
+        <p class="mt-1 text-[11px] text-slate-500 m-0">Chọn hạng mục lỗi của xe này rồi tạo phiếu SC (theo xe / lần ĐG).</p>
+      </div>
+      <table class="min-w-full text-[12px]">
+        <thead class="sticky top-0 z-[1] bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+          <tr>
+            <th class="px-2 py-2 text-center font-medium w-8"></th>
+            <th class="px-2 py-2 text-left font-medium">Hạng mục</th>
+            <th class="px-2 py-2 text-left font-medium">Loại</th>
+            <th class="px-2 py-2 text-left font-medium">Chi tiết SC / VT</th>
+          </tr>
+        </thead>
+        <tbody>${failRowsHtml}</tbody>
+      </table>`
+    : `<div class="px-4 py-10 text-center text-sm text-slate-500">${
+        row.periodExempt ? 'Phiếu miễn kỳ — không có hạng mục lỗi.'
+          : (row.evalStatus === 'DRAFT' ? 'Phiếu nháp — chưa ghi nhận hạng mục lỗi.' : 'Đạt — không có hạng mục lỗi.')
+      }</div>`;
+  const ordersBody = orders.length
+    ? `<table class="min-w-full text-[12px]">
+        <thead class="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+          <tr>
+            <th class="px-3 py-2 text-left font-medium">Mã phiếu</th>
+            <th class="px-3 py-2 text-left font-medium">Loại</th>
+            <th class="px-3 py-2 text-right font-medium">Tiền</th>
+            <th class="px-3 py-2 text-left font-medium">TT</th>
+          </tr>
+        </thead>
+        <tbody>${orders.map(o => `<tr class="border-t border-slate-100">
+          <td class="px-3 py-2"><button type="button" data-open-order="${esc(o.id)}" class="slick-link">${esc(o.code)}</button></td>
+          <td class="px-3 py-2">${typeof orderWorkKindBadges === 'function' ? orderWorkKindBadges(o) : esc(o.type || 'SC')}</td>
+          <td class="px-3 py-2 text-right tabular-nums">${typeof money === 'function' ? money(o.cost) : (o.cost || 0)}</td>
+          <td class="px-3 py-2">${typeof execBadge === 'function' ? execBadge(o.status) : esc(o.status || '—')}</td>
+        </tr>`).join('')}</tbody>
+      </table>`
+    : `<div class="px-4 py-10 text-center text-sm text-slate-500">Chưa có phiếu SC liên kết từ lần ĐG này</div>`;
+  const infoBody = `
+    <div class="space-y-3 px-4 py-3 text-sm">
+      <dl class="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-2 text-xs">
+        <dt class="text-slate-500">Biển số</dt><dd class="m-0 font-semibold text-slate-900">${esc(plate)}</dd>
+        <dt class="text-slate-500">Ngày ĐG</dt><dd class="m-0 tabular-nums">${esc(row.date || '—')}</dd>
+        <dt class="text-slate-500">Kỳ</dt><dd class="m-0">${esc(row.periodText || '—')}</dd>
+        <dt class="text-slate-500">Khu vực</dt><dd class="m-0">${esc(row.areaLabel || formatAreaLabel(v?.area) || '—')}</dd>
+        <dt class="text-slate-500">KTV</dt><dd class="m-0">${esc(row.inspector || '—')}</dd>
+        <dt class="text-slate-500">Kết quả</dt><dd class="m-0">${esc(row.resultText || '—')}</dd>
+        <dt class="text-slate-500">Trạng thái</dt><dd class="m-0">${row.statusHtml || evalListStatusChip(ev)}</dd>
+        <dt class="text-slate-500">Hạng mục lỗi</dt><dd class="m-0 tabular-nums">${fails.length}</dd>
+        <dt class="text-slate-500">Phiếu SC</dt><dd class="m-0 tabular-nums">${orders.length}</dd>
+      </dl>
+      ${ev?.note ? `<div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700"><span class="font-medium text-slate-800">Ghi chú phiếu:</span> ${esc(ev.note)}</div>` : '<p class="m-0 text-xs text-slate-400">Không có ghi chú phiếu.</p>'}
+      <p class="m-0 text-[11px] leading-relaxed text-slate-500">Tick hạng mục ở tab «Hạng mục lỗi» rồi tạo phiếu SC theo xe.</p>
+    </div>`;
+  const body = tab === 'orders' ? ordersBody : (tab === 'info' ? infoBody : failsBody);
+  return `
+    <div class="plan-side-head">
+      <div class="min-w-0">
+        <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Chi tiết theo xe · tạo phiếu SC</div>
+        <div class="mt-0.5 text-base font-semibold text-slate-900">${esc(plate)}</div>
+        <div class="mt-1 flex flex-wrap items-center gap-1.5">
+          ${row.statusHtml || evalListStatusChip(ev)}
+          <span class="chip bg-slate-100 text-slate-700">${esc(row.date || '—')}</span>
+          ${row.failCount ? `<span class="chip border border-rose-300 bg-rose-50 text-rose-800">${row.failCount} lỗi</span>` : ''}
+          <span class="chip border border-emerald-300 bg-emerald-50 text-emerald-900">${orders.length} phiếu SC</span>
+        </div>
+        <div class="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-slate-500">
+          <span>${esc(row.areaLabel || formatAreaLabel(v?.area) || '—')}</span>
+          <span>KTV: ${esc(row.inspector || '—')}</span>
+          <span>Kỳ: ${esc(row.periodText || '—')}</span>
+        </div>
+      </div>
+      <button type="button" id="btnCloseAssessFailPanel" class="btn btn-ghost btn-xs shrink-0" title="Đóng">✕</button>
+    </div>
+    <div class="plan-side-tabs">
+      <button type="button" class="plan-side-tab ${tab === 'fails' ? 'on' : ''}" data-assess-panel-tab="fails">Hạng mục lỗi (${fails.length})</button>
+      <button type="button" class="plan-side-tab ${tab === 'orders' ? 'on' : ''}" data-assess-panel-tab="orders">Phiếu SC (${orders.length})</button>
+      <button type="button" class="plan-side-tab ${tab === 'info' ? 'on' : ''}" data-assess-panel-tab="info">Thông tin</button>
+    </div>
+    <div class="plan-side-body" data-assess-group-key="${esc(groupKey)}">${body}</div>
+    <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-4 py-3">
+      <button type="button" id="btnCloseAssessFailPanel2" class="btn btn-outline btn-sm">Đóng</button>
+      ${ev?.status === 'DRAFT'
+        ? `<button type="button" data-eval="${row.vehicleId}" class="btn btn-primary btn-sm">Tiếp tục nháp</button>`
+        : `<button type="button" data-view-eval="${esc(row.evalId || '')}" class="btn btn-outline btn-sm">Xem phiếu ĐG</button>`}
+      ${canCreateSc ? `<button type="button" id="btnAssessPanelCreateSc" class="btn btn-primary btn-sm" ${nSel ? '' : 'disabled'} title="Tạo phiếu SC từ hạng mục đã chọn của xe này">Tạo phiếu SC${nSel ? ' (' + nSel + ')' : ''}</button>` : ''}
+    </div>`;
+}
+function bindAssessFailPanel() {
+  const panel = document.getElementById('assessSidePanel');
+  if (!panel) return;
+  const body = panel.querySelector('.plan-side-body');
+  const groupKey = (body && body.getAttribute('data-assess-group-key')) || '';
+  panel.setAttribute('data-assess-group-key', groupKey);
+  const close = () => closeAssessFailPanel();
+  const refreshPanel = () => {
+    const row = findAssessFailRowById(view.selectedAssessFailId);
+    if (!row) return;
+    panel.innerHTML = assessFailSidePanelHtml(row);
+    bindAssessFailPanel();
+  };
+  const createFromSelection = () => {
+    /* Chỉ tạo từ hạng mục đã chọn của xe đang xem */
+    const keep = new Set(assessFailPanelSelectableRows(groupKey).map(r => String(r.id)));
+    const onlyThis = assessCheckedFailIds().filter(id => keep.has(String(id)));
+    if (!onlyThis.length) { toast('Tick hạng mục lỗi cần tạo phiếu SC'); return; }
+    view.checkedAssessFailIds = onlyThis;
+    createRepairOrdersFromAssessFailSelection();
+  };
+  $('#btnCloseAssessFailPanel', panel)?.addEventListener('click', close);
+  $('#btnCloseAssessFailPanel2', panel)?.addEventListener('click', close);
+  $('#assessSideBackdrop')?.addEventListener('click', close);
+  $$('[data-assess-panel-tab]', panel).forEach(b => {
+    b.onclick = () => {
+      view.assessFailPanelTab = b.getAttribute('data-assess-panel-tab') || 'fails';
+      refreshPanel();
+    };
+  });
+  $('#assessPanelCheckAll', panel)?.addEventListener('change', (e) => {
+    setAssessFailGroupChecked(groupKey, !!e.target.checked);
+    syncAssessFailPanelSelectionUi();
+  });
+  $$('.assess-panel-fail-ck', panel).forEach(cb => {
+    cb.addEventListener('change', () => {
+      setAssessFailChecked(cb.getAttribute('data-assess-fail-id'), cb.checked);
+      syncAssessFailPanelSelectionUi();
+    });
+  });
+  $('#btnAssessPanelClearSel', panel)?.addEventListener('click', () => {
+    setAssessFailGroupChecked(groupKey, false);
+    syncAssessFailPanelSelectionUi();
+  });
+  $('#btnAssessPanelCreateSelected', panel)?.addEventListener('click', createFromSelection);
+  $('#btnAssessPanelCreateSc', panel)?.addEventListener('click', createFromSelection);
+  $$('[data-view-eval]', panel).forEach(b => {
+    b.onclick = () => { const id = b.getAttribute('data-view-eval'); if (id) openEvalResultModal(id); };
+  });
+  $$('[data-eval]', panel).forEach(b => {
+    b.onclick = () => openEvalModal(Number(b.getAttribute('data-eval')));
+  });
+  $$('[data-open-order]', panel).forEach(b => {
+    b.onclick = () => {
+      view = { ...view, name: 'order', orderId: b.getAttribute('data-open-order'), from: 'assessment' };
+      render();
+    };
+  });
+}
+function openAssessFailPanel(item) {
+  if (!item) return;
+  /* Luôn mở theo dòng xe / phiếu ĐG (group), không mở theo từng hạng mục */
+  const groupRow = item.__group ? item : findAssessFailRowById('g-' + item.groupKey);
+  if (!groupRow || !groupRow.__group) return;
+  item = groupRow;
+  view.assessFailPanelOpen = true;
+  view.selectedAssessFailId = item.id;
+  view._listSelKey = 'assessResults';
+  view._listSelId = item.id;
+  const ws = document.querySelector('[data-assess-fail-workspace]');
+  const panel = document.getElementById('assessSidePanel');
+  if (ws && panel) {
+    ws.classList.add('is-open');
+    panel.innerHTML = assessFailSidePanelHtml(item);
+    bindAssessFailPanel();
+    const grid = window._listGrids && window._listGrids.assessResults;
+    if (grid) {
+      try { grid.invalidate(); grid.render(); } catch (_) {}
+      /* Grid full width — panel đè lên (không bóp cột), giống openPlanPanel */
+      requestAnimationFrame(() => { try { grid.resizeCanvas(); } catch (_) {} });
+    }
+  } else {
+    render();
+  }
+}
+function closeAssessFailPanel() {
+  view.assessFailPanelOpen = false;
+  view.selectedAssessFailId = null;
+  view._listSelId = null;
+  const ws = document.querySelector('[data-assess-fail-workspace]');
+  const panel = document.getElementById('assessSidePanel');
+  if (ws) ws.classList.remove('is-open');
+  if (panel) panel.innerHTML = '';
+  const grid = window._listGrids && window._listGrids.assessResults;
+  if (grid) {
+    try { grid.invalidate(); grid.render(); } catch (_) {}
+    requestAnimationFrame(() => { try { grid.resizeCanvas(); } catch (_) {} });
+  }
+}
+function buildAssessResultsGridRows(evals) {
+  const rows = [];
+  (evals || []).forEach((ev) => {
+    const v = vehicleById(ev.vehicleId);
+    const plate = v?.plate || ev.identity?.vehicleNumber || '—';
+    const good = evalGoodCount(ev);
+    const fail = evalFailCount(ev);
+    const total = good + fail;
+    const fails = evalFailItemsBrief(ev, { asObjects: true, maxNote: 60 });
+    const periodText = formatAssessPeriodPlain(ev, v);
+    const areaLabel = formatAreaLabel(v?.area);
+    const orders = ev.status === 'SUBMITTED' ? ordersLinkedToEval(ev, ev.vehicleId) : [];
+    const canCreateSc = ev.status === 'SUBMITTED' && !ev.periodExempt && fail > 0;
+    const orderCount = orders.length;
+    const orderCodes = orders.map(o => o.code).filter(Boolean).join(', ');
+    const statusHtml = evalListStatusChip(ev);
+    const resultText = ev.periodExempt
+      ? 'Miễn kỳ'
+      : (ev.status === 'DRAFT' ? 'Nháp' : (fail ? (fail + ' lỗi · ' + good + '/' + total) : ('Đạt · ' + good + '/' + (total || '—'))));
+    const groupKey = String(ev.id || ('ev-' + ev.vehicleId + '-' + (ev.date || 'na')));
+    const groupTitle = [
+      plate,
+      fails.length ? (fails.length + ' hạng mục lỗi') : (ev.periodExempt ? 'Miễn kỳ' : (ev.status === 'DRAFT' ? 'Nháp' : 'Đạt')),
+    ].filter(Boolean).join(' · ');
+    const base = {
+      groupKey,
+      evalId: ev.id || groupKey,
+      vehicleId: ev.vehicleId,
+      date: ev.date || '—',
+      plate,
+      areaLabel: areaLabel || '—',
+      periodText,
+      inspector: ev.inspector || '—',
+      resultText,
+      statusHtml,
+      statusText: ev.periodExempt ? 'Miễn kỳ' : (ev.status === 'DRAFT' ? 'Nháp' : (orderCount ? 'Đã tạo phiếu SC' : 'Đã nộp')),
+      failCount: fail,
+      goodCount: good,
+      canCreateSc,
+      periodExempt: !!ev.periodExempt,
+      orderCount,
+      orderCodes: orderCodes || '',
+      evalNote: ev.note || '',
+      evalStatus: ev.status || '',
+    };
+    rows.push({
+      ...base,
+      id: 'g-' + groupKey,
+      __group: true,
+      groupTitle,
+      itemLabel: groupTitle,
+      itemNote: '',
+      assessKindLabel: '',
+      act: 'group',
+    });
+    if (!fails.length) {
+      const emptyLabel = ev.periodExempt
+        ? 'Miễn kỳ — không có hạng mục lỗi'
+        : (ev.status === 'DRAFT' ? 'Nháp — chưa ghi nhận hạng mục lỗi' : 'Đạt — không có hạng mục lỗi');
+      rows.push({
+        ...base,
+        id: groupKey + '-none',
+        isEmpty: true,
+        itemId: '',
+        itemBaseLabel: emptyLabel,
+        itemLabel: emptyLabel,
+        itemNote: ev.note || '',
+        itemRawNote: ev.note || '',
+        itemDetail: null,
+        assessKind: '',
+        assessKindLabel: '—',
+        act: 'empty',
+      });
+    } else {
+      fails.forEach((f) => {
+        rows.push({
+          ...base,
+          id: groupKey + '-' + f.itemId,
+          isEmpty: false,
+          itemId: f.itemId,
+          itemBaseLabel: f.baseLabel,
+          itemLabel: f.label,
+          itemNote: f.note || '',
+          itemRawNote: f.rawNote || '',
+          itemDetail: f.detail,
+          assessKind: f.kind,
+          assessKindLabel: f.kindLabel,
+          act: 'fail',
+        });
+      });
+    }
+  });
+  return rows;
+}
+function registerAssessResultsGrid(evals) {
+  const rows = buildAssessResultsGridRows(evals);
+  const leafCount = rows.filter(r => !r.__group).length;
+  const checkFmt = (r, c, v, col, item) => {
+    if (item.__group) {
+      const kids = assessSelectableFailRows(rows).filter(x => String(x.groupKey) === String(item.groupKey));
+      if (!kids.length) return '';
+      const n = kids.filter(x => isAssessFailChecked(x.id)).length;
+      const checked = n === kids.length ? 'checked' : '';
+      return `<div class="flex h-full items-center justify-center"><input type="checkbox" class="assess-fail-group-ck order-grid-row-checkbox" data-assess-group-key="${esc(item.groupKey)}" ${checked} aria-label="Chọn cả phiếu ĐG" /></div>`;
+    }
+    if (item.isEmpty || item.evalStatus !== 'SUBMITTED' || item.periodExempt || !item.itemId) {
+      return '<span class="text-slate-300">—</span>';
+    }
+    return `<div class="flex h-full items-center justify-center"><input type="checkbox" class="assess-fail-ck order-grid-row-checkbox" data-assess-fail-id="${esc(item.id)}" ${isAssessFailChecked(item.id) ? 'checked' : ''} aria-label="Chọn hạng mục" /></div>`;
+  };
+  const vehOnly = (item) => !!item.__group;
+  const leafDash = '<span class="text-slate-300">—</span>';
+  registerListGrid('assessResults', rows, [
+    { id: '_ck', field: 'checked', name: '', width: 36, minWidth: 36, maxWidth: 40, cssClass: 'c', sortable: false, filterable: false, resizable: false, formatter: checkFmt },
+    { id: 'itemLabel', field: 'itemLabel', name: 'Hạng mục lỗi', width: 220, minWidth: 160, sortable: true,
+      formatter: (r, c, v, col, item) => {
+        if (item.__group) {
+          return `<span title="${esc(item.groupTitle || '')}">▾ ${esc(item.groupTitle || item.plate || '')}</span>`;
+        }
+        if (item.isEmpty) return `<span class="text-slate-500">${esc(item.itemLabel || '—')}</span>`;
+        const cls = item.assessKind === 'replace' ? 'assess-fail-item-chip is-replace' : 'assess-fail-item-chip';
+        return `<span class="${cls}" title="${esc(item.itemLabel || '')}">${esc(item.itemBaseLabel || item.itemLabel || '—')} (${esc(item.assessKindLabel || '')})</span>`;
+      } },
+    { id: 'itemNote', field: 'itemNote', name: 'Ghi chú', width: 160, minWidth: 100, sortable: true,
+      formatter: (r, c, v, col, item) => item.__group ? '' : `<span class="text-xs text-slate-600" title="${esc(item.itemRawNote || item.itemNote || '')}">${esc(item.itemNote || '—')}</span>` },
+    { id: 'date', field: 'date', name: 'Ngày ĐG', width: 100, minWidth: 88, sortable: true, cssClass: 'r',
+      formatter: (r, c, v, col, item) => vehOnly(item)
+        ? `<span class="tabular-nums">${esc(item.date || '—')}</span>`
+        : leafDash },
+    { id: 'plate', field: 'plate', name: 'Biển số', width: 110, minWidth: 90, sortable: true,
+      formatter: (r, c, v, col, item) => vehOnly(item)
+        ? `<button type="button" class="slick-link" data-open-vehicle="${item.vehicleId}">${esc(item.plate)}</button>`
+        : leafDash },
+    { id: 'areaLabel', field: 'areaLabel', name: 'Khu vực', width: 110, minWidth: 90, sortable: true,
+      formatter: (r, c, v, col, item) => vehOnly(item) ? esc(item.areaLabel || '—') : leafDash },
+    { id: 'periodText', field: 'periodText', name: 'Kỳ', width: 140, minWidth: 110, sortable: true,
+      formatter: (r, c, v, col, item) => vehOnly(item)
+        ? `<span class="text-xs tabular-nums" title="${esc(item.periodText || '')}">${esc(item.periodText || '—')}</span>`
+        : leafDash },
+    { id: 'inspector', field: 'inspector', name: 'KTV', width: 120, minWidth: 90, sortable: true,
+      formatter: (r, c, v, col, item) => vehOnly(item)
+        ? `<span class="text-xs" title="${esc(item.inspector || '')}">${esc(item.inspector || '—')}</span>`
+        : leafDash },
+    { id: 'resultText', field: 'resultText', name: 'Kết quả', width: 110, minWidth: 90, sortable: true, cssClass: 'c',
+      formatter: (r, c, v, col, item) => vehOnly(item)
+        ? `<span class="text-xs font-semibold tabular-nums ${item.failCount ? 'text-rose-700' : 'text-emerald-700'}">${esc(item.resultText || '—')}</span>`
+        : leafDash },
+    { id: 'statusText', field: 'statusText', name: 'Trạng thái', width: 130, minWidth: 100, sortable: true, filterType: 'select',
+      formatter: (r, c, v, col, item) => vehOnly(item)
+        ? (item.statusHtml || esc(item.statusText || '—'))
+        : leafDash },
+    { id: 'orderCount', field: 'orderCount', name: 'Số phiếu SC', width: 100, minWidth: 80, sortable: true, cssClass: 'c',
+      formatter: (r, c, v, col, item) => {
+        if (!vehOnly(item)) return leafDash;
+        const n = Number(item.orderCount) || 0;
+        if (!n) return '<span class="text-slate-300 tabular-nums">0</span>';
+        return `<span class="inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-xs font-bold tabular-nums text-emerald-900" title="${esc(item.orderCodes || '')}">${n}</span>`;
+      } },
+    { id: 'orderCodes', field: 'orderCodes', name: 'Phiếu SC', width: 150, minWidth: 110, sortable: true,
+      formatter: (r, c, v, col, item) => {
+        /* Tạo / xem phiếu SC theo xe (lần ĐG), không theo từng tiêu chí */
+        if (!vehOnly(item)) return leafDash;
+        const orders = (item.evalId ? ordersLinkedToEval(evaluationById(item.evalId), item.vehicleId) : []) || [];
+        if (orders.length) {
+          return orders.map(o => `<button type="button" class="slick-link block truncate text-left" data-open-order="${esc(o.id)}">${esc(o.code)}</button>`).join('');
+        }
+        if (item.canCreateSc) {
+          return `<button type="button" data-create-order-from-eval="${item.vehicleId}" data-create-order-eval-id="${esc(item.evalId || '')}" class="text-xs font-bold text-rose-700 hover:underline">+ Tạo phiếu SC</button>`;
+        }
+        return leafDash;
+      } },
+    { id: '_act', field: 'act', name: 'Thao tác', width: 140, minWidth: 110, sortable: false, filterable: false,
+      formatter: (r, c, v, col, item) => {
+        if (item.__group) {
+          return `<div class="flex h-full items-center justify-end gap-1">
+            <button type="button" data-assess-fail-open="${esc(item.id)}" class="btn btn-primary btn-xs">Xem xe</button>
+            ${item.evalStatus === 'DRAFT'
+              ? `<button type="button" data-eval="${item.vehicleId}" class="btn btn-outline btn-xs">Tiếp tục nháp</button>`
+              : `<button type="button" data-view-eval="${esc(item.evalId || '')}" class="btn btn-outline btn-xs">Xem ĐG</button>`}
+          </div>`;
+        }
+        return leafDash;
+      } },
+  ], { forceFitColumns: true, fullWidthRows: true, colFilters: true, rowHeight: 34 });
+  return { rows, leafCount };
 }
 function renderAssessmentResultsPanel() {
   const f = F();
@@ -74140,108 +75159,72 @@ function renderAssessmentResultsPanel() {
     if (f.evalResult === 'EXEMPT' && !ev.periodExempt) return false;
     return true;
   });
-  const pg = paginate(list);
-  const nDraft = all.filter(e => e.status === 'DRAFT').length;
-  const nSub = all.filter(e => e.status === 'SUBMITTED').length;
-  const nFail = all.filter(e => e.status === 'SUBMITTED' && evalFailCount(e) > 0).length;
+  const { rows, leafCount } = registerAssessResultsGrid(list);
+  const nDraft = list.filter(e => e.status === 'DRAFT').length;
+  const nSub = list.filter(e => e.status === 'SUBMITTED').length;
+  const nFail = list.filter(e => e.status === 'SUBMITTED' && evalFailCount(e) > 0).length;
+  const nFailItems = rows.filter(r => !r.__group && !r.isEmpty).length;
+  const nLinkedOrders = list.reduce((sum, ev) => sum + (ev.status === 'SUBMITTED' ? ordersLinkedToEval(ev, ev.vehicleId).length : 0), 0);
+  const nSel = assessCheckedFailIds().length;
+  const selected = view.assessFailPanelOpen && view.selectedAssessFailId
+    ? (rows.find(r => String(r.id) === String(view.selectedAssessFailId)) || null)
+    : null;
+  if (view.assessFailPanelOpen && !selected) {
+    view.assessFailPanelOpen = false;
+    view.selectedAssessFailId = null;
+  }
+  const panelOpen = !!(view.assessFailPanelOpen && selected);
   return `
-    <div class="mb-4 grid gap-3 sm:grid-cols-3">
-      <div class="card p-4"><p class="text-xs text-slate-500 m-0">Tổng phiếu ĐG</p><p class="mt-1 text-2xl font-bold tabular-nums">${all.length}</p></div>
-      <div class="card p-4"><p class="text-xs text-slate-500 m-0">Đã nộp · có hạng mục lỗi</p><p class="mt-1 text-2xl font-bold tabular-nums text-rose-700">${nFail}<span class="text-sm font-medium text-slate-400"> / ${nSub}</span></p></div>
-      <div class="card p-4"><p class="text-xs text-slate-500 m-0">Nháp</p><p class="mt-1 text-2xl font-bold tabular-nums text-slate-700">${nDraft}</p></div>
-    </div>
-    <p class="mb-3 text-sm text-slate-600">Xem kết quả đánh giá định kỳ trên một danh sách — hạng mục lỗi hiện ngay trên dòng, không cần mở từng phiếu.</p>
     ${filterBarShell([
       filterSearch('flt-search', 'Biển số, KTV, ghi chú, hạng mục lỗi…', f.search),
       filterSelect('flt-area', 'Khu vực', f.area, [['ALL','Tất cả'], ...areas().map(a => [a, formatAreaLabel(a)])]),
       filterSelect('flt-kind', 'Loại phương tiện', f.kind, [['ALL','Tất cả'],['vehicle','Xe'],['trailer','Mooc']]),
       filterSelect('flt-assessStatus', 'Trạng thái phiếu', f.assessStatus, [['ALL','Tất cả'],['SUBMITTED','Đã nộp'],['DRAFT','Nháp'],['PENDING','Chưa nộp / khác']]),
       filterSelect('flt-evalResult', 'Kết quả', f.evalResult || 'ALL', [['ALL','Tất cả'],['PASS','Đạt (không lỗi)'],['FAIL','Có SC / Thay'],['EXEMPT','Miễn kỳ']]),
-    ].join(''), `${list.length} / ${all.length} phiếu`)}
-    <div class="card overflow-hidden">
-      <div class="border-b border-slate-200 px-5 py-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 class="text-base font-semibold m-0">Kết quả đánh giá định kỳ</h2>
-        <span class="text-xs text-slate-500">${pg.items.length} dòng trang này</span>
+    ].join(''), `${list.length} / ${all.length} phiếu · ${nFailItems} hạng mục lỗi`)}
+    <div class="plan-workspace list-slick-workspace assess-fail-workspace ${panelOpen ? 'is-open' : ''}" data-assess-fail-workspace data-list-workspace="assessResults">
+      <div class="plan-grid-pane">
+        <div class="plan-period-bar">
+          <div class="flex items-center gap-2 flex-wrap min-w-0">
+            <span class="plan-period-label">Kết quả đánh giá định kỳ</span>
+            <span class="text-xs text-slate-500">${list.length} phiếu · ${leafCount} dòng</span>
+          </div>
+          <div class="plan-kpi-strip" aria-label="Tóm tắt lưới">
+            <div class="plan-kpi-chip" title="Phiếu ĐG đang hiện"><span class="plan-kpi-ico">Σ</span><span class="plan-kpi-val">${list.length}</span></div>
+            <div class="plan-kpi-chip" title="Đã nộp · có lỗi"><span class="plan-kpi-ico">!</span><span class="plan-kpi-val text-rose-700">${nFail}<span class="text-[11px] font-medium text-slate-400">/${nSub}</span></span></div>
+            <div class="plan-kpi-chip" title="Hạng mục lỗi"><span class="plan-kpi-ico">HM</span><span class="plan-kpi-val">${nFailItems}</span></div>
+            <div class="plan-kpi-chip" title="Nháp"><span class="plan-kpi-ico">N</span><span class="plan-kpi-val">${nDraft}</span></div>
+            <div class="plan-kpi-chip" title="Phiếu SC liên kết"><span class="plan-kpi-ico">SC</span><span class="plan-kpi-val">${nLinkedOrders}</span></div>
+          </div>
+        </div>
+        <div class="plan-grid-toolbar ${nSel ? 'has-sel' : ''}">
+          <div class="plan-grid-toolbar-left">
+            <button type="button" class="plan-tb-btn is-success" id="btnAssessBulkCreateSc" ${nSel ? '' : 'disabled'} title="Tạo phiếu SC từ hạng mục đã chọn">
+              ${planTbIco('plus')} Tạo phiếu SC
+            </button>
+            <button type="button" class="plan-tb-btn" id="btnAssessSelectAllFail" title="Chọn tất cả hạng mục lỗi đang hiện">
+              ${planTbIco('checkOn')} Chọn tất cả lỗi
+            </button>
+            <button type="button" class="plan-tb-btn" id="btnAssessClearSel" ${nSel ? '' : 'disabled'}>
+              ${planTbIco('x')} Bỏ chọn
+            </button>
+            <span class="plan-tb-divider"></span>
+            <span class="text-xs text-slate-500 hidden md:inline">Tạo phiếu SC theo xe · bấm dòng xám xem chi tiết · tick hạng mục rồi «Tạo phiếu SC»</span>
+          </div>
+          <div class="plan-grid-toolbar-right">
+            <span data-assess-sel-count class="text-xs font-medium text-slate-600 tabular-nums">${nSel ? ('Đã chọn ' + nSel + ' hạng mục') : ''}</span>
+            <span class="text-xs text-slate-500 tabular-nums" data-list-vis-count="assessResults">${leafCount} dòng</span>
+            <button type="button" class="plan-tb-btn" data-clear-list-col-filters="assessResults" title="Xóa lọc theo cột">Xóa lọc cột</button>
+            <span class="plan-tb-divider"></span>
+            <button type="button" class="plan-tb-btn is-ghost" title="Tải lại" data-list-reload="assessResults" aria-label="Tải lại">${planTbIco('refresh')}</button>
+          </div>
+        </div>
+        <div class="list-grid-container">
+          <div id="listSlick-assessResults" data-list-slick="assessResults" class="list-slick-host slickgrid-container"></div>
+        </div>
       </div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full assess-results-table text-sm">
-          <colgroup>
-            <col style="width:7%" />
-            <col style="width:10%" />
-            <col style="width:8%" />
-            <col style="width:9%" />
-            <col style="width:9%" />
-            <col style="width:9%" />
-            <col style="width:22%" />
-            <col style="width:9%" />
-            <col style="width:8%" />
-            <col style="width:9%" />
-          </colgroup>
-          <thead class="bg-slate-50 text-slate-600"><tr>
-            <th class="th text-left">Ngày ĐG</th>
-            <th class="th text-left">Biển số</th>
-            <th class="th text-left assess-cell-wrap">Khu vực</th>
-            <th class="th text-left assess-cell-wrap">Kỳ</th>
-            <th class="th text-left assess-cell-wrap">KTV</th>
-            <th class="th text-center">Kết quả</th>
-            <th class="th text-left assess-cell-wrap">Hạng mục lỗi / ghi chú</th>
-            <th class="th text-left">Trạng thái</th>
-            <th class="th text-left assess-cell-wrap">Phiếu SC</th>
-            <th class="th text-right">Thao tác</th>
-          </tr></thead>
-          <tbody>
-            ${pg.items.map((ev) => {
-              const v = vehicleById(ev.vehicleId);
-              const plate = v?.plate || ev.identity?.vehicleNumber || '—';
-              const good = evalGoodCount(ev);
-              const fail = evalFailCount(ev);
-              const total = good + fail;
-              const fails = evalFailItemsBrief(ev, { asObjects: true, maxNote: 40 });
-              const periodHtml = formatAssessPeriodHtml(ev, v);
-              const orders = ev.status === 'SUBMITTED' ? ordersLinkedToEval(ev, ev.vehicleId) : [];
-              const resultCell = ev.periodExempt
-                ? '<span class="inline-flex items-center rounded-md border border-rose-400 bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-900">Miễn kỳ</span>'
-                : ev.status === 'DRAFT'
-                  ? '<span class="text-slate-400">—</span>'
-                  : (fail
-                    ? `<span class="inline-flex items-center rounded-md border border-rose-400 bg-rose-100 px-2 py-0.5 text-xs font-bold tabular-nums text-rose-900">${fail} lỗi</span><span class="text-slate-400"> · </span><span class="text-sm font-semibold tabular-nums text-emerald-800">${good}/${total}</span>`
-                    : `<span class="inline-flex items-center rounded-md border border-emerald-400 bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">Đạt</span><span class="text-slate-400"> · </span><span class="text-sm font-semibold tabular-nums text-slate-700">${good}/${total || '—'}</span>`);
-              const failCell = fails.length
-                ? `<ul class="m-0 w-full min-w-0 space-y-1 list-none p-0">${fails.slice(0, 4).map(t =>
-                    `<li class="min-w-0 rounded border border-rose-400 bg-rose-100 px-2 py-1 text-[11px] font-semibold leading-snug text-rose-950" title="${esc(t.full)}"><span class="block">${esc(t.label)}</span>${t.note ? `<span class="mt-0.5 block font-medium text-rose-800/90">${esc(t.note)}</span>` : ''}</li>`
-                  ).join('')}${fails.length > 4 ? `<li class="text-[11px] font-medium text-slate-500">+${fails.length - 4} hạng mục…</li>` : ''}</ul>${ev.note ? `<div class="mt-1 truncate text-[11px] text-slate-500" title="${esc(ev.note)}">${esc(ev.note)}</div>` : ''}`
-                : `<span class="block truncate text-xs text-slate-500" title="${esc(ev.note || '')}">${esc(ev.note || '—')}</span>`;
-              const canCreateSc = canCreateRepairFromEval(ev, ev.vehicleId);
-              let orderCell = '<span class="text-slate-300">—</span>';
-              if (orders.length) {
-                orderCell = orders.map(o =>
-                  `<button type="button" data-open-order="${esc(o.id)}" class="block w-full truncate text-left text-xs font-semibold text-blue-700 hover:underline" title="${esc(o.code)}">${esc(o.code)}</button>`
-                ).join('');
-              } else if (canCreateSc) {
-                orderCell = `<button type="button" data-create-order-from-eval="${ev.vehicleId}" data-create-order-eval-id="${esc(ev.id || '')}" class="text-xs font-bold text-rose-700 hover:underline">+ Tạo phiếu SC</button>`;
-              }
-              const action = ev.status === 'DRAFT'
-                ? `<button type="button" data-eval="${ev.vehicleId}" class="btn btn-primary btn-sm">Tiếp tục nháp</button>`
-                : `<button type="button" data-view-eval="${esc(ev.id)}" class="btn btn-outline btn-sm">Xem phiếu</button>
-                   <button type="button" data-open-vehicle="${ev.vehicleId}" class="btn btn-outline btn-sm ml-1">Xe</button>`;
-              return `<tr class="row-h align-top ${ev.status === 'DRAFT' ? 'bg-amber-50/40' : (fail ? 'bg-rose-50/45' : '')}">
-                <td class="td font-medium tabular-nums">${esc(ev.date || '—')}</td>
-                <td class="td assess-cell-wrap"><button type="button" data-open-vehicle="${ev.vehicleId}" class="font-medium text-blue-600 hover:underline">${esc(plate)}</button>
-                  ${v ? ` ${vehicleChip(v)}` : ''}</td>
-                <td class="td assess-cell-wrap text-xs" title="${esc(formatAreaLabel(v?.area))}">${esc(formatAreaLabel(v?.area))}</td>
-                <td class="td assess-cell-wrap text-xs">${periodHtml}</td>
-                <td class="td assess-cell-wrap text-xs" title="${esc(ev.inspector || '')}">${esc(ev.inspector || '—')}</td>
-                <td class="td text-center">${resultCell}</td>
-                <td class="td assess-cell-wrap">${failCell}</td>
-                <td class="td">${evalListStatusChip(ev)}</td>
-                <td class="td assess-cell-wrap">${orderCell}</td>
-                <td class="td text-right">${action}</td>
-              </tr>`;
-            }).join('') || `<tr><td colspan="10" class="px-5 py-12 text-center text-slate-500">Chưa có kết quả đánh giá khớp bộ lọc</td></tr>`}
-          </tbody>
-        </table>
-      </div>
-      ${paginationBar(pg)}
+      <button type="button" class="plan-side-backdrop" id="assessSideBackdrop" aria-label="Đóng chi tiết" tabindex="-1"></button>
+      <aside id="assessSidePanel" class="plan-side" role="dialog" aria-modal="true">${panelOpen ? assessFailSidePanelHtml(selected) : ''}</aside>
     </div>`;
 }
 
@@ -74261,7 +75244,7 @@ function pageAssessment() {
   if (assessTab === 'results') {
     return pageShell(
       'Đánh giá phương tiện định kỳ',
-      'Tab Kết quả — xem toàn bộ phiếu ĐG đã nộp / nháp · hạng mục lỗi ngay trên danh sách',
+      'Tab Kết quả — mỗi hạng mục lỗi một dòng · chọn hạng mục để tạo phiếu SC',
       `<button data-nav-settings-eval class="btn btn-outline">Cài đặt nhắc đánh giá</button>`,
       tabs + renderAssessmentResultsPanel()
     );
@@ -76622,9 +77605,11 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
   };
   if (fromPeriodicEval && locked) {
     const ev = window._evalOrderSeed || DB.evaluations[lockedId];
+    const seedIds = window._evalOrderSeedItemIds;
     const flat = typeof allEvalItemsFlat === 'function' ? allEvalItemsFlat() : [];
     Object.entries(ev?.items || {}).forEach(([id, a]) => {
       if (a !== 'repair' && a !== 'replace') return;
+      if (seedIds && !seedIds.has(String(id))) return;
       const it = flat.find(x => x.id === id);
       const note = (ev.itemNotes && ev.itemNotes[id]) ? String(ev.itemNotes[id]).trim() : '';
       addWorkItem({
@@ -76635,6 +77620,7 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
         source: 'eval',
       });
     });
+    window._evalOrderSeedItemIds = null;
   }
   const renderMatChips = () => {
     const pwms = $('#orderPwmsChips'), ktv = $('#orderKtvChips');
