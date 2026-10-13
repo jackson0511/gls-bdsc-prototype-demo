@@ -66841,17 +66841,47 @@ function openPlanCellAutocomplete(grid, row, cell) {
   handleCellPopClick(btn, null);
   return true;
 }
+function listStatusLabel(kind, code) {
+  if (kind === 'eval') {
+    return ({ due: 'Đến hạn', soon: 'Sắp đến hạn', ok: 'Đúng hạn', overdue: 'Quá hạn' }[code] || code || '');
+  }
+  if (kind === 'approval') {
+    return ({
+      DRAFT: 'Nháp',
+      PENDING: 'Chờ duyệt',
+      PENDING_APPROVAL: 'Chờ duyệt',
+      APPROVED: 'Đã duyệt',
+      REJECTED: 'Từ chối',
+    }[code] || code || '');
+  }
+  if (kind === 'exec') {
+    return ({
+      NOT_STARTED: 'Chưa bắt đầu',
+      IN_PROGRESS: 'Đang thực hiện',
+      COMPLETED: 'Hoàn thành',
+      CANCELLED: 'Đã hủy',
+    }[code] || code || '');
+  }
+  return code || '';
+}
 function listColFilterValue(item, col) {
   if (!item || !col) return '';
   const ff = col.filterField || col.field;
-  if (ff === 'evalSortKey' || ff === 'evalHtml') {
+  if (ff === 'evalSortKey' || ff === 'evalHtml' || ff === 'evalStatus') {
     const st = item.evalStatus || '';
-    const label = st === 'due' ? 'Đến hạn' : st === 'soon' ? 'Sắp đến hạn' : st === 'ok' ? 'Đúng hạn' : st === 'overdue' ? 'Quá hạn' : '';
-    return [label, st, item.nextEval, stripCellPlainText(item.evalHtml)].filter(Boolean).join(' ');
+    return [listStatusLabel('eval', st), st, item.nextEval, stripCellPlainText(item.evalHtml)].filter(Boolean).join(' ');
+  }
+  if (ff === 'approvalStatus' || ff === 'approvalHtml' || ff === 'approvalSortKey') {
+    const st = item.approvalStatus || '';
+    return [listStatusLabel('approval', st), st, stripCellPlainText(item.approvalHtml)].filter(Boolean).join(' ');
+  }
+  if (ff === 'execStatus' || ff === 'execHtml' || ff === 'execSortKey' || ff === 'status') {
+    const st = item.execStatus || item.status || '';
+    return [listStatusLabel('exec', st), st, stripCellPlainText(item.execHtml)].filter(Boolean).join(' ');
   }
   if (ff === 'lastMaintCostNum') return item.lastMaintCostText != null ? item.lastMaintCostText : item.lastMaintCostNum;
   if (ff === 'lastRepairCostNum') return item.lastRepairCostText != null ? item.lastRepairCostText : item.lastRepairCostNum;
-  if (ff === 'kindLabel') return item.kindLabel || '';
+  if (ff === 'kindLabel' || ff === 'kindHtml') return item.kindLabel || stripCellPlainText(item.kindHtml) || '';
   const raw = item[ff];
   if (raw == null) return '';
   if (typeof raw === 'string' && raw.indexOf('<') >= 0) return stripCellPlainText(raw);
@@ -66869,8 +66899,9 @@ function mountListSlickGrid(host, rows, cols, opts) {
     host.innerHTML = '<div class="p-6 text-sm text-slate-500">Không tải được lưới dữ liệu</div>';
     return null;
   }
-  const o = opts || {};
+  const o = Object.assign({}, opts || {});
   const enableColFilters = o.colFilters !== false;
+  delete o.colFilters;
   const allRows = (rows || []).map((r, i) => ({ id: r.id != null ? r.id : ('r' + i), ...r }));
   let visibleRows = allRows.slice();
   const dataView = {
@@ -66889,13 +66920,18 @@ function mountListSlickGrid(host, rows, cols, opts) {
     fullWidthRows: true,
     rowHeight: 32,
     headerRowHeight: enableColFilters ? 40 : 0,
-    showHeaderRow: enableColFilters,
-    explicitInitialization: false,
+    showHeaderRow: !!enableColFilters,
+    explicitInitialization: !!enableColFilters,
     enableTextSelectionOnCells: true,
     syncColumnCellResize: true,
     multiColumnSort: false,
     sanitizer: (dirty) => dirty,
-  }, o);
+  }, o, {
+    /* luôn giữ filter row khi bật — không để opts ghi đè tắt */
+    headerRowHeight: enableColFilters ? 40 : (o.headerRowHeight != null ? o.headerRowHeight : 0),
+    showHeaderRow: !!enableColFilters,
+    explicitInitialization: !!enableColFilters,
+  });
   const safeCols = (cols || []).map(c => Object.assign({}, c, {
     minWidth: c.minWidth != null ? c.minWidth : 64,
     rerenderOnResize: true,
@@ -66903,6 +66939,7 @@ function mountListSlickGrid(host, rows, cols, opts) {
   let grid;
   try {
     grid = new Slick.Grid(host, dataView, safeCols, options);
+    if (options.explicitInitialization && typeof grid.init === 'function') grid.init();
   } catch (err) {
     console.warn('list grid failed', key, err);
     host.innerHTML = '<div class="p-6 text-sm text-rose-600">Lỗi khởi tạo lưới</div>';
@@ -66932,10 +66969,15 @@ function mountListSlickGrid(host, rows, cols, opts) {
         const q = f[col.id];
         if (q == null || String(q).trim() === '') continue;
         const ff = col.filterField || col.field;
-        const isSelect = col.filterType === 'select' || ff === 'kindLabel' || ff === 'evalStatus'
-          || ff === 'evalSortKey' || ff === 'evalHtml';
+        const isSelect = col.filterType === 'select'
+          || ff === 'kindLabel' || ff === 'evalStatus' || ff === 'evalSortKey' || ff === 'evalHtml'
+          || ff === 'approvalStatus' || ff === 'approvalHtml' || ff === 'approvalSortKey'
+          || ff === 'execStatus' || ff === 'execHtml' || ff === 'execSortKey';
         if (isSelect) {
-          const cmpField = (ff === 'evalSortKey' || ff === 'evalHtml') ? 'evalStatus' : ff;
+          let cmpField = ff;
+          if (ff === 'evalSortKey' || ff === 'evalHtml') cmpField = 'evalStatus';
+          else if (ff === 'approvalHtml' || ff === 'approvalSortKey') cmpField = 'approvalStatus';
+          else if (ff === 'execHtml' || ff === 'execSortKey') cmpField = 'execStatus';
           if (String(r[cmpField] ?? '') !== String(q)) return false;
         } else if (!includes(listColFilterValue(r, col), q)) {
           return false;
@@ -66974,7 +67016,20 @@ function mountListSlickGrid(host, rows, cols, opts) {
   if (enableColFilters) {
     const uniq = (field) => [...new Set(allRows.map(r => r[field]).filter(v => v != null && String(v).trim() !== ''))]
       .sort((a, b) => String(a).localeCompare(String(b), 'vi'));
-    const evalStatusLabel = (st) => ({ due: 'Đến hạn', soon: 'Sắp đến hạn', ok: 'Đúng hạn', overdue: 'Quá hạn' }[st] || st);
+    const resolveSelectField = (ff) => {
+      if (ff === 'evalSortKey' || ff === 'evalHtml') return 'evalStatus';
+      if (ff === 'approvalHtml' || ff === 'approvalSortKey') return 'approvalStatus';
+      if (ff === 'execHtml' || ff === 'execSortKey') return 'execStatus';
+      if (ff === 'kindHtml') return 'kindLabel';
+      return ff;
+    };
+    const selectOptionLabel = (ff, code) => {
+      const f = resolveSelectField(ff);
+      if (f === 'evalStatus') return listStatusLabel('eval', code);
+      if (f === 'approvalStatus') return listStatusLabel('approval', code);
+      if (f === 'execStatus') return listStatusLabel('exec', code);
+      return code;
+    };
     const fillHeaderFilterNode = (node, col) => {
       if (!node || !col || col.id === '_act' || col.id === '_ck' || col.filterable === false) {
         if (node) node.innerHTML = '';
@@ -66987,22 +67042,19 @@ function mountListSlickGrid(host, rows, cols, opts) {
       wrap.className = 'slick-filter';
       const cur = (view.listGridColFilters[key] || {})[col.id] || '';
       const ff = col.filterField || col.field;
-      const useSelect = col.filterType === 'select' || ff === 'kindLabel' || ff === 'evalStatus';
+      const selectField = resolveSelectField(ff);
+      const useSelect = col.filterType === 'select'
+        || selectField === 'kindLabel' || selectField === 'evalStatus'
+        || selectField === 'approvalStatus' || selectField === 'execStatus'
+        || selectField === 'year' || selectField === 'sourceText';
       if (useSelect) {
         const sel = document.createElement('select');
         sel.className = 'search-filter';
         sel.setAttribute('aria-label', 'Lọc ' + (col.name || col.id));
-        let opts = uniq(ff === 'evalSortKey' || ff === 'evalHtml' ? 'evalStatus' : ff);
-        if (ff === 'evalStatus' || ff === 'evalSortKey' || ff === 'evalHtml') {
-          opts = uniq('evalStatus');
-          sel.innerHTML = `<option value="">Tất cả</option>` + opts.map(v =>
-            `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(evalStatusLabel(v))}</option>`
-          ).join('');
-        } else {
-          sel.innerHTML = `<option value="">Tất cả</option>` + opts.map(v =>
-            `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(v)}</option>`
-          ).join('');
-        }
+        const opts = uniq(selectField);
+        sel.innerHTML = `<option value="">Tất cả</option>` + opts.map(v =>
+          `<option value="${esc(v)}" ${String(v) === String(cur) ? 'selected' : ''}>${esc(selectOptionLabel(ff, v))}</option>`
+        ).join('');
         sel.addEventListener('change', () => {
           view.listGridColFilters[key][col.id] = sel.value;
           applyListColFilters();
@@ -67032,9 +67084,15 @@ function mountListSlickGrid(host, rows, cols, opts) {
     };
     const paintAllHeaderFilters = () => {
       try {
-        if (typeof grid.setHeaderRowVisibility === 'function') grid.setHeaderRowVisibility(true);
         if (typeof grid.setOptions === 'function') grid.setOptions({ showHeaderRow: true, headerRowHeight: 40 });
+        if (typeof grid.setHeaderRowVisibility === 'function') grid.setHeaderRowVisibility(true);
+        if (typeof grid.resizeCanvas === 'function') grid.resizeCanvas();
       } catch (_) {}
+      /* CDN theme đôi khi ẩn headerrow bằng CSS */
+      host.querySelectorAll('.slick-headerrow, .slick-headerrow-columns').forEach((el) => {
+        el.style.display = 'block';
+        el.style.height = '40px';
+      });
       safeCols.forEach((col, idx) => {
         let node = null;
         try {
@@ -67058,10 +67116,17 @@ function mountListSlickGrid(host, rows, cols, opts) {
         }
       });
     }
+    if (grid.onColumnsReordered) {
+      grid.onColumnsReordered.subscribe(() => { setTimeout(paintAllHeaderFilters, 0); });
+    }
+    if (grid.onColumnsResized) {
+      grid.onColumnsResized.subscribe(() => { setTimeout(paintAllHeaderFilters, 0); });
+    }
     paintAllHeaderFilters();
     requestAnimationFrame(paintAllHeaderFilters);
     setTimeout(paintAllHeaderFilters, 0);
     setTimeout(paintAllHeaderFilters, 80);
+    setTimeout(paintAllHeaderFilters, 200);
   }
 
   applyListColFilters();
@@ -70502,12 +70567,23 @@ function pageHistory() {
     const rows = ordersAll.map(o => {
       ensureOrderApproval(o);
       const v = vehicleById(o.vehicleId);
+      const appr = o.approvalStatus || 'DRAFT';
+      const exec = o.status || 'NOT_STARTED';
+      const apprRank = ({ REJECTED: 0, PENDING_APPROVAL: 1, PENDING: 1, DRAFT: 2, APPROVED: 3 }[appr] != null
+        ? { REJECTED: 0, PENDING_APPROVAL: 1, PENDING: 1, DRAFT: 2, APPROVED: 3 }[appr] : 9);
+      const execRank = ({ NOT_STARTED: 0, IN_PROGRESS: 1, COMPLETED: 2, CANCELLED: 3 }[exec] != null
+        ? { NOT_STARTED: 0, IN_PROGRESS: 1, COMPLETED: 2, CANCELLED: 3 }[exec] : 9);
+      const kindLabel = orderHasWorkKind(o, 'MAINT') && orderHasWorkKind(o, 'REPAIR') ? 'BD+SC'
+        : orderHasWorkKind(o, 'REPAIR') ? 'Sửa chữa'
+        : orderHasWorkKind(o, 'MAINT') ? 'Bảo dưỡng' : '—';
       return {
         id: o.id,
         orderId: o.id,
         vehicleId: o.vehicleId,
         code: o.code,
         plate: v ? v.plate : '—',
+        vehicleKind: v ? (v.isTrailer ? 'Mooc' : 'Xe') : '—',
+        kindLabel,
         kindHtml: orderWorkKindBadges(o),
         occurrence: 'Lần ' + (o.occurrence || '—'),
         date: o.date || '—',
@@ -70515,27 +70591,40 @@ function pageHistory() {
         garage: o.garage || '—',
         sourceText: sourceLabel(o.source),
         system: o.system || '—',
-        approvalHtml: approvalBadge(o.approvalStatus),
-        execHtml: execBadge(o.status),
+        approvalStatus: appr,
+        approvalSortKey: apprRank,
+        approvalHtml: approvalBadge(appr),
+        execStatus: exec,
+        execSortKey: execRank,
+        execHtml: execBadge(exec),
       };
     });
     registerListGrid('histOrders', rows, [
       { id: 'code', field: 'code', name: 'Mã phiếu', width: 140, minWidth: 110, sortable: true, formatter: (r, c, v, col, item) =>
         `<button type="button" class="slick-link" data-open-order="${item.orderId}">${esc(item.code)}</button>` },
-      { id: 'plate', field: 'plate', name: 'Phương tiện', width: 120, minWidth: 90, sortable: true, formatter: (r, c, v, col, item) =>
+      { id: 'plate', field: 'plate', name: 'Biển số', width: 110, minWidth: 90, sortable: true, formatter: (r, c, v, col, item) =>
         `<button type="button" class="slick-link" data-open-vehicle="${item.vehicleId}">${esc(item.plate)}</button>` },
-      { id: 'kindHtml', field: 'kindHtml', name: 'Hạng mục', width: 110, minWidth: 90, sortable: false, formatter: (r, c, v, col, item) => item.kindHtml || '—' },
+      { id: 'vehicleKind', field: 'vehicleKind', name: 'Loại xe', width: 80, minWidth: 64, sortable: true, cssClass: 'c', filterType: 'select',
+        formatter: (r, c, v, col, item) => item.vehicleKind === 'Mooc'
+          ? '<span class="chip bg-orange-100 text-orange-800">Mooc</span>'
+          : (item.vehicleKind === 'Xe' ? '<span class="chip bg-blue-100 text-blue-800">Xe</span>' : '—') },
+      { id: 'kindHtml', field: 'kindLabel', name: 'Hạng mục', width: 110, minWidth: 90, sortable: true, filterType: 'select', filterField: 'kindLabel',
+        formatter: (r, c, v, col, item) => item.kindHtml || '—' },
       { id: 'occurrence', field: 'occurrence', name: 'Số lần', width: 80, minWidth: 64, sortable: true },
       { id: 'date', field: 'date', name: 'Ngày', width: 110, minWidth: 90, cssClass: 'r', sortable: true },
       { id: 'kmText', field: 'kmText', name: 'Odo', width: 110, minWidth: 80, cssClass: 'r', sortable: true },
       { id: 'garage', field: 'garage', name: 'Nơi thực hiện', width: 160, minWidth: 120, sortable: true },
-      { id: 'sourceText', field: 'sourceText', name: 'Nguồn tạo', width: 150, minWidth: 110, sortable: true },
+      { id: 'sourceText', field: 'sourceText', name: 'Nguồn tạo', width: 150, minWidth: 110, sortable: true, filterType: 'select' },
       { id: 'system', field: 'system', name: 'Hệ thống', width: 160, minWidth: 120, sortable: true },
-      { id: 'approvalHtml', field: 'approvalHtml', name: 'Duyệt', width: 120, minWidth: 90, cssClass: 'c', sortable: false, formatter: (r, c, v, col, item) => item.approvalHtml || '—' },
-      { id: 'execHtml', field: 'execHtml', name: 'Thực thi', width: 130, minWidth: 100, cssClass: 'c', sortable: false, formatter: (r, c, v, col, item) => item.execHtml || '—' },
+      { id: 'approvalHtml', field: 'approvalSortKey', name: 'Duyệt', width: 120, minWidth: 90, cssClass: 'c', sortable: true,
+        filterType: 'select', filterField: 'approvalStatus',
+        formatter: (r, c, v, col, item) => item.approvalHtml || '—' },
+      { id: 'execHtml', field: 'execSortKey', name: 'Thực thi', width: 130, minWidth: 100, cssClass: 'c', sortable: true,
+        filterType: 'select', filterField: 'execStatus',
+        formatter: (r, c, v, col, item) => item.execHtml || '—' },
       { id: '_act', field: 'act', name: 'Thao tác', width: 100, minWidth: 80, sortable: false, filterable: false, formatter: (r, c, v, col, item) =>
         `<div class="flex h-full items-center justify-center"><button type="button" data-open-order="${item.orderId}" class="btn btn-primary btn-xs">Chi tiết</button></div>` },
-    ], { colFilters: true });
+    ], { forceFitColumns: false, colFilters: true });
     const title = byPlate
       ? ('Phiếu theo xe ' + byPlate)
       : (scope === 'REPAIR' ? 'Phiếu sửa chữa' : scope === 'MAINT' ? 'Phiếu bảo dưỡng' : 'Phiếu bảo dưỡng & sửa chữa');
