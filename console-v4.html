@@ -74003,11 +74003,11 @@ function evalEnforcementChip(status) {
 }
 
 function evalListStatusChip(ev) {
-  if (!ev) return '<span class="chip border border-amber-300 bg-amber-50/60 text-amber-700">Chưa kiểm tra</span>';
-  if (ev.periodExempt) return '<span class="chip border border-rose-300 bg-rose-50 text-rose-700">Miễn kỳ</span>';
-  if (ev.status === 'SUBMITTED') return '<span class="chip border border-emerald-300 bg-emerald-50 text-emerald-700">Đã tạo phiếu</span>';
-  if (ev.status === 'DRAFT') return '<span class="chip border border-slate-300 bg-slate-50 text-slate-600">Nháp</span>';
-  return '<span class="chip border border-amber-300 bg-amber-50/60 text-amber-700">Chưa kiểm tra</span>';
+  if (!ev) return '<span class="chip border border-amber-400 bg-amber-100 font-semibold text-amber-900">Chưa kiểm tra</span>';
+  if (ev.periodExempt) return '<span class="chip border border-rose-400 bg-rose-100 font-semibold text-rose-900">Miễn kỳ</span>';
+  if (ev.status === 'SUBMITTED') return '<span class="chip border border-emerald-400 bg-emerald-100 font-semibold text-emerald-900">Đã tạo phiếu</span>';
+  if (ev.status === 'DRAFT') return '<span class="chip border border-slate-400 bg-slate-100 font-semibold text-slate-800">Nháp</span>';
+  return '<span class="chip border border-amber-400 bg-amber-100 font-semibold text-amber-900">Chưa kiểm tra</span>';
 }
 
 function evalRowHighlightClass(enforcement) {
