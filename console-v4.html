@@ -63574,15 +63574,15 @@ const DEFAULT = {
       itemNotes: {},
       details: {},
     },
-    /* Case B · nộp + chọn tạo dòng kế hoạch */
+    /* Case B · nộp có SC · chưa tạo phiếu (nút tạo phiếu ở cột Phiếu SC) */
     102: {
-      date: '2026-09-22', status: 'SUBMITTED', note: 'Có SC phanh · đề xuất đưa kế hoạch tháng',
+      date: '2026-09-22', status: 'SUBMITTED', note: 'Có SC phanh · chỉ nộp, tạo phiếu SC sau',
       inspector: 'Trần KTV',
       dateStart: '2026-09-01', dateEnd: '2026-09-30',
       periodExempt: false, periodExemptReason: '',
-      postEvalAction: 'plan',
+      postEvalAction: 'later',
       goodCount: 14, failCount: 2,
-      linkedOrderIds: [], linkedPlanIds: ['p-eval-102a', 'p-eval-102b'],
+      linkedOrderIds: [], linkedPlanIds: [],
       identity: {
         inspectionDate: '2026-09-22', vehicleNumber: '50H-87033', chassisNumber: '—',
         engineNumber: '—', operatingKm: '1710613', trailerNumber: '',
@@ -63591,7 +63591,7 @@ const DEFAULT = {
       },
       conclusion: {
         replacementRequest: '',
-        mechanicManagerRemedies: 'Lên kế hoạch tán bố thắng',
+        mechanicManagerRemedies: 'Cần tạo phiếu SC tán bố thắng',
         driverRemedies: '',
         driverOpinion: 'Phanh hơi yếu',
       },
@@ -63708,17 +63708,17 @@ const DEFAULT = {
       itemNotes: {}, details: {},
     },
     {
-      id: 'ev-102-20260922', vehicleId: 102, date: '2026-09-22', status: 'SUBMITTED', note: 'Có SC phanh · đề xuất đưa kế hoạch tháng',
+      id: 'ev-102-20260922', vehicleId: 102, date: '2026-09-22', status: 'SUBMITTED', note: 'Có SC phanh · chỉ nộp, tạo phiếu SC sau',
       inspector: 'Trần KTV', dateStart: '2026-09-01', dateEnd: '2026-09-30',
-      periodExempt: false, periodExemptReason: '', postEvalAction: 'plan',
-      goodCount: 14, failCount: 2, linkedOrderIds: [], linkedPlanIds: ['p-eval-102a', 'p-eval-102b'],
+      periodExempt: false, periodExemptReason: '', postEvalAction: 'later',
+      goodCount: 14, failCount: 2, linkedOrderIds: [], linkedPlanIds: [],
       identity: {
         inspectionDate: '2026-09-22', vehicleNumber: '50H-87033', chassisNumber: '—',
         engineNumber: '—', operatingKm: '1710613', trailerNumber: '',
         driverName: 'Lê Tài', driverPhone: '0902 111 222', drivingLicense: 'B2',
         tractorDocuments: '—', trailerDocuments: '—', civilLiabilityInsurance: '—',
       },
-      conclusion: { replacementRequest: '', mechanicManagerRemedies: 'Lên kế hoạch tán bố thắng', driverRemedies: '', driverOpinion: 'Phanh hơi yếu' },
+      conclusion: { replacementRequest: '', mechanicManagerRemedies: 'Cần tạo phiếu SC tán bố thắng', driverRemedies: '', driverOpinion: 'Phanh hơi yếu' },
       items: { c1: 'ok', c8: 'ok', c9: 'repair', c11: 'ok', c14: 'ok', c16: 'repair' },
       itemNotes: { c9: 'Bố thắng mòn', c16: 'Cực ắc quy oxy hóa' },
       details: {
@@ -71083,8 +71083,7 @@ function renderVehicleAssessment(v) {
           <th class="th text-left">Kỳ</th>
           <th class="th text-left">KTV</th>
           <th class="th text-center">Kết quả hạng mục</th>
-          <th class="th text-left">Phiếu BD/SC liên kết</th>
-          <th class="th text-left">Kế hoạch</th>
+          <th class="th text-left">Phiếu SC liên kết</th>
           <th class="th text-right">Thao tác</th>
         </tr></thead>
         <tbody>
@@ -71093,7 +71092,6 @@ function renderVehicleAssessment(v) {
             const fail = evalFailCount(h);
             const isDraftRow = h.status === 'DRAFT';
             const orders = isDraftRow ? [] : ordersLinkedToEval(h, v.id);
-            const plans = isDraftRow ? [] : plansLinkedToEval(h, v.id);
             const ky = (h.dateStart && h.dateEnd) ? `${h.dateStart} → ${h.dateEnd}` : (h.date || '—');
             return `<tr class="row-h align-top ${isDraftRow ? 'bg-amber-50/40' : ''}">
               <td class="td whitespace-nowrap font-medium">${esc(h.date || '—')}</td>
@@ -71110,11 +71108,6 @@ function renderVehicleAssessment(v) {
                   `<button type="button" data-open-order="${o.id}" class="block text-left text-xs font-medium text-blue-600 hover:underline mb-0.5">${esc(o.code)} · ${orderWorkKindBadges(o)}</button>`
                 ).join('') : '<span class="text-xs text-slate-400">—</span>'}
               </td>
-              <td class="td">
-                ${plans.length ? plans.map(p =>
-                  `<div class="text-xs text-slate-700 mb-0.5"><span class="font-medium text-violet-700">${esc(p.code || 'KH')}</span> · ${esc(p.service || p.note || '')}</div>`
-                ).join('') : '<span class="text-xs text-slate-400">—</span>'}
-              </td>
               <td class="td text-right whitespace-nowrap">
                 ${isDraftRow
                   ? `<button type="button" data-eval="${v.id}" class="btn btn-primary btn-sm">Tiếp tục nháp</button>`
@@ -71122,7 +71115,7 @@ function renderVehicleAssessment(v) {
               </td>
             </tr>
             <tr class="border-b border-slate-100 ${isDraftRow ? 'bg-amber-50/20' : ''}">
-              <td colspan="8" class="px-4 pb-3 pt-0">
+              <td colspan="7" class="px-4 pb-3 pt-0">
                 <div class="rounded-md border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
                   <span class="font-medium text-slate-700">Ghi chú:</span> ${esc(h.note || '—')}
                   ${fail ? ` · Hạng mục lỗi: ${Object.entries(h.items || {}).filter(([,a]) => a === 'repair' || a === 'replace').map(([id,a]) => {
@@ -73732,13 +73725,6 @@ function canCreateRepairFromEval(ev, vehicleId) {
   if (typeof evalFailCount === 'function' ? evalFailCount(ev) <= 0 : !(ev.failCount > 0)) return false;
   return ordersLinkedToEval(ev, vehicleId).length === 0;
 }
-function plansLinkedToEval(ev, vehicleId) {
-  const ids = new Set((ev?.linkedPlanIds || []).map(String));
-  return (DB.plans || []).filter(p =>
-    ids.has(String(p.id)) ||
-    (Number(p.vehicleId) === Number(vehicleId) && p.source === 'PERIODIC_ASSESSMENT' && ev?.date && p.fromEvalDate === ev.date)
-  );
-}
 function assessChip(a) {
   if (a === 'ok') return '<span class="chip border border-emerald-200 bg-emerald-50 text-emerald-800">Tốt</span>';
   if (a === 'repair') return '<span class="chip border border-amber-200 bg-amber-50 text-amber-900">SC</span>';
@@ -74049,7 +74035,6 @@ function evalListStatusChip(ev) {
   if (ev.periodExempt) return '<span class="chip border border-rose-400 bg-rose-100 font-semibold text-rose-900">Miễn kỳ</span>';
   if (ev.status === 'SUBMITTED') {
     if ((ev.linkedOrderIds || []).length) return '<span class="chip border border-emerald-400 bg-emerald-100 font-semibold text-emerald-900">Đã tạo phiếu SC</span>';
-    if ((ev.linkedPlanIds || []).length) return '<span class="chip border border-violet-400 bg-violet-100 font-semibold text-violet-900">Đã tạo kế hoạch</span>';
     return '<span class="chip border border-sky-400 bg-sky-100 font-semibold text-sky-900">Đã nộp</span>';
   }
   if (ev.status === 'DRAFT') return '<span class="chip border border-slate-400 bg-slate-100 font-semibold text-slate-800">Nháp</span>';
@@ -74214,7 +74199,6 @@ function renderAssessmentResultsPanel() {
               const fails = evalFailItemsBrief(ev, { asObjects: true, maxNote: 40 });
               const periodHtml = formatAssessPeriodHtml(ev, v);
               const orders = ev.status === 'SUBMITTED' ? ordersLinkedToEval(ev, ev.vehicleId) : [];
-              const plans = ev.status === 'SUBMITTED' ? plansLinkedToEval(ev, ev.vehicleId) : [];
               const resultCell = ev.periodExempt
                 ? '<span class="inline-flex items-center rounded-md border border-rose-400 bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-900">Miễn kỳ</span>'
                 : ev.status === 'DRAFT'
@@ -74235,15 +74219,10 @@ function renderAssessmentResultsPanel() {
                 ).join('');
               } else if (canCreateSc) {
                 orderCell = `<button type="button" data-create-order-from-eval="${ev.vehicleId}" data-create-order-eval-id="${esc(ev.id || '')}" class="text-xs font-bold text-rose-700 hover:underline">+ Tạo phiếu SC</button>`;
-              } else if (plans.length) {
-                orderCell = plans.map(p =>
-                  `<button type="button" data-goto-plan-vehicle="${ev.vehicleId}" class="block w-full truncate text-left text-xs font-semibold text-violet-800 hover:underline" title="${esc(p.code || 'KH')}">${esc(p.code || 'KH')}</button>`
-                ).join('') + '<div class="text-[10px] text-slate-400">Kế hoạch từ ĐG</div>';
               }
               const action = ev.status === 'DRAFT'
                 ? `<button type="button" data-eval="${ev.vehicleId}" class="btn btn-primary btn-sm">Tiếp tục nháp</button>`
                 : `<button type="button" data-view-eval="${esc(ev.id)}" class="btn btn-outline btn-sm">Xem phiếu</button>
-                   ${canCreateSc ? `<button type="button" data-create-order-from-eval="${ev.vehicleId}" data-create-order-eval-id="${esc(ev.id || '')}" class="btn btn-primary btn-sm ml-1">Tạo phiếu SC</button>` : ''}
                    <button type="button" data-open-vehicle="${ev.vehicleId}" class="btn btn-outline btn-sm ml-1">Xe</button>`;
               return `<tr class="row-h align-top ${ev.status === 'DRAFT' ? 'bg-amber-50/40' : (fail ? 'bg-rose-50/45' : '')}">
                 <td class="td font-medium tabular-nums">${esc(ev.date || '—')}</td>
@@ -74315,7 +74294,7 @@ function pageAssessment() {
   const pgAsm = paginate(list);
   return pageShell(
     'Đánh giá phương tiện định kỳ',
-    'Cảnh báo ĐG sắp hạn / quá hạn / khóa · cảnh báo vỏ lốp / ắc quy · từ ĐG chỉ tạo phiếu sửa chữa / kế hoạch SC',
+    'Cảnh báo ĐG sắp hạn / quá hạn / khóa · cảnh báo vỏ lốp / ắc quy · từ ĐG chỉ tạo phiếu sửa chữa',
     `<button data-nav-settings-eval class="btn btn-outline">Cài đặt nhắc đánh giá</button>`,
     tabs + `
     <div class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -74347,7 +74326,7 @@ function pageAssessment() {
       <span class="text-amber-700 font-medium">vàng</span> = Quá hạn ·
       <span class="text-orange-700 font-medium">cam</span> = Sắp đến hạn ·
       trắng = đã nộp / không cảnh báo.
-      Xe mẫu: <code>51C-29273</code> đã nộp · <code>50H-87033</code> KH từ ĐG · <code>50H-69138</code> phiếu SC ·
+      Xe mẫu: <code>51C-29273</code> đã nộp · <code>50H-87033</code> chờ tạo phiếu SC · <code>50H-69138</code> phiếu SC ·
       <code>51C-41767</code> đã khóa · <code>50E-21624</code> quá hạn · <code>50E-36177</code> sắp đến hạn.
     </div>
     ${filterBarShell([
@@ -74380,7 +74359,6 @@ function pageAssessment() {
             const good = evalGoodCount(ev);
             const totalItems = good + fail;
             const orders = submitted ? ordersLinkedToEval(ev, v.id) : [];
-            const plans = submitted ? plansLinkedToEval(ev, v.id) : [];
             const canCreateSc = canCreateRepairFromEval(ev, v.id);
             const enf = resolveEvalEnforcement(v, ev);
             const rowCls = evalRowHighlightClass(enf);
@@ -74393,17 +74371,10 @@ function pageAssessment() {
               ).join('');
             } else if (canCreateSc) {
               orderCell = `<button type="button" data-create-order-from-eval="${v.id}" class="text-xs font-bold text-rose-700 hover:underline">+ Tạo phiếu SC</button>`;
-            } else if (plans.length) {
-              orderCell = plans.map(p =>
-                `<button type="button" data-goto-plan-vehicle="${v.id}" class="block text-left text-xs font-medium text-violet-700 hover:underline">${esc(p.code)}</button>`
-              ).join('') + '<div class="text-[10px] text-slate-400">Kế hoạch từ ĐG</div>';
             }
-            const actionBtn = canCreateSc
-              ? `<button type="button" data-create-order-from-eval="${v.id}" class="btn btn-primary btn-sm">Tạo phiếu SC</button>
-                 <button data-eval="${v.id}" class="btn btn-outline btn-sm ml-1">Chi tiết</button>`
-              : (submitted || ev?.status === 'DRAFT'
-                ? `<button data-eval="${v.id}" class="btn btn-outline btn-sm inline-flex items-center gap-1">Chi tiết</button>`
-                : `<button data-eval="${v.id}" class="btn btn-outline btn-sm inline-flex items-center gap-1 text-blue-600 !border-blue-300">+ Đánh giá</button>`);
+            const actionBtn = submitted || ev?.status === 'DRAFT'
+              ? `<button data-eval="${v.id}" class="btn btn-outline btn-sm inline-flex items-center gap-1">Chi tiết</button>`
+              : `<button data-eval="${v.id}" class="btn btn-outline btn-sm inline-flex items-center gap-1 text-blue-600 !border-blue-300">+ Đánh giá</button>`;
             return `<tr class="row-h ${rowCls}">
               <td class="td">${esc(formatAreaLabel(v.area))}</td>
               <td class="td font-medium">${esc(v.plate)}</td>
@@ -75666,7 +75637,6 @@ function openEvalResultModal(evalId) {
   const notes = ev.itemNotes || {};
   const details = ev.details || {};
   const orders = ordersLinkedToEval(ev, ev.vehicleId);
-  const plans = plansLinkedToEval(ev, ev.vehicleId);
   const good = evalGoodCount(ev);
   const fail = evalFailCount(ev);
   const weekLabel = (() => {
@@ -75752,7 +75722,7 @@ function openEvalResultModal(evalId) {
       </section>
       `}
 
-      <section class="mb-2 grid gap-3 lg:grid-cols-2">
+      <section class="mb-2">
         <div class="rounded-md border border-slate-200">
           <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">Phiếu sửa chữa của lần ĐG này · ${orders.length}</div>
           <div class="divide-y divide-slate-100">
@@ -75761,16 +75731,7 @@ function openEvalResultModal(evalId) {
               ${orderWorkKindBadges(o)}
               <span class="text-xs text-slate-500 ml-auto">${esc(o.status || '')}</span>
               <div class="w-full text-slate-700 text-xs">${esc(o.content || '')}</div>
-            </div>`).join('') : '<div class="px-3 py-6 text-center text-xs text-slate-400">Chưa có phiếu SC · ĐG chỉ tạo sửa chữa, không tạo bảo dưỡng</div>'}
-          </div>
-        </div>
-        <div class="rounded-md border border-slate-200">
-          <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">Kế hoạch từ lần ĐG · ${plans.length}</div>
-          <div class="divide-y divide-slate-100">
-            ${plans.length ? plans.map(p => `<div class="px-3 py-2.5 text-sm">
-              <div class="font-medium text-violet-700">${esc(p.code || 'KH')}</div>
-              <div class="text-slate-800 text-xs mt-0.5">${esc(p.service || p.note || '—')}</div>
-            </div>`).join('') : '<div class="px-3 py-6 text-center text-xs text-slate-400">Không có kế hoạch liên kết</div>'}
+            </div>`).join('') : '<div class="px-3 py-6 text-center text-xs text-slate-400">Chưa có phiếu SC · ĐG chỉ tạo sửa chữa, không tạo bảo dưỡng / kế hoạch</div>'}
           </div>
         </div>
       </section>
@@ -76006,16 +75967,14 @@ function openEvalModal(vid) {
 
       <div id="evalPostActionsWrap" class="mb-4 space-y-2">
         <p class="text-sm font-semibold text-slate-900">Nộp đánh giá</p>
-        <div class="grid gap-2 sm:grid-cols-3">
-          <button type="button" id="btnEvalOpenPlanConfirm" class="btn btn-outline !h-auto !whitespace-normal px-3 py-3 text-center text-sm">
-            <span class="block font-semibold text-slate-900">Tạo kế hoạch</span>
-          </button>
+        <div class="grid gap-2 sm:grid-cols-2">
           <button type="button" data-eval-submit="sc" class="btn btn-outline !h-auto !whitespace-normal px-3 py-3 text-center text-sm !border-rose-300 !bg-rose-50">
             <span class="block font-semibold text-rose-950">Tạo phiếu sửa chữa</span>
-            <span class="mt-0.5 block text-[11px] font-normal text-rose-800/80">Chỉ SC · không tạo bảo dưỡng</span>
+            <span class="mt-0.5 block text-[11px] font-normal text-rose-800/80">Chỉ SC · không tạo bảo dưỡng / kế hoạch</span>
           </button>
           <button type="button" data-eval-submit="later" class="btn btn-primary !h-auto !whitespace-normal px-3 py-3 text-center text-sm">
             <span class="block font-semibold">Chỉ nộp đánh giá</span>
+            <span class="mt-0.5 block text-[11px] font-normal text-slate-500">Tạo phiếu SC sau từ danh sách</span>
           </button>
         </div>
       </div>
@@ -76024,29 +75983,7 @@ function openEvalModal(vid) {
         <button type="button" id="btnEvalSaveDraft" class="btn btn-outline">Lưu nháp</button>
         <button type="button" id="btnEvalSubmitSimple" class="btn btn-primary hidden">Lưu &amp; nộp phiếu</button>
       </div>
-    </form>
-    <div id="evalPlanConfirm" class="fixed inset-0 z-[70] hidden items-center justify-center bg-slate-900/50 p-4">
-      <div class="w-full max-w-sm rounded-lg bg-white shadow-xl">
-        <div class="border-b border-slate-200 px-4 py-3">
-          <h3 class="text-base font-bold text-slate-900">Tạo kế hoạch?</h3>
-          <p class="mt-0.5 text-xs text-slate-500">Chọn tháng đưa hạng mục SC / Thay vào kế hoạch, rồi xác nhận.</p>
-        </div>
-        <div class="space-y-3 px-4 py-4">
-          <label class="block text-sm font-medium text-slate-700">Tháng kế hoạch
-            <input type="month" id="evalPlanPeriod" class="mt-1 block w-full rounded border border-slate-300 px-2 py-2 text-sm" value="${esc(String(dateStart || today).slice(0, 7))}" />
-          </label>
-          <button type="button" id="evalPlanSetNext" class="btn btn-outline btn-sm w-full">Đưa sang tháng sau</button>
-        </div>
-        <div class="flex justify-end gap-2 border-t border-slate-100 px-4 py-3">
-          <button type="button" id="evalPlanConfirmCancel" class="btn btn-outline">Hủy</button>
-          <button type="button" id="evalPlanConfirmOk" class="btn btn-primary">Xác nhận tạo kế hoạch</button>
-        </div>
-      </div>
-    </div>`, 'max-w-4xl');
-
-  // Popup chọn tháng nằm ngoài khung scroll của modal để không bị cắt
-  const planConfirmEl = $('#evalPlanConfirm');
-  if (planConfirmEl && $('#modalRoot')) $('#modalRoot').appendChild(planConfirmEl);
+    </form>`, 'max-w-4xl');
 
   $$('#modalRoot [data-copy-seri]').forEach(btn => {
     btn.addEventListener('click', async (e) => {
@@ -76362,19 +76299,6 @@ function openEvalModal(vid) {
   };
   $('[data-close]').onclick = closeModal;
 
-  const nextMonthKey = (ym) => {
-    const [yy, mm] = String(ym || '').split('-').map(Number);
-    if (!yy || !mm) return '';
-    const nd = new Date(yy, mm - 1 + 1, 1);
-    return `${nd.getFullYear()}-${String(nd.getMonth() + 1).padStart(2, '0')}`;
-  };
-  const showPlanConfirm = (show) => {
-    const el = $('#evalPlanConfirm');
-    if (!el) return;
-    el.classList.toggle('hidden', !show);
-    el.classList.toggle('flex', !!show);
-  };
-
   const saveEval = (formStatus, postActionOverride) => {
     const fd = new FormData($('#evalForm'));
     const periodExempt = !!fd.get('periodExempt');
@@ -76440,18 +76364,10 @@ function openEvalModal(vid) {
       if (invalidMsg) { toast(invalidMsg); return; }
     }
 
-    const postActionEarly = String(postActionOverride || 'later');
-    if (formStatus === 'SUBMITTED' && !periodExempt && fail > 0 && postActionEarly === 'plan') {
-      const basePeriodEarly = String($('#evalPlanPeriod')?.value || '').slice(0, 7);
-      if (!/^\d{4}-\d{2}$/.test(basePeriodEarly)) {
-        toast('Chọn tháng kế hoạch');
-        showPlanConfirm(true);
-        $('#evalPlanPeriod')?.focus();
-        return;
-      }
-    }
-
     const date = fd.get('inspectionDate') || fd.get('dateStart') || today;
+    const postAction = formStatus === 'SUBMITTED' && fail > 0 && !periodExempt
+      ? String(postActionOverride || 'later')
+      : 'later';
     DB.evaluations[vid] = {
       date,
       dateStart: fd.get('dateStart'),
@@ -76461,9 +76377,7 @@ function openEvalModal(vid) {
       inspector: fd.get('inspector'),
       periodExempt,
       periodExemptReason: fd.get('periodExemptReason') || '',
-      postEvalAction: formStatus === 'SUBMITTED' && fail > 0 && !periodExempt
-        ? String(postActionOverride || 'later')
-        : 'later',
+      postEvalAction: postAction === 'sc' ? 'sc' : 'later',
       goodCount: Object.values(items).filter(a => a === 'ok').length,
       failCount: fail,
       linkedOrderIds: [],
@@ -76494,98 +76408,27 @@ function openEvalModal(vid) {
       veh.evalStatus = (periodExempt || fail === 0) ? 'ok' : 'due';
     }
 
-    let createdPlans = [];
     let createdOrder = null;
-    if (formStatus === 'SUBMITTED' && fail > 0 && !periodExempt) {
-      const postAction = String(postActionOverride || 'later');
-      const wantPlan = postAction === 'plan';
-      const wantSc = postAction === 'sc';
-      const period = String($('#evalPlanPeriod')?.value || date || today).slice(0, 7);
+    if (formStatus === 'SUBMITTED' && fail > 0 && !periodExempt && postAction === 'sc') {
       const inspector = fd.get('inspector') || 'KTV';
-
-      if (wantPlan) {
-        const pushPlan = (row) => {
-          const sys = (row.system || '').toLowerCase();
-          const cat = (DB.catalog || []).find(c => {
-            const cs = (c.system || '').toLowerCase();
-            return cs && sys && (cs.includes(sys.split(' ')[0]) || sys.includes(cs));
-          }) || null;
-          const p = {
-            id: uid('p'),
-            period,
-            code: 'MP-2026-' + (2000 + Math.floor(Math.random() * 700)),
-            vehicleId: Number(vid),
-            driver: '',
-            branch: veh.area,
-            catalogId: cat ? cat.id : null,
-            system: row.system || (cat ? cat.system : 'Từ đánh giá'),
-            service: row.service,
-            qty: row.qty || 1,
-            uom: row.uom || 'Lần',
-            unitPrice: row.unitPrice != null ? row.unitPrice : 0,
-            vat: 8,
-            status: 'NEW',
-            note: row.note || '',
-            nextKm: null,
-            nextDate: null,
-            vendor: '—',
-            source: 'PERIODIC_ASSESSMENT',
-            fromEvalDate: date,
-          };
-          DB.plans.unshift(p);
-          createdPlans.push(p);
-        };
-        workItems.filter(w => w.service === 'Sửa chữa').forEach(w => {
-          pushPlan({
-            system: w.system,
-            service: w.content,
-            qty: 1,
-            uom: 'Lần',
-            note: 'Từ ĐG · checklist: ' + (w.fromCheck || '') + ' · SC',
-          });
-        });
-        materialsOut.forEach(m => {
-          pushPlan({
-            system: 'Vật tư thay thế',
-            service: (m.code ? m.code + ' · ' : '') + m.name,
-            qty: m.qty || 1,
-            uom: m.uom || 'Cái',
-            note: 'Từ ĐG · Thay vật tư',
-            unitPrice: m.price || 0,
-          });
-        });
-        if (!createdPlans.length && workItems.length) {
-          workItems.forEach(w => pushPlan({
-            system: w.system,
-            service: w.content,
-            qty: 1,
-            uom: 'Lần',
-            note: 'Từ ĐG · ' + (w.service || ''),
-          }));
-        }
-      }
-
-      if (wantSc) {
-        createdOrder = {
-          id: uid('o'), code: 'RO-2026-' + (1100 + Math.floor(Math.random() * 800)),
-          vehicleId: Number(vid), type: 'WORK',
-          occurrence: ordersOf(vid).length + 1,
-          date, km: veh.km, garage: veh.garage, source: 'PERIODIC_ASSESSMENT',
-          system: 'Từ đánh giá', status: 'NOT_STARTED', approvalStatus: 'DRAFT', revision: 0, cost: 0, catalogId: null,
-          content: 'SC từ đánh giá định kỳ (' + fail + ' hạng mục)',
-          createdAt: date,
-          primaryKind: 'REPAIR',
-          materials: materialsOut,
-          workItems: (workItems.length ? workItems : [{ system: 'Từ đánh giá', content: fd.get('note') || 'Hạng mục không đạt', service: 'Sửa chữa', kind: 'REPAIR', performer: inspector, hours: null }])
-            .map(w => ({ ...w, kind: 'REPAIR', service: w.service === 'Thay thế' ? 'Thay thế' : 'Sửa chữa' })),
-          planIds: [],
-          approvalLog: [{ at: nowStamp(), action: 'CREATE', by: inspector, note: 'Tạo phiếu sửa chữa từ đánh giá định kỳ · nháp (không qua kế hoạch)' }],
-        };
-        DB.orders.unshift(createdOrder);
-      }
-      DB.evaluations[vid].linkedPlanIds = createdPlans.map(p => p.id);
-      DB.evaluations[vid].linkedOrderIds = createdOrder ? [createdOrder.id] : [];
-      DB.evaluations[vid].postEvalAction = postAction;
+      createdOrder = {
+        id: uid('o'), code: 'RO-2026-' + (1100 + Math.floor(Math.random() * 800)),
+        vehicleId: Number(vid), type: 'WORK',
+        occurrence: ordersOf(vid).length + 1,
+        date, km: veh.km, garage: veh.garage, source: 'PERIODIC_ASSESSMENT',
+        system: 'Từ đánh giá', status: 'NOT_STARTED', approvalStatus: 'DRAFT', revision: 0, cost: 0, catalogId: null,
+        content: 'SC từ đánh giá định kỳ (' + fail + ' hạng mục)',
+        createdAt: date,
+        primaryKind: 'REPAIR',
+        materials: materialsOut,
+        workItems: (workItems.length ? workItems : [{ system: 'Từ đánh giá', content: fd.get('note') || 'Hạng mục không đạt', service: 'Sửa chữa', kind: 'REPAIR', performer: inspector, hours: null }])
+          .map(w => ({ ...w, kind: 'REPAIR', service: w.service === 'Thay thế' ? 'Thay thế' : 'Sửa chữa' })),
+        planIds: [],
+        approvalLog: [{ at: nowStamp(), action: 'CREATE', by: inspector, note: 'Tạo phiếu sửa chữa từ đánh giá định kỳ · nháp (không qua kế hoạch)' }],
+      };
+      DB.orders.unshift(createdOrder);
+      DB.evaluations[vid].linkedOrderIds = [createdOrder.id];
+      DB.evaluations[vid].postEvalAction = 'sc';
     }
     if (formStatus === 'SUBMITTED' || formStatus === 'DRAFT') archiveEvaluation(vid, DB.evaluations[vid]);
 
@@ -76603,78 +76446,35 @@ function openEvalModal(vid) {
       return;
     }
     if (fail === 0) {
-      toast('Đã nộp phiếu đánh giá · tất cả hạng mục Tốt · không tạo kế hoạch');
+      toast('Đã nộp phiếu đánh giá · tất cả hạng mục Tốt');
       render();
       return;
     }
 
-    const planLines = createdPlans.map(p =>
-      '<li class="text-sm"><span class="font-medium text-blue-600">' + esc(p.code) + '</span> · ' + esc(p.service) + ' · SL ' + p.qty + ' ' + esc(p.uom) + ' <span class="chip bg-violet-100 text-violet-800">Từ đánh giá</span></li>'
-    ).join('');
     openModal(`
       <div class="border-b border-slate-200 px-5 py-4">
         <h2 class="text-lg font-bold text-slate-900">Đã nộp đánh giá</h2>
         <p class="text-sm text-slate-600">${esc(veh.plate)} · ${fail} hạng mục SC / Thay</p>
       </div>
       <div class="px-5 py-4 space-y-3">
-        ${createdPlans.length ? `
-          <div class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
-            <strong>Đã tạo kế hoạch</strong> · ${createdPlans.length} hạng mục · kỳ <strong>${esc(createdPlans[0].period)}</strong> — trạng thái <em>Mới</em>.
-          </div>
-          <ul class="space-y-1.5 list-disc pl-5">${planLines}</ul>
-        ` : createdOrder ? `<div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">Không tạo kế hoạch — đã tạo phiếu sửa chữa nháp ngay.</div>`
-          : `<div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">Chỉ nộp đánh giá — tạo phiếu sửa chữa sau từ danh sách «Đánh giá phương tiện định kỳ».</div>`}
-        ${createdOrder ? `<div class="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">Đã tạo phiếu SC nháp <strong>${esc(createdOrder.code)}</strong> (chỉ sửa chữa, không bảo dưỡng).</div>` : (!createdPlans.length ? `<div class="text-xs text-slate-500">Chưa tạo phiếu — bấm «Tạo phiếu SC» trên danh sách đánh giá khi sẵn sàng.</div>` : `<div class="text-xs text-slate-500">Có thể tạo phiếu SC sau từ kế hoạch.</div>`)}
-        <p class="text-xs text-slate-500 leading-relaxed">${createdPlans.length
-          ? 'Tiếp theo: mở <strong>Kế hoạch</strong> → chỉnh số lượng / đơn giá → tạo phiếu sửa chữa.'
-          : createdOrder
-            ? 'Phiếu sửa chữa nháp đã sẵn — không tạo kế hoạch song song.'
-            : 'Danh sách đánh giá sẽ hiện nút «Tạo phiếu SC» khi phiếu ĐG đã nộp và còn hạng mục lỗi.'}</p>
+        ${createdOrder
+          ? `<div class="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">Đã tạo phiếu SC nháp <strong>${esc(createdOrder.code)}</strong> (chỉ sửa chữa, không bảo dưỡng / kế hoạch).</div>`
+          : `<div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">Chỉ nộp đánh giá — tạo phiếu sửa chữa sau từ cột «Phiếu SC» trên danh sách.</div>`}
+        <p class="text-xs text-slate-500 leading-relaxed">${createdOrder
+          ? 'Phiếu sửa chữa nháp đã sẵn sàng để mở và chỉnh.'
+          : 'Danh sách đánh giá sẽ hiện nút «+ Tạo phiếu SC» ở cột Phiếu SC khi phiếu ĐG đã nộp và còn hạng mục lỗi.'}</p>
       </div>
       <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-3">
         <button type="button" data-close class="btn btn-outline">Đóng</button>
-        ${createdOrder ? `<button type="button" id="btnGotoOrder" class="btn btn-outline">Mở phiếu SC</button>` : ''}
-        <button type="button" id="btnGotoPlans" class="btn btn-primary">Xem kế hoạch</button>
+        ${createdOrder ? `<button type="button" id="btnGotoOrder" class="btn btn-primary">Mở phiếu SC</button>` : ''}
       </div>`);
     $('[data-close]').onclick = () => { closeModal(); render(); };
-    $('#btnGotoPlans')?.addEventListener('click', () => {
-      closeModal();
-      view = { ...view, name: menuPlansNav(), vehicleId: Number(vid), plansTab: 'lines', filters: Object.assign(defaultFilters(), menuWorkScope() ? { orderType: menuWorkScope() } : {}), page: 1 };
-      render();
-      toast('Đã chuyển tới kế hoạch · ' + createdPlans.length + ' hạng mục từ đánh giá');
-    });
     $('#btnGotoOrder')?.addEventListener('click', () => {
       closeModal();
       view = { ...view, name: 'order', orderId: createdOrder.id, from: 'vehicle', vehicleId: Number(vid) };
       render();
     });
   };
-
-  $('#btnEvalOpenPlanConfirm')?.addEventListener('click', () => {
-    const cur = String(dateStart || today).slice(0, 7);
-    if ($('#evalPlanPeriod') && !$('#evalPlanPeriod').value) $('#evalPlanPeriod').value = cur;
-    showPlanConfirm(true);
-  });
-  $('#evalPlanConfirmCancel')?.addEventListener('click', () => showPlanConfirm(false));
-  $('#evalPlanConfirm')?.addEventListener('click', (e) => {
-    if (e.target === $('#evalPlanConfirm')) showPlanConfirm(false);
-  });
-  $('#evalPlanSetNext')?.addEventListener('click', () => {
-    const inp = $('#evalPlanPeriod');
-    if (!inp) return;
-    const base = inp.value || String(dateStart || today).slice(0, 7);
-    inp.value = nextMonthKey(base) || base;
-  });
-  $('#evalPlanConfirmOk')?.addEventListener('click', () => {
-    const ym = String($('#evalPlanPeriod')?.value || '').slice(0, 7);
-    if (!/^\d{4}-\d{2}$/.test(ym)) {
-      toast('Chọn tháng kế hoạch');
-      $('#evalPlanPeriod')?.focus();
-      return;
-    }
-    showPlanConfirm(false);
-    saveEval('SUBMITTED', 'plan');
-  });
 
   $('#btnEvalSaveDraft')?.addEventListener('click', () => saveEval('DRAFT'));
   $('#btnEvalSubmitSimple')?.addEventListener('click', () => saveEval('SUBMITTED', 'later'));
