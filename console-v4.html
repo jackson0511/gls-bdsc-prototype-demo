@@ -242,6 +242,29 @@
       box-sizing: border-box;
       border: 1px solid var(--heroui-default-200, #dedee0);
     }
+    /* Force canvas/header full container width (tránh khoảng trắng phải) */
+    .list-slick-workspace .list-slick-host.slickgrid-container,
+    .assess-fail-workspace .list-slick-host {
+      width: 100% !important;
+    }
+    .list-slick-workspace .slick-pane,
+    .list-slick-workspace .slick-viewport,
+    .list-slick-workspace .slick-header,
+    .list-slick-workspace .slick-headerrow {
+      width: 100% !important;
+    }
+    .list-slick-workspace .slick-header-columns,
+    .list-slick-workspace .slick-headerrow-columns {
+      width: 100% !important;
+      min-width: 100% !important;
+    }
+    .list-slick-workspace .slick-headerrow-column .slick-filter,
+    .list-slick-workspace .slick-headerrow-column input.search-filter,
+    .list-slick-workspace .slick-headerrow-column select.search-filter {
+      width: 100% !important;
+      max-width: none !important;
+      flex: 1 1 auto;
+    }
     .list-slick-workspace .slick-header-columns { border-bottom: 1px solid #cbd5e1; background: #f8fafc; }
     .list-slick-workspace .slick-header-column { font-size: 12px; font-weight: 600; color: #334155; }
     .list-slick-workspace .slick-header-column,
@@ -66741,10 +66764,27 @@ function showListCtx(ev, key, item) {
     el._listCtx = { key, item, vehicleId: item.vehicleId != null ? item.vehicleId : item.id, plate: item.plate };
   } else if (key === 'assessResults') {
     const groupId = item.__group ? item.id : ('g-' + item.groupKey);
+    const group = item.__group ? item : findAssessFailRowById(groupId);
     bits.push(slickMenuItem('assess-open', 'file', 'Xem chi tiết lần ĐG · ' + (item.plate || '')));
+    if (group && group.evalStatus === 'DRAFT' && group.vehicleId != null) {
+      bits.push(slickMenuItem('eval', 'file', 'Tiếp tục nháp'));
+    } else if (group && group.evalId) {
+      bits.push(slickMenuItem('view-eval', 'file', 'Xem phiếu ĐG'));
+    }
+    if (group && group.canCreateSc) {
+      bits.push(slickMenuItem('assess-create-sc', 'plus', 'Tạo phiếu SC (cả hạng mục lỗi)'));
+    }
     if (item.vehicleId != null) bits.push(slickMenuItem('open-vehicle', 'truck', 'Mở xe ' + (item.plate || '')));
     bits.push(slickMenuItem('copy-code', 'copy', 'Sao chép biển số'));
-    el._listCtx = { key, item, assessGroupId: groupId, vehicleId: item.vehicleId, plate: item.plate, code: item.plate || '' };
+    el._listCtx = {
+      key, item,
+      assessGroupId: groupId,
+      groupKey: group?.groupKey || item.groupKey,
+      evalId: group?.evalId || item.evalId,
+      vehicleId: item.vehicleId,
+      plate: item.plate,
+      code: item.plate || '',
+    };
   } else {
     bits.push(slickMenuItem('copy-code', 'copy', 'Sao chép'));
     el._listCtx = { key, item, code: item.code || item.plate || item.name || '' };
@@ -66774,6 +66814,17 @@ function showListCtx(ev, key, item) {
       if (act === 'assess-open' && ctx.assessGroupId) {
         const g = findAssessFailRowById(ctx.assessGroupId);
         if (g) openAssessFailPanel(g);
+        return;
+      }
+      if (act === 'view-eval' && ctx.evalId) {
+        openEvalResultModal(ctx.evalId);
+        return;
+      }
+      if (act === 'assess-create-sc' && ctx.groupKey) {
+        const kids = assessFailPanelSelectableRows(ctx.groupKey);
+        if (!kids.length) { toast('Không có hạng mục lỗi để tạo phiếu SC'); return; }
+        view.checkedAssessFailIds = kids.map(r => String(r.id));
+        createRepairOrdersFromAssessFailSelection();
         return;
       }
       if (act === 'copy-code') {
@@ -67160,17 +67211,22 @@ function mountListSlickGrid(host, rows, cols, opts) {
       if (!item) return null;
       const sel = (view._listSelKey === key && String(item.id) === String(view._listSelId))
         || (key === 'assessResults' && view.assessFailPanelOpen && String(item.id) === String(view.selectedAssessFailId));
-      if (item.__group) {
-        /* Dòng xe: title+ghi chú gộp; các cột Kết quả / Trạng thái / SC / Thao tác vẫn riêng */
+      if (key === 'assessResults' && item.__group) {
+        /* Dòng xe: gộp title+ghi chú; giữ các cột meta / SC */
         return {
           cssClasses: 'assess-group-row' + (sel ? ' list-row-sel plan-row-sel' : ''),
-          columns: {
-            1: { colspan: 2 }, /* itemLabel + itemNote */
-          },
+          columns: { 1: { colspan: 2 } },
+        };
+      }
+      if (key === 'assessResults' && !item.__group) {
+        /* Dòng tiêu chí: 1 cell full sau checkbox (không để cột meta trống) */
+        const colCount = (cols && cols.length) || 12;
+        return {
+          cssClasses: [!item.isEmpty ? 'assess-fail-row' : '', sel ? 'list-row-sel' : ''].filter(Boolean).join(' '),
+          columns: { 1: { colspan: Math.max(1, colCount - 1) } },
         };
       }
       const classes = [];
-      if (key === 'assessResults' && !item.isEmpty && item.failCount > 0) classes.push('assess-fail-row');
       if (sel) classes.push('list-row-sel');
       return classes.length ? { cssClasses: classes.join(' ') } : null;
     },
@@ -67404,12 +67460,21 @@ function mountListSlickGrid(host, rows, cols, opts) {
 
   applyListColFilters();
 
-  const fit = () => { try { grid.resizeCanvas(); } catch (_) {} };
+  const fit = () => {
+    try {
+      if (o.forceFitColumns !== false && typeof grid.setOptions === 'function') {
+        grid.setOptions({ forceFitColumns: true, fullWidthRows: true });
+      }
+      if (typeof grid.resizeCanvas === 'function') grid.resizeCanvas();
+      if (typeof grid.autosizeColumns === 'function') grid.autosizeColumns();
+    } catch (_) {}
+  };
   fit();
   requestAnimationFrame(fit);
   setTimeout(fit, 0);
   setTimeout(fit, 80);
   setTimeout(fit, 200);
+  setTimeout(fit, 400);
   if (!window._listGridResizeBound) {
     window._listGridResizeBound = true;
     window.addEventListener('resize', () => {
@@ -75068,16 +75133,19 @@ function registerAssessResultsGrid(evals) {
   const leafDash = '<span class="text-slate-300">—</span>';
   registerListGrid('assessResults', rows, [
     { id: '_ck', field: 'checked', name: '', width: 36, minWidth: 36, maxWidth: 40, cssClass: 'c', sortable: false, filterable: false, resizable: false, formatter: checkFmt },
-    { id: 'itemLabel', field: 'itemLabel', name: 'Hạng mục lỗi', width: 220, minWidth: 160, sortable: true,
+    { id: 'itemLabel', field: 'itemLabel', name: 'Hạng mục lỗi', width: 260, minWidth: 180, sortable: true,
       formatter: (r, c, v, col, item) => {
         if (item.__group) {
           return `<span title="${esc(item.groupTitle || '')}">▾ ${esc(item.groupTitle || item.plate || '')}</span>`;
         }
         if (item.isEmpty) return `<span class="text-slate-500">${esc(item.itemLabel || '—')}</span>`;
         const cls = item.assessKind === 'replace' ? 'assess-fail-item-chip is-replace' : 'assess-fail-item-chip';
-        return `<span class="${cls}" title="${esc(item.itemLabel || '')}">${esc(item.itemBaseLabel || item.itemLabel || '—')} (${esc(item.assessKindLabel || '')})</span>`;
+        const note = item.itemNote
+          ? `<span class="ml-2 text-xs font-normal text-slate-500" title="${esc(item.itemRawNote || item.itemNote)}">${esc(item.itemNote)}</span>`
+          : '';
+        return `<span class="inline-flex items-center gap-1 min-w-0"><span class="${cls}" title="${esc(item.itemLabel || '')}">${esc(item.itemBaseLabel || item.itemLabel || '—')} (${esc(item.assessKindLabel || '')})</span>${note}</span>`;
       } },
-    { id: 'itemNote', field: 'itemNote', name: 'Ghi chú', width: 160, minWidth: 100, sortable: true,
+    { id: 'itemNote', field: 'itemNote', name: 'Ghi chú', width: 140, minWidth: 90, sortable: true,
       formatter: (r, c, v, col, item) => item.__group ? '' : `<span class="text-xs text-slate-600" title="${esc(item.itemRawNote || item.itemNote || '')}">${esc(item.itemNote || '—')}</span>` },
     { id: 'date', field: 'date', name: 'Ngày ĐG', width: 100, minWidth: 88, sortable: true, cssClass: 'r',
       formatter: (r, c, v, col, item) => vehOnly(item)
@@ -75087,21 +75155,21 @@ function registerAssessResultsGrid(evals) {
       formatter: (r, c, v, col, item) => vehOnly(item)
         ? `<button type="button" class="slick-link" data-open-vehicle="${item.vehicleId}">${esc(item.plate)}</button>`
         : leafDash },
-    { id: 'areaLabel', field: 'areaLabel', name: 'Khu vực', width: 110, minWidth: 90, sortable: true,
+    { id: 'areaLabel', field: 'areaLabel', name: 'Khu vực', width: 120, minWidth: 90, sortable: true,
       formatter: (r, c, v, col, item) => vehOnly(item) ? esc(item.areaLabel || '—') : leafDash },
-    { id: 'periodText', field: 'periodText', name: 'Kỳ', width: 140, minWidth: 110, sortable: true,
+    { id: 'periodText', field: 'periodText', name: 'Kỳ', width: 150, minWidth: 110, sortable: true,
       formatter: (r, c, v, col, item) => vehOnly(item)
         ? `<span class="text-xs tabular-nums" title="${esc(item.periodText || '')}">${esc(item.periodText || '—')}</span>`
         : leafDash },
-    { id: 'inspector', field: 'inspector', name: 'KTV', width: 120, minWidth: 90, sortable: true,
+    { id: 'inspector', field: 'inspector', name: 'KTV', width: 130, minWidth: 90, sortable: true,
       formatter: (r, c, v, col, item) => vehOnly(item)
         ? `<span class="text-xs" title="${esc(item.inspector || '')}">${esc(item.inspector || '—')}</span>`
         : leafDash },
-    { id: 'resultText', field: 'resultText', name: 'Kết quả', width: 110, minWidth: 90, sortable: true, cssClass: 'c',
+    { id: 'resultText', field: 'resultText', name: 'Kết quả', width: 120, minWidth: 90, sortable: true, cssClass: 'c',
       formatter: (r, c, v, col, item) => vehOnly(item)
         ? `<span class="text-xs font-semibold tabular-nums ${item.failCount ? 'text-rose-700' : 'text-emerald-700'}">${esc(item.resultText || '—')}</span>`
         : leafDash },
-    { id: 'statusText', field: 'statusText', name: 'Trạng thái', width: 130, minWidth: 100, sortable: true, filterType: 'select',
+    { id: 'statusText', field: 'statusText', name: 'Trạng thái', width: 140, minWidth: 100, sortable: true, filterType: 'select',
       formatter: (r, c, v, col, item) => vehOnly(item)
         ? (item.statusHtml || esc(item.statusText || '—'))
         : leafDash },
@@ -75112,9 +75180,9 @@ function registerAssessResultsGrid(evals) {
         if (!n) return '<span class="text-slate-300 tabular-nums">0</span>';
         return `<span class="inline-flex items-center rounded-md border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-xs font-bold tabular-nums text-emerald-900" title="${esc(item.orderCodes || '')}">${n}</span>`;
       } },
-    { id: 'orderCodes', field: 'orderCodes', name: 'Phiếu SC', width: 150, minWidth: 110, sortable: true,
+    { id: 'orderCodes', field: 'orderCodes', name: 'Phiếu SC', width: 160, minWidth: 120, sortable: true,
       formatter: (r, c, v, col, item) => {
-        /* Tạo / xem phiếu SC theo xe (lần ĐG), không theo từng tiêu chí */
+        /* Tạo / xem phiếu SC theo xe (lần ĐG); thao tác khác → chuột phải */
         if (!vehOnly(item)) return leafDash;
         const orders = (item.evalId ? ordersLinkedToEval(evaluationById(item.evalId), item.vehicleId) : []) || [];
         if (orders.length) {
@@ -75122,18 +75190,6 @@ function registerAssessResultsGrid(evals) {
         }
         if (item.canCreateSc) {
           return `<button type="button" data-create-order-from-eval="${item.vehicleId}" data-create-order-eval-id="${esc(item.evalId || '')}" class="text-xs font-bold text-rose-700 hover:underline">+ Tạo phiếu SC</button>`;
-        }
-        return leafDash;
-      } },
-    { id: '_act', field: 'act', name: 'Thao tác', width: 140, minWidth: 110, sortable: false, filterable: false,
-      formatter: (r, c, v, col, item) => {
-        if (item.__group) {
-          return `<div class="flex h-full items-center justify-end gap-1">
-            <button type="button" data-assess-fail-open="${esc(item.id)}" class="btn btn-primary btn-xs">Xem xe</button>
-            ${item.evalStatus === 'DRAFT'
-              ? `<button type="button" data-eval="${item.vehicleId}" class="btn btn-outline btn-xs">Tiếp tục nháp</button>`
-              : `<button type="button" data-view-eval="${esc(item.evalId || '')}" class="btn btn-outline btn-xs">Xem ĐG</button>`}
-          </div>`;
         }
         return leafDash;
       } },
@@ -75210,7 +75266,7 @@ function renderAssessmentResultsPanel() {
               ${planTbIco('x')} Bỏ chọn
             </button>
             <span class="plan-tb-divider"></span>
-            <span class="text-xs text-slate-500 hidden md:inline">Tạo phiếu SC theo xe · bấm dòng xám xem chi tiết · tick hạng mục rồi «Tạo phiếu SC»</span>
+            <span class="text-xs text-slate-500 hidden md:inline">Bấm dòng xám xem panel · chuột phải thao tác · tick hạng mục → tạo phiếu SC</span>
           </div>
           <div class="plan-grid-toolbar-right">
             <span data-assess-sel-count class="text-xs font-medium text-slate-600 tabular-nums">${nSel ? ('Đã chọn ' + nSel + ' hạng mục') : ''}</span>
