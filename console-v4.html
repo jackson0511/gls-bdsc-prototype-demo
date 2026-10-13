@@ -197,12 +197,16 @@
     .list-slick-workspace .plan-period-bar .plan-period-label { font-weight: 600; color: #0f172a; }
     /* List grid column filters (giống kế hoạch BD) */
     .list-slick-workspace .slick-headerrow,
-    .list-slick-workspace .slick-headerrow-columns {
+    .list-slick-workspace .slick-headerrow-columns,
+    .list-slick-host .slick-headerrow,
+    .list-slick-host .slick-headerrow-columns {
       display: block !important;
       height: 40px !important;
       line-height: 40px;
       background: #fafafa;
       border-bottom: 1px solid #e4e4e7;
+      visibility: visible !important;
+      opacity: 1 !important;
     }
     .list-slick-workspace .slick-headerrow-column {
       display: flex !important;
@@ -71692,6 +71696,10 @@ function pageOrder() {
   const backLabel = view.from === 'catHistory' ? '← Lịch sử danh mục'
     : view.from === 'vehicleHistory' ? '← Lịch sử xe'
     : view.from === 'vehicle' ? '← Chi tiết xe'
+    : view.from === 'fleet' ? '← Xe & mooc'
+    : view.from === 'historyRepair' ? '← Danh sách sửa chữa'
+    : view.from === 'historyMaint' || view.from === 'history' ? '← Danh sách bảo dưỡng'
+    : (typeof isPlansNav === 'function' && isPlansNav(view.from)) ? '← Kế hoạch bảo dưỡng'
     : '← Danh sách phiếu';
   const ap = o.approvalStatus || 'DRAFT';
   const ps = o.purchaseSync || { status: 'NONE' };
@@ -78351,10 +78359,64 @@ function bind() {
     const from = view.name === 'catHistory' ? 'catHistory'
       : view.name === 'vehicleHistory' ? 'vehicleHistory'
       : view.name === 'vehicle' ? 'vehicle'
-      : 'history';
+      : (view.name === 'fleet' || isHistoryNav(view.name) || isPlansNav(view.name)) ? view.name
+      : (view.from && (isHistoryNav(view.from) || view.from === 'fleet' || isPlansNav(view.from)) ? view.from : menuHomeNav());
     view = { ...view, name: 'order', orderId: id, from };
     render();
   };
+  const navigateBackFromOrder = () => {
+    const from = view.from;
+    const pageSize = view.pageSize || 10;
+    if (from === 'catHistory') {
+      view = { ...view, name: 'catHistory', orderId: null };
+      render(); return;
+    }
+    if (from === 'vehicleHistory') {
+      view = { ...view, name: 'vehicleHistory', orderId: null };
+      render(); return;
+    }
+    if (from === 'vehicle') {
+      view = { ...view, name: 'vehicle', vehicleTab: view.vehicleTab === 'catalog' ? 'orders' : (view.vehicleTab || 'orders'), orderId: null };
+      render(); return;
+    }
+    if (from === 'fleet') {
+      view = defaultView({ name: 'fleet', histTab: 'vehicles', menuScope: null, from: null, ordersByPlate: null, filters: defaultFilters(), page: 1, pageSize });
+      render(); return;
+    }
+    if (from && isPlansNav(from)) {
+      view = { ...view, name: from, orderId: null, from: null, plansTab: view.plansTab || 'lines' };
+      render(); return;
+    }
+    let name = from;
+    if (!isHistoryNav(name) || name === 'history') {
+      name = (menuWorkScope() === 'REPAIR' || orderPrimaryKind(DB.orders.find(x => String(x.id) === String(view.orderId))) === 'REPAIR')
+        ? 'historyRepair' : 'historyMaint';
+    }
+    const scope = name === 'historyRepair' ? 'REPAIR' : 'MAINT';
+    view = {
+      name,
+      histTab: 'orders',
+      vehicleId: null,
+      vehicleTab: 'catalog',
+      plansTab: 'lines',
+      templateId: null,
+      orderId: null,
+      catalogId: null,
+      criteriaGroupId: null,
+      from: null,
+      ordersByPlate: null,
+      menuScope: scope,
+      filters: Object.assign(defaultFilters(), { orderType: scope }),
+      page: 1,
+      pageSize,
+    };
+    render();
+  };
+  $$('[data-nav-back-order]').forEach(b => b.onclick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigateBackFromOrder();
+  });
   $$('[data-open-order]').forEach(b => b.onclick = (e) => { e.stopPropagation(); openOrderDetail(b.dataset.openOrder); });
   $$('[data-row-order]').forEach(tr => tr.onclick = () => openOrderDetail(tr.dataset.rowOrder));
   $$('[data-cat-history]').forEach(b => b.onclick = (e) => {
