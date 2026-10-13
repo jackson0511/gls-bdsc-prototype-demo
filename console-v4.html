@@ -74055,14 +74055,20 @@ function listAllEvaluationResults() {
     return String(b.date || '').localeCompare(String(a.date || ''));
   });
 }
-function evalFailItemsBrief(ev) {
+function evalFailItemsBrief(ev, opts) {
+  const maxNote = (opts && opts.maxNote != null) ? opts.maxNote : 56;
   const items = ev?.items || {};
   const flat = typeof allEvalItemsFlat === 'function' ? allEvalItemsFlat() : [];
   return Object.entries(items)
     .filter(([, a]) => a === 'repair' || a === 'replace')
     .map(([id, a]) => {
       const it = flat.find(x => x.id === id);
-      const note = (ev.itemNotes && ev.itemNotes[id]) ? (' · ' + ev.itemNotes[id]) : '';
+      const rawNote = (ev.itemNotes && ev.itemNotes[id]) ? String(ev.itemNotes[id]).trim() : '';
+      let note = '';
+      if (rawNote) {
+        const clipped = rawNote.length > maxNote ? (rawNote.slice(0, maxNote).trimEnd() + '…') : rawNote;
+        note = ' · ' + clipped;
+      }
       return (it?.label || id) + ' (' + (a === 'repair' ? 'SC' : 'Thay') + ')' + note;
     });
 }
@@ -74137,40 +74143,42 @@ function renderAssessmentResultsPanel() {
               const orders = ev.status === 'SUBMITTED' ? ordersLinkedToEval(ev, ev.vehicleId) : [];
               const plans = ev.status === 'SUBMITTED' ? plansLinkedToEval(ev, ev.vehicleId) : [];
               const resultCell = ev.periodExempt
-                ? '<span class="chip border border-rose-300 bg-rose-50 text-rose-700">Miễn kỳ</span>'
+                ? '<span class="inline-flex items-center rounded-md border border-rose-400 bg-rose-100 px-2 py-0.5 text-xs font-bold text-rose-900">Miễn kỳ</span>'
                 : ev.status === 'DRAFT'
                   ? '<span class="text-slate-400">—</span>'
                   : (fail
-                    ? `<span class="text-rose-700 font-semibold tabular-nums">${fail} lỗi</span><span class="text-slate-400"> · </span><span class="text-emerald-700 tabular-nums">${good}/${total}</span>`
-                    : `<span class="text-emerald-700 font-semibold">Đạt</span><span class="text-slate-400"> · </span><span class="tabular-nums">${good}/${total || '—'}</span>`);
+                    ? `<span class="inline-flex items-center rounded-md border border-rose-400 bg-rose-100 px-2 py-0.5 text-xs font-bold tabular-nums text-rose-900">${fail} lỗi</span><span class="text-slate-400"> · </span><span class="text-sm font-semibold tabular-nums text-emerald-800">${good}/${total}</span>`
+                    : `<span class="inline-flex items-center rounded-md border border-emerald-400 bg-emerald-100 px-2 py-0.5 text-xs font-bold text-emerald-900">Đạt</span><span class="text-slate-400"> · </span><span class="text-sm font-semibold tabular-nums text-slate-700">${good}/${total || '—'}</span>`);
               const failCell = fails.length
-                ? `<ul class="m-0 pl-3.5 text-xs text-rose-800 space-y-0.5 list-disc">${fails.slice(0, 6).map(t => `<li>${esc(t)}</li>`).join('')}${fails.length > 6 ? `<li class="text-slate-500">+${fails.length - 6} hạng mục…</li>` : ''}</ul>${ev.note ? `<div class="mt-1 text-[11px] text-slate-500">${esc(ev.note)}</div>` : ''}`
-                : `<span class="text-xs text-slate-500">${esc(ev.note || '—')}</span>`;
+                ? `<ul class="m-0 max-w-[18rem] space-y-1 list-none p-0">${fails.slice(0, 5).map(t =>
+                    `<li class="rounded border border-rose-300 bg-rose-50 px-1.5 py-0.5 text-[11px] font-semibold leading-snug text-rose-900 break-words [overflow-wrap:anywhere]">${esc(t)}</li>`
+                  ).join('')}${fails.length > 5 ? `<li class="text-[11px] font-medium text-slate-500">+${fails.length - 5} hạng mục…</li>` : ''}</ul>${ev.note ? `<div class="mt-1 max-w-[18rem] truncate text-[11px] text-slate-500" title="${esc(ev.note)}">${esc(ev.note)}</div>` : ''}`
+                : `<span class="block max-w-[18rem] truncate text-xs text-slate-500" title="${esc(ev.note || '')}">${esc(ev.note || '—')}</span>`;
               let orderCell = '<span class="text-slate-300">—</span>';
               if (orders.length) {
                 orderCell = orders.map(o =>
-                  `<button type="button" data-open-order="${esc(o.id)}" class="block text-left text-xs font-medium text-blue-600 hover:underline">${esc(o.code)}</button>`
+                  `<button type="button" data-open-order="${esc(o.id)}" class="block max-w-[8rem] truncate text-left text-xs font-semibold text-blue-700 hover:underline" title="${esc(o.code)}">${esc(o.code)}</button>`
                 ).join('');
               } else if (plans.length) {
                 orderCell = plans.map(p =>
-                  `<button type="button" data-goto-plan-vehicle="${ev.vehicleId}" class="block text-left text-xs font-medium text-violet-700 hover:underline">${esc(p.code || 'KH')}</button>`
+                  `<button type="button" data-goto-plan-vehicle="${ev.vehicleId}" class="block max-w-[8rem] truncate text-left text-xs font-semibold text-violet-800 hover:underline" title="${esc(p.code || 'KH')}">${esc(p.code || 'KH')}</button>`
                 ).join('');
               }
               const action = ev.status === 'DRAFT'
                 ? `<button type="button" data-eval="${ev.vehicleId}" class="btn btn-primary btn-sm">Tiếp tục nháp</button>`
                 : `<button type="button" data-view-eval="${esc(ev.id)}" class="btn btn-outline btn-sm">Xem phiếu</button>
                    <button type="button" data-open-vehicle="${ev.vehicleId}" class="btn btn-outline btn-sm ml-1">Xe</button>`;
-              return `<tr class="row-h align-top ${ev.status === 'DRAFT' ? 'bg-amber-50/30' : (fail ? 'bg-rose-50/20' : '')}">
+              return `<tr class="row-h align-top ${ev.status === 'DRAFT' ? 'bg-amber-50/40' : (fail ? 'bg-rose-50/45' : '')}">
                 <td class="td whitespace-nowrap font-medium tabular-nums">${esc(ev.date || '—')}</td>
-                <td class="td"><button type="button" data-open-vehicle="${ev.vehicleId}" class="font-medium text-blue-600 hover:underline">${esc(plate)}</button>
+                <td class="td whitespace-nowrap"><button type="button" data-open-vehicle="${ev.vehicleId}" class="font-medium text-blue-600 hover:underline">${esc(plate)}</button>
                   ${v ? ` ${vehicleChip(v)}` : ''}</td>
-                <td class="td text-xs">${esc(formatAreaLabel(v?.area))}</td>
-                <td class="td text-xs tabular-nums whitespace-nowrap">${esc(period)}</td>
-                <td class="td text-xs">${esc(ev.inspector || '—')}</td>
-                <td class="td text-center">${resultCell}</td>
-                <td class="td min-w-[14rem] max-w-sm">${failCell}</td>
-                <td class="td">${evalListStatusChip(ev)}</td>
-                <td class="td">${orderCell}</td>
+                <td class="td max-w-[7rem] truncate text-xs" title="${esc(formatAreaLabel(v?.area))}">${esc(formatAreaLabel(v?.area))}</td>
+                <td class="td max-w-[9rem] text-xs tabular-nums leading-snug break-words">${esc(period)}</td>
+                <td class="td max-w-[8rem] truncate text-xs" title="${esc(ev.inspector || '')}">${esc(ev.inspector || '—')}</td>
+                <td class="td whitespace-nowrap text-center">${resultCell}</td>
+                <td class="td w-[18rem] max-w-[18rem] overflow-hidden">${failCell}</td>
+                <td class="td whitespace-nowrap">${evalListStatusChip(ev)}</td>
+                <td class="td max-w-[8rem] overflow-hidden">${orderCell}</td>
                 <td class="td text-right whitespace-nowrap">${action}</td>
               </tr>`;
             }).join('') || `<tr><td colspan="10" class="px-5 py-12 text-center text-slate-500">Chưa có kết quả đánh giá khớp bộ lọc</td></tr>`}
