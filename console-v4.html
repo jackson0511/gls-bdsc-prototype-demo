@@ -68204,9 +68204,10 @@ function hasDeepLinkQuery(sp) {
   if (!sp) return false;
   return !!(sp.get('page') || sp.get('nav') || sp.get('vehicleId') || sp.get('vid')
     || sp.get('orderId') || sp.get('oid') || sp.get('plate') || sp.get('catalogId') || sp.get('cid')
-    || sp.get('templateId') || sp.get('tid') || sp.get('criteriaGroupId') || sp.get('gid'));
+    || sp.get('templateId') || sp.get('tid') || sp.get('criteriaGroupId') || sp.get('gid')
+    || sp.get('evalVehicleId') || sp.get('evid') || sp.get('evalId') || sp.get('eid'));
 }
-/** Đọc deep-link: ?page=fleet|plansMaint|vehicle&vehicleId=&tab=&q=&plate=&orderId=&scope=MAINT|REPAIR&mode=LINE|VEHICLE */
+/** Đọc deep-link: ?page=…&evalVehicleId= / &evalId= (mở chi tiết phiếu ĐG) */
 function parseViewFromQuery(search) {
   try {
     const sp = new URLSearchParams(search != null ? search : (typeof location !== 'undefined' ? location.search : ''));
@@ -68217,9 +68218,15 @@ function parseViewFromQuery(search) {
     const tab = String(sp.get('tab') || '').trim();
     const plate = String(sp.get('plate') || '').trim();
     let vehicleId = sp.get('vehicleId') || sp.get('vid');
-    if (!vehicleId && plate && page === 'vehicle' && typeof findVehicleByPlate === 'function') {
+    const evalId = sp.get('evalId') || sp.get('eid') || null;
+    let evalVehicleId = sp.get('evalVehicleId') || sp.get('evid') || null;
+    if (!vehicleId && plate && (page === 'vehicle' || evalVehicleId || evalId) && typeof findVehicleByPlate === 'function') {
       const found = findVehicleByPlate(plate);
       if (found) vehicleId = found.id;
+    }
+    if (!evalVehicleId && plate && (sp.has('evalVehicleId') || sp.has('evid') || sp.get('modal') === 'eval') && typeof findVehicleByPlate === 'function') {
+      const found = findVehicleByPlate(plate);
+      if (found) evalVehicleId = found.id;
     }
     const orderId = sp.get('orderId') || sp.get('oid');
     const catalogId = sp.get('catalogId') || sp.get('cid');
@@ -68234,6 +68241,8 @@ function parseViewFromQuery(search) {
       from,
       filters: defaultFilters(),
       ordersByPlate: null,
+      evalId: evalId || null,
+      evalVehicleId: evalVehicleId != null && evalVehicleId !== '' ? Number(evalVehicleId) : null,
     };
     if (q) overrides.filters.search = q;
     if (scopeRaw === 'MAINT' || scopeRaw === 'REPAIR') {
@@ -68274,6 +68283,8 @@ function parseViewFromQuery(search) {
       overrides.plansTab = 'templates';
     } else if (page === 'tireBattery' && tab) {
       overrides.filters.tbTab = tab === 'BATTERY' ? 'BATTERY' : 'TIRE';
+    } else if ((overrides.evalVehicleId || overrides.evalId) && page === 'fleet') {
+      overrides.name = 'assessment';
     }
     return overrides;
   } catch (_) {
@@ -68306,11 +68317,53 @@ function buildViewQuery(v) {
   } else if (v.name === 'tireBattery' && v.filters && v.filters.tbTab && v.filters.tbTab !== 'TIRE') {
     sp.set('tab', v.filters.tbTab);
   }
+  if (v.evalId) {
+    sp.set('evalId', String(v.evalId));
+    const ev = typeof evaluationById === 'function' ? evaluationById(v.evalId) : null;
+    if (ev && ev.vehicleId != null) {
+      sp.set('evalVehicleId', String(ev.vehicleId));
+      const veh = typeof vehicleById === 'function' ? vehicleById(ev.vehicleId) : null;
+      if (veh && veh.plate && !sp.get('plate')) sp.set('plate', veh.plate);
+    }
+  } else if (v.evalVehicleId != null) {
+    sp.set('evalVehicleId', String(v.evalVehicleId));
+    const veh = typeof vehicleById === 'function' ? vehicleById(v.evalVehicleId) : null;
+    if (veh && veh.plate && !sp.get('plate')) sp.set('plate', veh.plate);
+  }
   if (v.ordersByPlate) sp.set('plate', v.ordersByPlate);
-  else if (v.filters && v.filters.search && v.name !== 'vehicle') sp.set('q', v.filters.search);
+  else if (v.filters && v.filters.search && v.name !== 'vehicle' && !sp.get('plate')) sp.set('q', v.filters.search);
   if (v.from) sp.set('from', v.from);
   if (v.menuScope === 'MAINT' || v.menuScope === 'REPAIR') sp.set('scope', v.menuScope);
   return sp;
+}
+function setEvalDeepLink(opts) {
+  opts = opts || {};
+  view.evalId = opts.evalId != null ? opts.evalId : null;
+  view.evalVehicleId = opts.vehicleId != null ? Number(opts.vehicleId) : null;
+  if (view.evalVehicleId && !view.name) view.name = 'assessment';
+  if (view.evalVehicleId && (view.name === 'fleet' || !view.name)) view.name = 'assessment';
+  syncViewToQuery();
+}
+function clearEvalDeepLink() {
+  if (view.evalId == null && view.evalVehicleId == null) return;
+  view.evalId = null;
+  view.evalVehicleId = null;
+  syncViewToQuery();
+}
+function maybeOpenEvalFromQuery() {
+  if (window._openingEvalFromQuery) return;
+  const eid = view.evalId;
+  const evid = view.evalVehicleId;
+  if (eid == null && evid == null) return;
+  const root = document.getElementById('modalRoot');
+  if (root && !root.classList.contains('hidden') && root.innerHTML && root.innerHTML.trim()) return;
+  window._openingEvalFromQuery = true;
+  try {
+    if (eid && typeof openEvalResultModal === 'function') openEvalResultModal(eid);
+    else if (evid != null && typeof openEvalModal === 'function') openEvalModal(Number(evid));
+  } finally {
+    window._openingEvalFromQuery = false;
+  }
 }
 function syncViewToQuery(opts) {
   try {
@@ -70178,6 +70231,7 @@ function render() {
         try { if (typeof sel === 'number' && el.setSelectionRange) el.setSelectionRange(sel, sel); } catch {}
       }
     }
+    try { maybeOpenEvalFromQuery(); } catch (_) {}
   } catch (err) {
     console.error('render failed', err);
     const main = $('#main');
@@ -75327,11 +75381,15 @@ function closeModal() {
   root.classList.add('hidden');
   root.classList.remove('flex');
   root.innerHTML = '';
+  try { clearEvalDeepLink(); } catch (_) {}
 }
 
 function openEvalResultModal(evalId) {
   const ev = evaluationById(evalId);
   if (!ev) { toast('Không tìm thấy phiếu đánh giá'); return; }
+  try {
+    setEvalDeepLink({ evalId: ev.id || evalId, vehicleId: ev.vehicleId });
+  } catch (_) {}
   const v = vehicleById(ev.vehicleId);
   const id = ev.identity || {};
   const checklist = getEvalChecklist(v, {
@@ -75472,6 +75530,18 @@ function openEvalResultModal(evalId) {
 
 function openEvalModal(vid) {
   const v = vehicleById(vid);
+  if (!v) { toast('Không tìm thấy xe'); return; }
+  try {
+    view.evalId = null;
+    view.evalVehicleId = Number(v.id);
+    if (view.name === 'fleet') {
+      view.name = 'assessment';
+      syncViewToQuery();
+      render();
+      return;
+    }
+    syncViewToQuery();
+  } catch (_) {}
   const prevEval = DB.evaluations[vid] || {};
   const prev = prevEval.items || {};
   const prevDetails = prevEval.details || {};
