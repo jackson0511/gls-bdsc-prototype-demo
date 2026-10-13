@@ -495,6 +495,7 @@ function openMobileEvalView(id){
 
 
 let S={
+  page:'list',
   vehicleId:101,vehicleTab:'todo',orderId:'o2',orderTab:'slip',search:'',
   evalStep:1,periodExempt:false,createPlan:true,createSc:false,
   identity:{inspector:'Nguyễn Văn Kỹ thuật',km:'',driverId:'1',note:''},
@@ -506,6 +507,126 @@ let S={
 function emptyRow(){return{assessment:'',note:'',repairs:[],materials:[],pickQ:'',matQty:1,showPick:false,suggested:null}}
 function ensureRows(){CHECKLIST.forEach(g=>g.items.forEach(it=>{if(!S.rows[it.id])S.rows[it.id]=emptyRow()}))}
 ensureRows();
+
+/* ===== Deep-link query params (?page=&vehicleId=&plate=&tab=&orderId=&q=) ===== */
+const MOBILE_PAGES=new Set(['list','vehicle','order','create','eval']);
+const VEHICLE_TABS=new Set(['todo','assessment','plan','maintenance','repair']);
+const ORDER_TABS=new Set(['slip','progress','system']);
+function findVehicleByPlate(plate){
+  const p=String(plate||'').trim().toLowerCase();
+  if(!p)return null;
+  return VEHICLES.find(v=>String(v.plate||'').toLowerCase()===p)
+    ||VEHICLES.find(v=>String(v.plate||'').toLowerCase().includes(p))
+    ||null;
+}
+function findOrderById(id){
+  if(id==null||id==='')return null;
+  return ORDERS.find(o=>String(o.id)===String(id))||null;
+}
+function hasMobileDeepLink(sp){
+  return !!(sp.get('page')||sp.get('scr')||sp.get('nav')
+    ||sp.get('vehicleId')||sp.get('vid')
+    ||sp.get('orderId')||sp.get('oid')
+    ||sp.get('plate')||sp.get('q')||sp.get('search')||sp.get('tab'));
+}
+function parseMobileFromQuery(search){
+  try{
+    const sp=new URLSearchParams(search!=null?search:(typeof location!=='undefined'?location.search:''));
+    if(!hasMobileDeepLink(sp))return null;
+    let page=String(sp.get('page')||sp.get('scr')||sp.get('nav')||'list').trim().toLowerCase();
+    if(page==='home'||page==='fleet')page='list';
+    if(!MOBILE_PAGES.has(page))page='list';
+    const plate=String(sp.get('plate')||'').trim();
+    let vehicleId=sp.get('vehicleId')||sp.get('vid');
+    const orderId=sp.get('orderId')||sp.get('oid');
+    const tab=String(sp.get('tab')||'').trim().toLowerCase();
+    const q=String(sp.get('q')||sp.get('search')||'').trim();
+    if(!vehicleId&&plate){
+      const found=findVehicleByPlate(plate);
+      if(found)vehicleId=found.id;
+    }
+    if((page==='order'||orderId)&&orderId){
+      const o=findOrderById(orderId);
+      if(o&&vehicleId==null)vehicleId=o.vehicleId;
+      if(o)page='order';
+    }
+    if((page==='vehicle'||page==='create'||page==='eval')&&vehicleId==null&&!orderId)page='list';
+    const out={page};
+    if(vehicleId!=null&&vehicleId!=='')out.vehicleId=Number(vehicleId);
+    if(orderId!=null&&orderId!=='')out.orderId=String(orderId);
+    if(q)out.search=q;
+    if(page==='vehicle'&&VEHICLE_TABS.has(tab))out.vehicleTab=tab;
+    if(page==='order'&&ORDER_TABS.has(tab))out.orderTab=tab;
+    return out;
+  }catch(_){return null}
+}
+function buildMobileQuery(){
+  const sp=new URLSearchParams();
+  const page=S.page||'list';
+  sp.set('page',page);
+  if(page==='list'){
+    if(S.search)sp.set('q',S.search);
+  }else if(page==='vehicle'||page==='create'||page==='eval'){
+    if(S.vehicleId!=null)sp.set('vehicleId',String(S.vehicleId));
+    const v=veh(S.vehicleId);
+    if(v?.plate)sp.set('plate',v.plate);
+    if(page==='vehicle'&&S.vehicleTab&&S.vehicleTab!=='todo')sp.set('tab',S.vehicleTab);
+  }else if(page==='order'){
+    if(S.orderId!=null)sp.set('orderId',String(S.orderId));
+    const o=findOrderById(S.orderId);
+    if(o){
+      sp.set('vehicleId',String(o.vehicleId));
+      const v=veh(o.vehicleId);
+      if(v?.plate)sp.set('plate',v.plate);
+    }else if(S.vehicleId!=null){
+      sp.set('vehicleId',String(S.vehicleId));
+      const v=veh(S.vehicleId);
+      if(v?.plate)sp.set('plate',v.plate);
+    }
+    if(S.orderTab&&S.orderTab!=='slip')sp.set('tab',S.orderTab);
+  }
+  return sp;
+}
+function syncMobileToQuery(opts){
+  try{
+    if(typeof history==='undefined'||!history.replaceState)return;
+    if(window._skipMobileQuerySync)return;
+    const sp=buildMobileQuery();
+    const qs=sp.toString();
+    const url=location.pathname+(qs?'?'+qs:'')+(location.hash||'');
+    const cur=location.pathname+location.search+(location.hash||'');
+    if(url===cur)return;
+    if(opts&&opts.push)history.pushState({mobileView:1},'',url);
+    else history.replaceState({mobileView:1},'',url);
+  }catch(_){}
+}
+function applyMobileQuery(overrides){
+  if(!overrides)return;
+  if(overrides.page)S.page=overrides.page;
+  if(overrides.vehicleId!=null&&Number.isFinite(Number(overrides.vehicleId)))S.vehicleId=Number(overrides.vehicleId);
+  if(overrides.orderId!=null)S.orderId=String(overrides.orderId);
+  if(overrides.vehicleTab)S.vehicleTab=overrides.vehicleTab;
+  if(overrides.orderTab)S.orderTab=overrides.orderTab;
+  if(overrides.search!=null){
+    S.search=overrides.search;
+    const inp=$('#vehSearch');
+    if(inp)inp.value=overrides.search;
+  }
+}
+function bootFromQuery(){
+  const qv=parseMobileFromQuery();
+  if(qv)applyMobileQuery(qv);
+  show(S.page||'list',{skipPush:true});
+}
+window.addEventListener('popstate',()=>{
+  const qv=parseMobileFromQuery();
+  window._skipMobileQuerySync=true;
+  try{
+    if(qv)applyMobileQuery(qv);
+    else S.page='list';
+    show(S.page||'list',{skipSync:true});
+  }finally{window._skipMobileQuerySync=false}
+});
 
 function hashStr(s){let h=0;String(s||'').split('').forEach(c=>{h=((h<<5)-h)+c.charCodeAt(0);h|=0});return Math.abs(h)}
 /* ===== v2 helpers: trailer · catalog hint · tire/battery · last maint ===== */
@@ -776,7 +897,14 @@ function mhBadge(m){return m==='SYNCED'?'<span class="badge b-ok">Đã ĐB MH</s
 function baseBadge(b){return b?.status==='SYNCED'?'<span class="badge b-base">Đã ĐB BASE</span>':b?.status==='SYNCING'?'<span class="badge b-base">Đang ĐB BASE…</span>':'<span class="badge b-ns">Chưa ĐB BASE</span>'}
 function typeLabel(t){return t==='PERIODIC'?'Bảo dưỡng':'Sửa chữa'}
 
-function show(scr){
+function show(scr,opts){
+  opts=opts||{};
+  if(!MOBILE_PAGES.has(scr))scr='list';
+  S.page=scr;
+  if(scr==='order'){
+    const o=findOrderById(S.orderId);
+    if(o)S.vehicleId=o.vehicleId;
+  }
   $$('.scr').forEach(s=>s.classList.toggle('on',s.dataset.scr===scr));
   $('#fabCreate').style.display=scr==='list'?'block':'none';
   if(scr==='list')renderList();
@@ -802,6 +930,7 @@ function show(scr){
     syncCreateModeUi();
     syncCreateType();
   }
+  if(!opts.skipSync)syncMobileToQuery(opts.skipPush?null:{push:!!opts.push});
 }
 
 function renderList(){
@@ -2306,9 +2435,9 @@ document.body.addEventListener('click',e=>{
   const ve=e.target.closest('[data-view-eval-m]');
   if(ve){openMobileEvalView(ve.dataset.viewEvalM);return}
   const vt=e.target.closest('[data-vtab]');
-  if(vt){S.vehicleTab=vt.dataset.vtab;renderVehicle();return}
+  if(vt){S.vehicleTab=vt.dataset.vtab;renderVehicle();syncMobileToQuery();return}
   const ot=e.target.closest('[data-otab]');
-  if(ot){S.orderTab=ot.dataset.otab;renderOrder();return}
+  if(ot){S.orderTab=ot.dataset.otab;renderOrder();syncMobileToQuery();return}
   if(e.target.closest('#backToVehicle')){show('vehicle');return}
   if(e.target.closest('#fabCreate')){
     S.createMode='quick';S.createDetailsOpen=false;
@@ -2325,7 +2454,7 @@ document.body.addEventListener('click',e=>{
   if(go.dataset.go==='eval'){S.evalStep=1;S.periodExempt=false;S.rows={};ensureRows();applyEvalSuggestions()}
   show(go.dataset.go);
 });
-$('#vehSearch')?.addEventListener('input',()=>renderList());
+$('#vehSearch')?.addEventListener('input',()=>{renderList();syncMobileToQuery()});
 
 /* —— Lookup nội bộ (nhập mới chỉ lưu TMS/local, không sync PWMS) —— */
 const LOCAL_LS_KEY='fleet-bdsc-mobile-v2-local-lookups';
@@ -2670,7 +2799,7 @@ document.addEventListener('click',e=>{
 });
 
 initCreateAutocomplete();
-renderList();
+bootFromQuery();
 </script>
 </body>
 </html>
