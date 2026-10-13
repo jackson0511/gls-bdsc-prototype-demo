@@ -68529,6 +68529,17 @@ function evalGroupMountedUnitsHtml(group, vid) {
   return '';
 }
 function ordersOf(vid) { return DB.orders.filter(o => o.vehicleId === Number(vid)); }
+/** Phiếu BD hoặc SC mới nhất của xe (theo ngày, rồi id). */
+function latestOrderOfKind(vid, kind) {
+  return ordersOf(vid)
+    .filter((o) => orderPrimaryKind(o) === kind)
+    .slice()
+    .sort((a, b) => {
+      const d = String(b.date || '').localeCompare(String(a.date || ''));
+      if (d) return d;
+      return String(b.id || '').localeCompare(String(a.id || ''));
+    })[0] || null;
+}
 /**
  * Lịch sử BD & SC cùng xe/mooc — giống fleet HistoryTable (listMaintenanceHistory).
  * Lấy hạng mục từ các phiếu COMPLETED trước đó (loại trừ phiếu hiện tại).
@@ -69960,6 +69971,8 @@ function pageHistory() {
     const rows = vehiclesAll.map(v => {
       const os = ordersOf(v.id);
       const total = os.filter(o => o.status === 'COMPLETED').reduce((a, o) => a + (o.cost || 0), 0);
+      const lastMaint = latestOrderOfKind(v.id, 'MAINT');
+      const lastRepair = latestOrderOfKind(v.id, 'REPAIR');
       return {
         id: v.id,
         vehicleId: v.id,
@@ -69969,6 +69982,14 @@ function pageHistory() {
         type: v.type || '—',
         year: v.year != null ? v.year : '—',
         garage: v.garage || '—',
+        lastMaintCode: lastMaint ? (lastMaint.code || String(lastMaint.id)) : '—',
+        lastMaintOrderId: lastMaint ? lastMaint.id : null,
+        lastMaintCostNum: lastMaint ? (Number(lastMaint.cost) || 0) : null,
+        lastMaintCostText: lastMaint ? money(lastMaint.cost || 0) : '—',
+        lastRepairCode: lastRepair ? (lastRepair.code || String(lastRepair.id)) : '—',
+        lastRepairOrderId: lastRepair ? lastRepair.id : null,
+        lastRepairCostNum: lastRepair ? (Number(lastRepair.cost) || 0) : null,
+        lastRepairCostText: lastRepair ? money(lastRepair.cost || 0) : '—',
         orderCount: os.length,
         totalMoney: money(total),
         evalHtml: evalBadge(v.evalStatus) + (v.nextEval ? ' <span class="text-xs text-slate-500">' + esc(v.nextEval) + '</span>' : ''),
@@ -69980,17 +70001,33 @@ function pageHistory() {
       { id: 'gps', field: 'gps', name: 'GPS', width: 110, minWidth: 80, sortable: true },
       { id: 'type', field: 'type', name: 'Loại xe', width: 130, minWidth: 100, sortable: true },
       { id: 'year', field: 'year', name: 'Đời', width: 70, minWidth: 56, cssClass: 'r', sortable: true },
-      { id: 'garage', field: 'garage', name: 'Nơi BD gần nhất', width: 180, minWidth: 120, sortable: true },
-      { id: 'orderCount', field: 'orderCount', name: 'Số phiếu', width: 90, minWidth: 70, cssClass: 'r', sortable: true },
-      { id: 'totalMoney', field: 'totalMoney', name: 'Tổng tiền', width: 130, minWidth: 100, cssClass: 'r', sortable: true },
-      { id: 'evalHtml', field: 'evalHtml', name: 'Đánh giá', width: 180, minWidth: 120, sortable: false, formatter: (r, c, v, col, item) => item.evalHtml || '—' },
+      { id: 'garage', field: 'garage', name: 'Nơi BD gần nhất', width: 160, minWidth: 110, sortable: true },
+      { id: 'lastMaintCode', field: 'lastMaintCode', name: 'Phiếu BD gần nhất', width: 150, minWidth: 120, sortable: true,
+        formatter: (r, c, v, col, item) => item.lastMaintOrderId
+          ? `<button type="button" class="slick-link" data-open-order="${esc(item.lastMaintOrderId)}" title="Mở phiếu BD">${esc(item.lastMaintCode)}</button>`
+          : '<span class="text-slate-400">—</span>' },
+      { id: 'lastMaintCostNum', field: 'lastMaintCostNum', name: 'Tiền BD', width: 120, minWidth: 96, cssClass: 'r', sortable: true,
+        formatter: (r, c, v, col, item) => item.lastMaintOrderId
+          ? `<span class="tabular-nums">${esc(item.lastMaintCostText)}</span>`
+          : '<span class="text-slate-400">—</span>' },
+      { id: 'lastRepairCode', field: 'lastRepairCode', name: 'Phiếu SC gần nhất', width: 150, minWidth: 120, sortable: true,
+        formatter: (r, c, v, col, item) => item.lastRepairOrderId
+          ? `<button type="button" class="slick-link" data-open-order="${esc(item.lastRepairOrderId)}" title="Mở phiếu SC">${esc(item.lastRepairCode)}</button>`
+          : '<span class="text-slate-400">—</span>' },
+      { id: 'lastRepairCostNum', field: 'lastRepairCostNum', name: 'Tiền SC', width: 120, minWidth: 96, cssClass: 'r', sortable: true,
+        formatter: (r, c, v, col, item) => item.lastRepairOrderId
+          ? `<span class="tabular-nums">${esc(item.lastRepairCostText)}</span>`
+          : '<span class="text-slate-400">—</span>' },
+      { id: 'orderCount', field: 'orderCount', name: 'Số phiếu', width: 80, minWidth: 64, cssClass: 'r', sortable: true },
+      { id: 'totalMoney', field: 'totalMoney', name: 'Tổng tiền', width: 120, minWidth: 96, cssClass: 'r', sortable: true },
+      { id: 'evalHtml', field: 'evalHtml', name: 'Đánh giá', width: 160, minWidth: 120, sortable: false, formatter: (r, c, v, col, item) => item.evalHtml || '—' },
       { id: '_act', field: 'act', name: 'Thao tác', width: 220, minWidth: 180, sortable: false, formatter: (r, c, v, col, item) =>
         `<div class="flex h-full items-center justify-center gap-1">
           <button type="button" data-eval="${item.vehicleId}" class="btn btn-outline btn-xs">Đánh giá</button>
           <button type="button" data-open-vehicle="${item.vehicleId}" class="btn btn-primary btn-xs">Chi tiết</button>
           <button type="button" data-view-orders-plate="${esc(item.plate)}" class="btn btn-outline btn-xs">Phiếu</button>
         </div>` },
-    ]);
+    ], { forceFitColumns: false });
     body = listSlickHostHtml('fleetVehicles', 'Danh sách xe & mooc', {
       countLabel: vehiclesAll.length + ' / ' + DB.vehicles.length + ' xe·mooc',
     });
