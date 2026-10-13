@@ -66342,6 +66342,36 @@ function registerListGrid(key, rows, cols, opts) {
   window._listGridPacks = window._listGridPacks || {};
   window._listGridPacks[key] = { rows: rows || [], cols: cols || [], opts: opts || {} };
 }
+function openOrdersByPlate(plate, fromNav) {
+  const p = String(plate || '').trim();
+  if (!p) return;
+  const filters = defaultFilters();
+  filters.search = p;
+  filters.orderType = 'ALL';
+  view = {
+    ...view,
+    name: 'historyMaint',
+    histTab: 'orders',
+    from: fromNav || (view.name === 'fleet' ? 'fleet' : (view.from || null)),
+    menuScope: null,
+    ordersByPlate: p,
+    filters,
+    page: 1,
+  };
+  render();
+}
+function clearListPlateFilter() {
+  const backFleet = view.from === 'fleet' || !!view.ordersByPlate;
+  view.ordersByPlate = null;
+  view.filters = defaultFilters();
+  if (backFleet && view.name !== 'fleet') {
+    view = defaultView({ name: 'fleet', histTab: 'vehicles', menuScope: null, from: null, ordersByPlate: null, filters: defaultFilters(), page: 1, pageSize: view.pageSize || 10 });
+  } else {
+    view.from = view.name === 'fleet' ? null : view.from;
+    view.page = 1;
+  }
+  render();
+}
 function listSlickHostHtml(key, title, opts) {
   const o = (opts && typeof opts === 'object') ? opts : {};
   const compact = o.compact ? ' is-compact' : '';
@@ -66350,10 +66380,18 @@ function listSlickHostHtml(key, title, opts) {
   const searchPh = o.searchPlaceholder || 'Biển số / rơ-mooc / mã…';
   const searchVal = o.searchValue != null ? o.searchValue : ((typeof F === 'function' ? F() : view?.filters)?.search || '');
   const searchTitle = o.searchTitle || 'Tìm theo biển số, loại xe, GPS…';
+  const filterActive = !!(String(searchVal || '').trim() || view?.ordersByPlate);
+  const filterPlate = String(view?.ordersByPlate || searchVal || '').trim();
+  const showBackFleet = !!(o.showBackFleet || (view?.from === 'fleet' && key === 'histOrders'));
   const updatedAt = new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const extraKpis = Array.isArray(o.kpiChips) ? o.kpiChips.map((c) =>
     `<div class="plan-kpi-chip" title="${esc(c.title || c.ico || '')}"><span class="plan-kpi-ico">${esc(c.ico || '')}</span><span class="plan-kpi-val">${esc(String(c.val != null ? c.val : '—'))}</span></div>`
   ).join('') : '';
+  const filterActions = filterActive || showBackFleet ? `
+          ${filterActive && filterPlate ? `<span class="text-xs text-sky-700 bg-sky-50 border border-sky-200 rounded px-2 py-0.5 whitespace-nowrap">Lọc: <strong>${esc(filterPlate)}</strong></span>` : ''}
+          ${filterActive ? `<button type="button" class="plan-btn-change-period" data-clear-list-filter title="Xóa lọc, xem toàn bộ danh sách">Xem tất cả</button>` : ''}
+          ${showBackFleet ? `<button type="button" class="plan-btn-change-period" data-back-fleet-list title="Quay lại danh sách Xe & mooc">← Xe &amp; mooc</button>` : ''}
+        ` : '';
   return `<div class="plan-workspace list-slick-workspace${compact}" data-list-workspace="${esc(key)}">
     <div class="plan-grid-pane">
       <div class="plan-period-bar">
@@ -66364,6 +66402,7 @@ function listSlickHostHtml(key, title, opts) {
             ${planTbIco('search')}
             <input id="flt-search" class="plan-plate-search" type="search" placeholder="${esc(searchPh)}" value="${esc(searchVal)}" title="${esc(searchTitle)}" autocomplete="off" />
           </div>
+          ${filterActions}
         </div>
         <div class="plan-kpi-strip" aria-label="Tóm tắt lưới">
           <div class="plan-kpi-chip" title="Số dòng"><span class="plan-kpi-ico">Σ</span><span class="plan-kpi-val">${esc(kpiVal)}</span></div>
@@ -66434,8 +66473,8 @@ function showListCtx(ev, key, item) {
       }
       if (act === 'eval' && ctx.vehicleId != null) { openEvalModal(Number(ctx.vehicleId)); return; }
       if (act === 'view-orders' && ctx.plate) {
-        const filters = defaultFilters(); filters.search = ctx.plate;
-        view = { ...view, name: menuHomeNav(), histTab: 'orders', filters, page: 1 }; render(); return;
+        openOrdersByPlate(ctx.plate, view.name === 'fleet' ? 'fleet' : (view.from || null));
+        return;
       }
       if (act === 'copy-code') {
         const text = ctx.code || ctx.plate || '';
@@ -66853,10 +66892,7 @@ function mountListSlickGrid(host, rows, cols, opts) {
         const viewOrders = t.closest('[data-view-orders-plate]');
         if (viewOrders) {
           if (native && native.stopPropagation) native.stopPropagation();
-          const filters = defaultFilters();
-          filters.search = viewOrders.getAttribute('data-view-orders-plate') || '';
-          view = { ...view, name: menuHomeNav(), histTab: 'orders', filters, page: 1 };
-          render();
+          openOrdersByPlate(viewOrders.getAttribute('data-view-orders-plate') || '', view.name === 'fleet' ? 'fleet' : (view.from || null));
           return;
         }
       }
@@ -69967,7 +70003,11 @@ function pageHistory() {
   const isFleet = view.name === 'fleet';
   const scope = isFleet ? null : menuWorkScope();
   const f = F();
-  if (!isFleet) {
+  const byPlate = String(view.ordersByPlate || '').trim();
+  if (byPlate) {
+    f.search = byPlate;
+    f.orderType = 'ALL';
+  } else if (!isFleet) {
     if (scope === 'MAINT') f.orderType = 'MAINT';
     else if (scope === 'REPAIR') f.orderType = 'REPAIR';
   }
@@ -70090,7 +70130,9 @@ function pageHistory() {
       { id: '_act', field: 'act', name: 'Thao tác', width: 100, minWidth: 80, sortable: false, formatter: (r, c, v, col, item) =>
         `<div class="flex h-full items-center justify-center"><button type="button" data-open-order="${item.orderId}" class="btn btn-primary btn-xs">Chi tiết</button></div>` },
     ]);
-    const title = scope === 'REPAIR' ? 'Phiếu sửa chữa' : scope === 'MAINT' ? 'Phiếu bảo dưỡng' : 'Phiếu bảo dưỡng & sửa chữa';
+    const title = byPlate
+      ? ('Phiếu theo xe ' + byPlate)
+      : (scope === 'REPAIR' ? 'Phiếu sửa chữa' : scope === 'MAINT' ? 'Phiếu bảo dưỡng' : 'Phiếu bảo dưỡng & sửa chữa');
     const nBdOrd = ordersAll.filter(o => orderHasWorkKind(o, 'MAINT')).length;
     const nScOrd = ordersAll.filter(o => orderHasWorkKind(o, 'REPAIR')).length;
     body = listSlickHostHtml('histOrders', title, {
@@ -70099,7 +70141,8 @@ function pageHistory() {
       searchPlaceholder: 'Mã phiếu / biển số / nơi thực hiện…',
       searchTitle: 'Tìm theo mã phiếu, biển số, nơi thực hiện…',
       searchValue: f.search || '',
-      kpiChips: scope === 'REPAIR' || scope === 'MAINT' ? [] : [
+      showBackFleet: view.from === 'fleet' || !!byPlate,
+      kpiChips: [
         { ico: 'BD', val: nBdOrd, title: 'Phiếu bảo dưỡng' },
         { ico: 'SC', val: nScOrd, title: 'Phiếu sửa chữa' },
       ],
@@ -70114,12 +70157,16 @@ function pageHistory() {
       body
     );
   }
-  const title = scope === 'REPAIR' ? 'Sửa chữa' : scope === 'MAINT' ? 'Bảo dưỡng' : 'Bảo dưỡng &amp; sửa chữa';
-  const subtitle = scope === 'REPAIR'
-    ? 'Mỗi dòng = một phiếu SC · lưới giống kế hoạch bảo dưỡng'
-    : scope === 'MAINT'
-      ? 'Mỗi dòng = một phiếu BD · lưới giống kế hoạch bảo dưỡng'
-      : 'Mỗi dòng = một phiếu BD / SC · lưới giống kế hoạch bảo dưỡng';
+  const title = byPlate
+    ? ('Phiếu theo xe · ' + byPlate)
+    : (scope === 'REPAIR' ? 'Sửa chữa' : scope === 'MAINT' ? 'Bảo dưỡng' : 'Bảo dưỡng &amp; sửa chữa');
+  const subtitle = byPlate
+    ? 'Đang lọc phiếu của xe/mooc · bấm «← Xe & mooc» hoặc «Xem tất cả» để quay lại danh sách đầy đủ'
+    : (scope === 'REPAIR'
+      ? 'Mỗi dòng = một phiếu SC · lưới giống kế hoạch bảo dưỡng'
+      : scope === 'MAINT'
+        ? 'Mỗi dòng = một phiếu BD · lưới giống kế hoạch bảo dưỡng'
+        : 'Mỗi dòng = một phiếu BD / SC · lưới giống kế hoạch bảo dưỡng');
   const createLabel = scope === 'REPAIR' ? 'Tạo phiếu SC' : scope === 'MAINT' ? 'Tạo phiếu BD' : 'Tạo phiếu';
   return pageShell(
     title,
@@ -77697,12 +77744,14 @@ function bindFilters() {
     const evt = el.tagName === 'SELECT' || el.type === 'date' ? 'change' : 'input';
     el.addEventListener(evt, () => {
       view.filters[key] = el.value;
+      if (key === 'search') view.ordersByPlate = null;
       view.page = 1;
       render();
     });
   });
   $('#btnClearFilters')?.addEventListener('click', () => {
     view.filters = defaultFilters();
+    view.ordersByPlate = null;
     view.page = 1;
     toast('Đã xóa bộ lọc');
     render();
@@ -77795,9 +77844,11 @@ function bind() {
     render();
   });
   $$('[data-view-orders-plate]').forEach(b => b.onclick = () => {
-    const filters = defaultFilters();
-    filters.search = b.dataset.viewOrdersPlate;
-    view = { ...view, name: menuHomeNav(), histTab: 'orders', filters, page: 1 };
+    openOrdersByPlate(b.dataset.viewOrdersPlate, view.name === 'fleet' ? 'fleet' : (view.from || null));
+  });
+  $$('[data-clear-list-filter]').forEach(b => b.onclick = () => clearListPlateFilter());
+  $$('[data-back-fleet-list]').forEach(b => b.onclick = () => {
+    view = defaultView({ name: 'fleet', histTab: 'vehicles', menuScope: null, from: null, ordersByPlate: null, filters: defaultFilters(), page: 1, pageSize: view.pageSize || 10 });
     render();
   });
   $$('[data-eval]').forEach(b => b.onclick = () => openEvalModal(Number(b.dataset.eval)));
