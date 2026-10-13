@@ -1024,6 +1024,7 @@
           <span id="crumb" class="truncate">Bảo dưỡng</span>
         </div>
         <div class="flex shrink-0 items-center gap-2">
+          <button type="button" id="btnCopyDeepLink" class="btn btn-outline btn-sm" title="Sao chép link sâu tới trang / mode hiện tại (query param)">Copy link</button>
           <button id="btnReset" class="btn btn-outline btn-sm">Làm mới dữ liệu mẫu</button>
           <div class="flex size-8 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">KT</div>
         </div>
@@ -67895,6 +67896,147 @@ function loadViewState() {
     return null;
   }
 }
+function hasDeepLinkQuery(sp) {
+  if (!sp) return false;
+  return !!(sp.get('page') || sp.get('nav') || sp.get('vehicleId') || sp.get('vid')
+    || sp.get('orderId') || sp.get('oid') || sp.get('plate') || sp.get('catalogId') || sp.get('cid')
+    || sp.get('templateId') || sp.get('tid') || sp.get('criteriaGroupId') || sp.get('gid'));
+}
+/** Đọc deep-link: ?page=fleet|plansMaint|vehicle&vehicleId=&tab=&q=&plate=&orderId=&scope=MAINT|REPAIR&mode=LINE|VEHICLE */
+function parseViewFromQuery(search) {
+  try {
+    const sp = new URLSearchParams(search != null ? search : (typeof location !== 'undefined' ? location.search : ''));
+    if (!hasDeepLinkQuery(sp)) return null;
+    let page = sp.get('page') || sp.get('nav') || 'fleet';
+    if (page === 'plans') page = 'plansMaint';
+    if (page === 'history') page = 'historyMaint';
+    const tab = String(sp.get('tab') || '').trim();
+    const plate = String(sp.get('plate') || '').trim();
+    let vehicleId = sp.get('vehicleId') || sp.get('vid');
+    if (!vehicleId && plate && page === 'vehicle' && typeof findVehicleByPlate === 'function') {
+      const found = findVehicleByPlate(plate);
+      if (found) vehicleId = found.id;
+    }
+    const orderId = sp.get('orderId') || sp.get('oid');
+    const catalogId = sp.get('catalogId') || sp.get('cid');
+    const criteriaGroupId = sp.get('criteriaGroupId') || sp.get('gid');
+    const templateId = sp.get('templateId') || sp.get('tid');
+    const q = String(sp.get('q') || sp.get('search') || '').trim();
+    const from = sp.get('from') || null;
+    const scopeRaw = String(sp.get('scope') || '').toUpperCase();
+    const mode = String(sp.get('mode') || '').toUpperCase();
+    const overrides = {
+      name: page,
+      from,
+      filters: defaultFilters(),
+      ordersByPlate: null,
+    };
+    if (q) overrides.filters.search = q;
+    if (scopeRaw === 'MAINT' || scopeRaw === 'REPAIR') {
+      overrides.menuScope = scopeRaw;
+      overrides.filters.orderType = scopeRaw;
+    }
+    if (vehicleId != null && vehicleId !== '') overrides.vehicleId = Number(vehicleId);
+    if (orderId != null && orderId !== '') overrides.orderId = orderId;
+    if (catalogId != null && catalogId !== '') overrides.catalogId = Number(catalogId) || catalogId;
+    if (criteriaGroupId != null && criteriaGroupId !== '') overrides.criteriaGroupId = Number(criteriaGroupId) || criteriaGroupId;
+    if (templateId != null && templateId !== '') overrides.templateId = templateId;
+
+    if (page === 'fleet') {
+      overrides.histTab = 'vehicles';
+      overrides.menuScope = null;
+      overrides.filters = Object.assign(defaultFilters(), q ? { search: q } : {});
+    } else if (page === 'historyMaint' || page === 'historyRepair') {
+      overrides.histTab = 'orders';
+      if (!overrides.menuScope) {
+        overrides.menuScope = page === 'historyRepair' ? 'REPAIR' : 'MAINT';
+        overrides.filters.orderType = overrides.menuScope;
+      }
+      if (plate) {
+        overrides.ordersByPlate = plate;
+        overrides.filters.search = plate;
+        overrides.filters.orderType = 'ALL';
+        overrides.from = overrides.from || 'fleet';
+      }
+    } else if (page === 'vehicle') {
+      overrides.vehicleTab = tab || 'catalog';
+    } else if (page === 'plansMaint' || page === 'plansRepair' || page === 'plans') {
+      overrides.plansTab = tab || 'lines';
+      if (mode === 'LINE' || mode === 'VEHICLE') overrides.planSelectMode = mode;
+      if (q) overrides.planPlateQ = q;
+    } else if (page === 'reminder') {
+      overrides.remindTab = tab || 'dashboard';
+    } else if (page === 'planTemplate') {
+      overrides.plansTab = 'templates';
+    } else if (page === 'tireBattery' && tab) {
+      overrides.filters.tbTab = tab === 'BATTERY' ? 'BATTERY' : 'TIRE';
+    }
+    return overrides;
+  } catch (_) {
+    return null;
+  }
+}
+function buildViewQuery(v) {
+  const sp = new URLSearchParams();
+  if (!v || !v.name) return sp;
+  sp.set('page', v.name);
+  if (v.name === 'vehicle') {
+    if (v.vehicleId != null) sp.set('vehicleId', String(v.vehicleId));
+    if (v.vehicleTab && v.vehicleTab !== 'catalog') sp.set('tab', v.vehicleTab);
+    const veh = typeof vehicleById === 'function' ? vehicleById(v.vehicleId) : null;
+    if (veh && veh.plate) sp.set('plate', veh.plate);
+  } else if (v.name === 'order' && v.orderId != null) {
+    sp.set('orderId', String(v.orderId));
+  } else if (v.name === 'catalogDetail' && v.catalogId != null) {
+    sp.set('catalogId', String(v.catalogId));
+  } else if (v.name === 'criteriaDetail' && v.criteriaGroupId != null) {
+    sp.set('criteriaGroupId', String(v.criteriaGroupId));
+  } else if (v.name === 'planTemplate' && v.templateId != null) {
+    sp.set('templateId', String(v.templateId));
+  } else if (v.name === 'plansMaint' || v.name === 'plansRepair' || v.name === 'plans') {
+    if (v.plansTab && v.plansTab !== 'lines') sp.set('tab', v.plansTab);
+    if (v.planSelectMode && v.planSelectMode !== 'LINE') sp.set('mode', v.planSelectMode);
+    if (v.planPlateQ) sp.set('q', v.planPlateQ);
+  } else if (v.name === 'reminder' && v.remindTab && v.remindTab !== 'dashboard') {
+    sp.set('tab', v.remindTab);
+  } else if (v.name === 'tireBattery' && v.filters && v.filters.tbTab && v.filters.tbTab !== 'TIRE') {
+    sp.set('tab', v.filters.tbTab);
+  }
+  if (v.ordersByPlate) sp.set('plate', v.ordersByPlate);
+  else if (v.filters && v.filters.search && v.name !== 'vehicle') sp.set('q', v.filters.search);
+  if (v.from) sp.set('from', v.from);
+  if (v.menuScope === 'MAINT' || v.menuScope === 'REPAIR') sp.set('scope', v.menuScope);
+  return sp;
+}
+function syncViewToQuery(opts) {
+  try {
+    if (typeof history === 'undefined' || !history.replaceState) return;
+    if (window._skipQuerySync) return;
+    const sp = buildViewQuery(view);
+    const qs = sp.toString();
+    const url = location.pathname + (qs ? '?' + qs : '') + (location.hash || '');
+    const cur = location.pathname + location.search + (location.hash || '');
+    if (url === cur) return;
+    if (opts && opts.push) history.pushState({ bdscView: 1 }, '', url);
+    else history.replaceState({ bdscView: 1 }, '', url);
+  } catch (_) {}
+}
+function currentDeepLinkUrl() {
+  const sp = buildViewQuery(view);
+  const qs = sp.toString();
+  return location.origin + location.pathname + (qs ? '?' + qs : '');
+}
+function copyCurrentDeepLink() {
+  const url = currentDeepLinkUrl();
+  const done = () => toast('Đã copy link: ' + url.replace(/^https?:\/\/[^/]+/, ''));
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done).catch(() => {
+      try { prompt('Copy link:', url); } catch (_) {}
+    });
+  } else {
+    try { prompt('Copy link:', url); } catch (_) { toast(url); }
+  }
+}
 function saveViewState() {
   try {
     if (!view || !view.name) return;
@@ -67910,6 +68052,9 @@ function saveViewState() {
       criteriaGroupId: view.criteriaGroupId ?? null,
       from: view.from ?? null,
       menuScope: view.menuScope ?? null,
+      ordersByPlate: view.ordersByPlate || null,
+      remindTab: view.remindTab || 'dashboard',
+      planSelectMode: view.planSelectMode || 'LINE',
       page: view.page || 1,
       pageSize: view.pageSize || 10,
       filters: { ...defaultFilters(), ...(view.filters || {}) },
@@ -67919,6 +68064,7 @@ function saveViewState() {
       planShowAllPeriods: !!view.planShowAllPeriods,
     };
     localStorage.setItem(VIEW_STATE_KEY, JSON.stringify(snap));
+    syncViewToQuery();
   } catch (_) {}
 }
 /** Giữ trang hiện tại; nếu entity không còn (sau reset seed) thì lùi về màn cha an toàn */
@@ -67975,7 +68121,21 @@ function sanitizeRestoredView(raw) {
   }
   return v;
 }
-let view = sanitizeRestoredView(loadViewState());
+let view = sanitizeRestoredView(parseViewFromQuery() || loadViewState());
+if (!window._bdscPopstateBound) {
+  window._bdscPopstateBound = true;
+  window.addEventListener('popstate', () => {
+    const qv = parseViewFromQuery();
+    if (!qv) return;
+    window._skipQuerySync = true;
+    try {
+      view = sanitizeRestoredView(qv);
+      render();
+    } finally {
+      window._skipQuerySync = false;
+    }
+  });
+}
 
 function toast(msg) {
   const el = $('#toast');
@@ -78475,6 +78635,7 @@ $$('.nav-item[data-nav]').forEach(a => {
     render();
   });
 });
+$('#btnCopyDeepLink')?.addEventListener('click', () => copyCurrentDeepLink());
 $('#btnReset').onclick = () => {
   if (confirm('Làm mới toàn bộ dữ liệu mẫu về ban đầu?')) {
     saveViewState();
