@@ -1136,7 +1136,7 @@
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="tireBattery" title="Vỏ lốp / ắc quy"><span class="nav-ico">VL</span><span class="nav-label">Vỏ lốp / ắc quy</span></a>
       </nav>
       <div class="sidebar-foot border-t border-slate-800 px-4 py-3 text-[11px] text-slate-500">
-        Mẫu từ Excel khách: GLSPWMS + Dự toán SC HCM<br/>Bấm «Làm mới dữ liệu mẫu» để tải lại seed v4
+        Mẫu từ Excel khách: GLSPWMS + Dự toán SC HCM<br/>Seed v4.02 · bấm «Làm mới dữ liệu mẫu» nếu cần tải lại
       </div>
     </aside>
 
@@ -1164,8 +1164,9 @@
   <div id="toast" class="pointer-events-none fixed bottom-6 right-6 z-[60] hidden rounded-md bg-slate-900 px-4 py-2.5 text-sm text-white shadow-lg"></div>
 
 <script>
-const STORAGE_KEY = 'fleet-bdsc-proto-v4-01';
-const STORAGE_KEY_LEGACY = ['fleet-bdsc-proto-v3-02','fleet-bdsc-proto-v3-01'];
+const STORAGE_KEY = 'fleet-bdsc-proto-v4-02';
+const STORAGE_KEY_LEGACY = ['fleet-bdsc-proto-v4-01','fleet-bdsc-proto-v3-02','fleet-bdsc-proto-v3-01'];
+/* v4-02: seed ĐG ↔ phiếu SC (o23/o25/o26), nháp 50E-22295, khóa 51C-41767 */
 const DRIVER_INBOX_KEY = 'fleet-bdsc-driver-inbox-v4';
 const VIEW_STATE_KEY = 'fleet-bdsc-view-v4';
 let _saveFailToastAt = 0;
