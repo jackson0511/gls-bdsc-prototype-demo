@@ -66349,8 +66349,8 @@ function listSlickHostHtml(key, title, opts) {
       </div>
       <div class="plan-grid-toolbar">
         <div class="plan-grid-toolbar-left">
-          <span class="text-xs text-slate-500">Ctrl+C / Ctrl+V · kéo chọn ô · bấm tiêu đề cột để sắp xếp · hover ✎ để sửa ô</span>
-          <span class="plan-tb-updated hidden lg:inline">Cập nhật ${esc(updatedAt)}</span>
+          <span class="plan-tb-updated">Cập nhật ${esc(updatedAt)}</span>
+          <span class="text-xs text-slate-400 hidden md:inline">· chuột phải dòng để mở menu · bấm tiêu đề cột để sắp xếp</span>
         </div>
         <div class="plan-grid-toolbar-right">
           <span class="text-xs text-slate-500 tabular-nums">${countLabel ? esc(countLabel) : ''}</span>
@@ -66758,20 +66758,14 @@ function mountListSlickGrid(host, rows, cols, opts) {
     headerRowHeight: 0,
     showHeaderRow: false,
     explicitInitialization: false,
-    enableTextSelectionOnCells: false,
+    enableTextSelectionOnCells: true,
     syncColumnCellResize: true,
     multiColumnSort: false,
-    numberedMultiColumnSort: false,
-    tristateMultiColumnSort: false,
-    showCellSelection: true,
-    selectedCellCssClass: 'order-grid-cell-selected',
     sanitizer: (dirty) => dirty,
   }, opts || {});
   const safeCols = (cols || []).map(c => Object.assign({}, c, {
     minWidth: c.minWidth != null ? c.minWidth : 64,
     rerenderOnResize: true,
-    denyPaste: true,
-    selectable: c.selectable !== false && c.id !== '_ck' && c.id !== '_act' && c.id !== '_idx',
   }));
   let grid;
   try {
@@ -66784,13 +66778,7 @@ function mountListSlickGrid(host, rows, cols, opts) {
   window._listGrids[key] = grid;
   window._listGridRows = window._listGridRows || {};
   window._listGridRows[key] = dataRows;
-  attachExcelLikeGrid(grid, {
-    copyValue: (item, columnDef) => {
-      const v = item[columnDef.field];
-      return stripCellPlainText(v);
-    },
-    pasteValue: () => {},
-  });
+  /* Danh sách phiếu/xe: không gắn copy-paste Excel — tránh nuốt click nút Chi tiết */
   if (grid.onSort) {
     grid.onSort.subscribe((_e, args) => {
       if (!args || !args.sortCol) return;
@@ -66813,7 +66801,42 @@ function mountListSlickGrid(host, rows, cols, opts) {
     });
   }
   if (grid.onClick) {
-    grid.onClick.subscribe((_e, args) => {
+    grid.onClick.subscribe((e, args) => {
+      const native = (e && e.getNativeEvent && e.getNativeEvent()) || e;
+      const t = (native && native.target) || (e && e.target);
+      if (t && t.closest) {
+        const openOrder = t.closest('[data-open-order]');
+        if (openOrder) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          const from = view.name === 'fleet' || isHistoryNav(view.name) ? view.name : (view.from || menuHomeNav());
+          view = { ...view, name: 'order', orderId: openOrder.getAttribute('data-open-order'), from };
+          render();
+          return;
+        }
+        const openVeh = t.closest('[data-open-vehicle]');
+        if (openVeh) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          const from = view.name === 'fleet' || isHistoryNav(view.name) || isPlansNav(view.name) ? view.name : (view.from || menuHomeNav());
+          view = { ...view, name: 'vehicle', from, vehicleId: Number(openVeh.getAttribute('data-open-vehicle')), vehicleTab: 'catalog', filters: defaultFilters(), page: 1 };
+          render();
+          return;
+        }
+        const evalBtn = t.closest('[data-eval]');
+        if (evalBtn) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          if (typeof openEvalModal === 'function') openEvalModal(Number(evalBtn.getAttribute('data-eval')));
+          return;
+        }
+        const viewOrders = t.closest('[data-view-orders-plate]');
+        if (viewOrders) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          const filters = defaultFilters();
+          filters.search = viewOrders.getAttribute('data-view-orders-plate') || '';
+          view = { ...view, name: menuHomeNav(), histTab: 'orders', filters, page: 1 };
+          render();
+          return;
+        }
+      }
       const item = dataRows[args.row];
       if (!item) return;
       view._listSelKey = key;
