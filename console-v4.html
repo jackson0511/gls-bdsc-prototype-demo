@@ -64318,6 +64318,18 @@ function performerLookupOptions() {
   });
   return [...set.values()];
 }
+function technicianLookupOptions() {
+  const set = new Map();
+  (typeof DEMO_TECHNICIANS !== 'undefined' ? DEMO_TECHNICIANS : []).forEach((t) => {
+    const name = String(t.name || t || '').trim();
+    if (name) set.set(name.toLowerCase(), { id: t.id || name, name, code: t.code || '', sub: t.code || 'KTV' });
+  });
+  performerLookupOptions().forEach((o) => {
+    const name = String(o.name || '').trim();
+    if (name && !set.has(name.toLowerCase())) set.set(name.toLowerCase(), { id: o.id || name, name, sub: o.sub || '' });
+  });
+  return [...set.values()];
+}
 function vendorLookupOptions() {
   const set = new Map();
   garages().forEach(g => set.set(String(g).toLowerCase(), { id: g, name: g, sub: 'Nơi BD' }));
@@ -71279,7 +71291,10 @@ function pageOrder() {
               <dt class="text-xs text-slate-500">Kỹ thuật viên</dt>
               <dd class="font-medium">
                 <div class="mt-1 flex flex-wrap items-center gap-2">
-                  <input id="orderTechName" type="text" class="h-9 min-w-0 w-full max-w-xs flex-1 rounded-md border border-slate-300 px-2 text-sm" placeholder="Nhập tên KTV…" value="${esc(o.technicianName || '')}" ${canEditOrderDetail(o) || o.approvalStatus === 'APPROVED' ? '' : 'disabled'} />
+                  <div class="ac-wrap min-w-0 w-full max-w-xs flex-1">
+                    <input id="orderTechName" type="search" autocomplete="off" class="h-9 w-full rounded-md border border-slate-300 px-2 text-sm" placeholder="Tìm hoặc chọn KTV…" value="${esc(o.technicianName || '')}" ${canEditOrderDetail(o) || o.approvalStatus === 'APPROVED' ? '' : 'disabled'} />
+                    <div class="ac-dropdown hidden" id="orderTechNameDd"></div>
+                  </div>
                   <button type="button" data-save-tech="${o.id}" class="btn btn-outline btn-sm" ${canEditOrderDetail(o) || o.approvalStatus === 'APPROVED' ? '' : 'disabled'}>Lưu KTV</button>
                 </div>
               </dd>
@@ -77747,10 +77762,37 @@ function bind() {
     if (!o) return;
     const inp = document.getElementById('orderTechName');
     o.technicianName = String(inp?.value || '').trim();
+    if (o.technicianName) {
+      const hit = technicianLookupOptions().find(t => t.name.toLowerCase() === o.technicianName.toLowerCase());
+      if (hit && hit.id && hit.id !== hit.name) o.technicianId = hit.id;
+    }
     save();
     toast(o.technicianName ? ('Đã gán KTV: ' + o.technicianName) : 'Đã xoá tên KTV');
     render();
   });
+  {
+    const techInp = $('#orderTechName');
+    const techDd = $('#orderTechNameDd');
+    if (techInp && techDd && !techInp.disabled) {
+      bindCreatableAc(techInp, techDd, {
+        getOptions: technicianLookupOptions,
+        allowCreate: true,
+        format: (o) => `${esc(o.name)}${o.code || o.sub ? ` <span class="sub">· ${esc(o.code || o.sub)}</span>` : ''}`,
+        onPick: (opt) => {
+          techInp.value = opt.name || '';
+          const oid = $$('[data-save-tech]')[0]?.dataset?.saveTech;
+          const o = oid ? DB.orders.find(x => String(x.id) === String(oid)) : null;
+          if (o) {
+            o.technicianName = opt.name || '';
+            if (opt.id && opt.id !== opt.name) o.technicianId = opt.id;
+            save();
+            toast('Đã gán KTV: ' + o.technicianName);
+          }
+        },
+        onCreate: (raw) => ({ id: raw, name: raw, source: 'local', sub: 'mới' }),
+      });
+    }
+  }
   $$('[data-push-plan-row]').forEach(b => b.onclick = () => {
     const vid = b.getAttribute('data-push-plan-row');
     const cid = b.getAttribute('data-cid');
