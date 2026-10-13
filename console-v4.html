@@ -10226,9 +10226,9 @@ const DEFAULT = {
   },
   {
     "id": "o23",
-    "code": "PBD-2026-2006",
+    "code": "RO-2026-2006",
     "vehicleId": 105,
-    "type": "PERIODIC",
+    "type": "WORK",
     "occurrence": 1,
     "date": "2026-09-22",
     "km": 54538,
@@ -10239,8 +10239,9 @@ const DEFAULT = {
     "approvalStatus": "APPROVED",
     "revision": 1,
     "cost": 2200000,
-    "catalogId": 4,
-    "content": "Kiểm tra / thay ắc quy (thay thế)",
+    "catalogId": null,
+    "primaryKind": "REPAIR",
+    "content": "SC từ đánh giá định kỳ · thay ắc quy",
     "createdAt": "2026-09-22",
     "materials": [
       {
@@ -10256,7 +10257,8 @@ const DEFAULT = {
       {
         "system": "Ắc Quy",
         "content": "Thay ắc quy",
-        "service": "Bảo dưỡng",
+        "service": "Sửa chữa",
+        "kind": "REPAIR",
         "performer": "Nguyễn Văn Kỹ thuật",
         "hours": 1.0
       }
@@ -10265,7 +10267,7 @@ const DEFAULT = {
       "status": "NONE",
       "lastSyncedAt": null,
       "issueDocCode": null,
-      "note": "Phiếu bảo dưỡng mẫu (seed)"
+      "note": "Phiếu SC từ ĐG định kỳ (seed)"
     },
     "baseSync": {
       "status": "NONE",
@@ -10737,7 +10739,7 @@ const DEFAULT = {
     "date": "2026-08-05",
     "km": 127928,
     "garage": "Xưởng Hải Phòng",
-    "source": "PERIODIC_ASSESSMENT",
+    "source": "PLAN",
     "system": "Hệ Thống Máy Lạnh",
     "status": "COMPLETED",
     "approvalStatus": "APPROVED",
@@ -63608,7 +63610,7 @@ const DEFAULT = {
         c16: { repairs: [], materials: [{ id: 'm1', code: 'VTU-342-1000002', name: 'Ắc Bi Nhê', qty: 1, uom: 'Cái', price: 1850000 }] },
       },
     },
-    /* Case D · nộp có SC/Thay nhưng chưa tạo phiếu (giống Fleet: hiện nút Tạo phiếu BD/SC) */
+    /* Case D · nộp có SC/Thay nhưng chưa tạo phiếu (hiện nút Tạo phiếu SC) */
     110: {
       date: '2026-09-25', status: 'SUBMITTED', note: 'Có hạng mục lỗi · chỉ nộp, tạo phiếu sau',
       inspector: 'Vũ KTV',
@@ -73684,12 +73686,32 @@ function evalGoodCount(ev) {
   const items = ev.items || {};
   return Object.values(items).filter(a => a === 'ok').length;
 }
+/** ĐG định kỳ chỉ liên kết phiếu sửa chữa (RO) — loại PBD/MAINT */
+function orderIsEvalRepair(o) {
+  if (!o) return false;
+  const code = String(o.code || '');
+  if (code.startsWith('PBD')) return false;
+  if (o.type === 'PERIODIC') return false;
+  if (o.primaryKind === 'MAINT') return false;
+  if (typeof orderWorkKindCounts === 'function') {
+    const c = orderWorkKindCounts(o);
+    if (c.nM > 0 && c.nR === 0) return false;
+  }
+  return true;
+}
 function ordersLinkedToEval(ev, vehicleId) {
   const ids = new Set((ev?.linkedOrderIds || []).map(String));
   return (DB.orders || []).filter(o =>
-    ids.has(String(o.id)) ||
-    (Number(o.vehicleId) === Number(vehicleId) && o.source === 'PERIODIC_ASSESSMENT' && ev?.date && o.date === ev.date)
+    orderIsEvalRepair(o) && (
+      ids.has(String(o.id)) ||
+      (Number(o.vehicleId) === Number(vehicleId) && o.source === 'PERIODIC_ASSESSMENT' && ev?.date && o.date === ev.date)
+    )
   );
+}
+function canCreateRepairFromEval(ev, vehicleId) {
+  if (!ev || ev.status !== 'SUBMITTED' || ev.periodExempt) return false;
+  if (typeof evalFailCount === 'function' ? evalFailCount(ev) <= 0 : !(ev.failCount > 0)) return false;
+  return ordersLinkedToEval(ev, vehicleId).length === 0;
 }
 function plansLinkedToEval(ev, vehicleId) {
   const ids = new Set((ev?.linkedPlanIds || []).map(String));
@@ -73775,9 +73797,10 @@ function evaluationsOfVehicle(vid) {
     return String(b.date || '').localeCompare(String(a.date || ''));
   });
 }
-function openCreateOrderFromEval(vid) {
+function openCreateOrderFromEval(vid, fromEv) {
+  window._evalOrderSeed = fromEv || DB.evaluations[Number(vid)] || null;
   openCreateOrderModal(Number(vid), 'INCIDENTAL', 'PERIODIC_ASSESSMENT');
-  toast('Nguồn «Đánh giá định kỳ» · thêm hạng mục rồi tạo phiếu');
+  toast('Nguồn «Đánh giá định kỳ» · chỉ tạo phiếu sửa chữa');
 }
 function findVehicleByPlate(plate) {
   const p = String(plate || '').trim().toLowerCase();
@@ -74005,7 +74028,11 @@ function evalEnforcementChip(status) {
 function evalListStatusChip(ev) {
   if (!ev) return '<span class="chip border border-amber-400 bg-amber-100 font-semibold text-amber-900">Chưa kiểm tra</span>';
   if (ev.periodExempt) return '<span class="chip border border-rose-400 bg-rose-100 font-semibold text-rose-900">Miễn kỳ</span>';
-  if (ev.status === 'SUBMITTED') return '<span class="chip border border-emerald-400 bg-emerald-100 font-semibold text-emerald-900">Đã tạo phiếu</span>';
+  if (ev.status === 'SUBMITTED') {
+    if ((ev.linkedOrderIds || []).length) return '<span class="chip border border-emerald-400 bg-emerald-100 font-semibold text-emerald-900">Đã tạo phiếu SC</span>';
+    if ((ev.linkedPlanIds || []).length) return '<span class="chip border border-violet-400 bg-violet-100 font-semibold text-violet-900">Đã tạo kế hoạch</span>';
+    return '<span class="chip border border-sky-400 bg-sky-100 font-semibold text-sky-900">Đã nộp</span>';
+  }
   if (ev.status === 'DRAFT') return '<span class="chip border border-slate-400 bg-slate-100 font-semibold text-slate-800">Nháp</span>';
   return '<span class="chip border border-amber-400 bg-amber-100 font-semibold text-amber-900">Chưa kiểm tra</span>';
 }
@@ -74126,7 +74153,7 @@ function renderAssessmentResultsPanel() {
             <th class="th text-center">Kết quả</th>
             <th class="th text-left">Hạng mục lỗi / ghi chú</th>
             <th class="th text-left">Trạng thái</th>
-            <th class="th text-left">Phiếu BD/SC</th>
+            <th class="th text-left">Phiếu SC</th>
             <th class="th text-right">Thao tác</th>
           </tr></thead>
           <tbody>
@@ -74154,19 +74181,23 @@ function renderAssessmentResultsPanel() {
                     `<li class="rounded border border-rose-300 bg-rose-50 px-1.5 py-0.5 text-[11px] font-semibold leading-snug text-rose-900 break-words [overflow-wrap:anywhere]">${esc(t)}</li>`
                   ).join('')}${fails.length > 5 ? `<li class="text-[11px] font-medium text-slate-500">+${fails.length - 5} hạng mục…</li>` : ''}</ul>${ev.note ? `<div class="mt-1 max-w-[18rem] truncate text-[11px] text-slate-500" title="${esc(ev.note)}">${esc(ev.note)}</div>` : ''}`
                 : `<span class="block max-w-[18rem] truncate text-xs text-slate-500" title="${esc(ev.note || '')}">${esc(ev.note || '—')}</span>`;
+              const canCreateSc = canCreateRepairFromEval(ev, ev.vehicleId);
               let orderCell = '<span class="text-slate-300">—</span>';
               if (orders.length) {
                 orderCell = orders.map(o =>
                   `<button type="button" data-open-order="${esc(o.id)}" class="block max-w-[8rem] truncate text-left text-xs font-semibold text-blue-700 hover:underline" title="${esc(o.code)}">${esc(o.code)}</button>`
                 ).join('');
+              } else if (canCreateSc) {
+                orderCell = `<button type="button" data-create-order-from-eval="${ev.vehicleId}" data-create-order-eval-id="${esc(ev.id || '')}" class="text-xs font-bold text-rose-700 hover:underline">+ Tạo phiếu SC</button>`;
               } else if (plans.length) {
                 orderCell = plans.map(p =>
                   `<button type="button" data-goto-plan-vehicle="${ev.vehicleId}" class="block max-w-[8rem] truncate text-left text-xs font-semibold text-violet-800 hover:underline" title="${esc(p.code || 'KH')}">${esc(p.code || 'KH')}</button>`
-                ).join('');
+                ).join('') + '<div class="text-[10px] text-slate-400">Kế hoạch từ ĐG</div>';
               }
               const action = ev.status === 'DRAFT'
                 ? `<button type="button" data-eval="${ev.vehicleId}" class="btn btn-primary btn-sm">Tiếp tục nháp</button>`
                 : `<button type="button" data-view-eval="${esc(ev.id)}" class="btn btn-outline btn-sm">Xem phiếu</button>
+                   ${canCreateSc ? `<button type="button" data-create-order-from-eval="${ev.vehicleId}" data-create-order-eval-id="${esc(ev.id || '')}" class="btn btn-primary btn-sm ml-1">Tạo phiếu SC</button>` : ''}
                    <button type="button" data-open-vehicle="${ev.vehicleId}" class="btn btn-outline btn-sm ml-1">Xe</button>`;
               return `<tr class="row-h align-top ${ev.status === 'DRAFT' ? 'bg-amber-50/40' : (fail ? 'bg-rose-50/45' : '')}">
                 <td class="td whitespace-nowrap font-medium tabular-nums">${esc(ev.date || '—')}</td>
@@ -74238,7 +74269,7 @@ function pageAssessment() {
   const pgAsm = paginate(list);
   return pageShell(
     'Đánh giá phương tiện định kỳ',
-    'Cảnh báo ĐG sắp hạn / quá hạn / khóa · cảnh báo vỏ lốp / ắc quy (định mức kép) · tạo phiếu / kế hoạch từ ĐG',
+    'Cảnh báo ĐG sắp hạn / quá hạn / khóa · cảnh báo vỏ lốp / ắc quy · từ ĐG chỉ tạo phiếu sửa chữa / kế hoạch SC',
     `<button data-nav-settings-eval class="btn btn-outline">Cài đặt nhắc đánh giá</button>`,
     tabs + `
     <div class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -74292,7 +74323,7 @@ function pageAssessment() {
           <th class="th text-left">Kỹ thuật viên</th>
           <th class="th text-right">Hạng mục đạt</th>
           <th class="th text-left">Trạng thái</th>
-          <th class="th text-left">Phiếu BD &amp; SC</th>
+          <th class="th text-left">Phiếu SC</th>
           <th class="th text-right">Thao tác</th>
         </tr></thead>
         <tbody>
@@ -74304,6 +74335,7 @@ function pageAssessment() {
             const totalItems = good + fail;
             const orders = submitted ? ordersLinkedToEval(ev, v.id) : [];
             const plans = submitted ? plansLinkedToEval(ev, v.id) : [];
+            const canCreateSc = canCreateRepairFromEval(ev, v.id);
             const enf = resolveEvalEnforcement(v, ev);
             const rowCls = evalRowHighlightClass(enf);
             const periodLabel = formatEvalPeriodRange(v, ev);
@@ -74313,16 +74345,19 @@ function pageAssessment() {
               orderCell = orders.map(o =>
                 `<button type="button" data-open-order="${esc(o.id)}" class="block text-left text-xs font-medium text-blue-600 hover:underline">${esc(o.code)}</button>`
               ).join('');
+            } else if (canCreateSc) {
+              orderCell = `<button type="button" data-create-order-from-eval="${v.id}" class="text-xs font-bold text-rose-700 hover:underline">+ Tạo phiếu SC</button>`;
             } else if (plans.length) {
               orderCell = plans.map(p =>
                 `<button type="button" data-goto-plan-vehicle="${v.id}" class="block text-left text-xs font-medium text-violet-700 hover:underline">${esc(p.code)}</button>`
               ).join('') + '<div class="text-[10px] text-slate-400">Kế hoạch từ ĐG</div>';
-            } else if (submitted && fail > 0) {
-              orderCell = `<button type="button" data-create-order-from-eval="${v.id}" class="text-xs font-medium text-blue-600 hover:underline">Tạo phiếu BD/SC</button>`;
             }
-            const actionBtn = submitted || ev?.status === 'DRAFT'
-              ? `<button data-eval="${v.id}" class="btn btn-outline btn-sm inline-flex items-center gap-1">Chi tiết</button>`
-              : `<button data-eval="${v.id}" class="btn btn-outline btn-sm inline-flex items-center gap-1 text-blue-600 !border-blue-300">+ Tạo phiếu</button>`;
+            const actionBtn = canCreateSc
+              ? `<button type="button" data-create-order-from-eval="${v.id}" class="btn btn-primary btn-sm">Tạo phiếu SC</button>
+                 <button data-eval="${v.id}" class="btn btn-outline btn-sm ml-1">Chi tiết</button>`
+              : (submitted || ev?.status === 'DRAFT'
+                ? `<button data-eval="${v.id}" class="btn btn-outline btn-sm inline-flex items-center gap-1">Chi tiết</button>`
+                : `<button data-eval="${v.id}" class="btn btn-outline btn-sm inline-flex items-center gap-1 text-blue-600 !border-blue-300">+ Đánh giá</button>`);
             return `<tr class="row-h ${rowCls}">
               <td class="td">${esc(formatAreaLabel(v.area))}</td>
               <td class="td font-medium">${esc(v.plate)}</td>
@@ -75673,14 +75708,14 @@ function openEvalResultModal(evalId) {
 
       <section class="mb-2 grid gap-3 lg:grid-cols-2">
         <div class="rounded-md border border-slate-200">
-          <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">Phiếu BD/SC của lần ĐG này · ${orders.length}</div>
+          <div class="border-b border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">Phiếu sửa chữa của lần ĐG này · ${orders.length}</div>
           <div class="divide-y divide-slate-100">
             ${orders.length ? orders.map(o => `<div class="px-3 py-2.5 text-sm flex flex-wrap items-center gap-2">
               <button type="button" data-open-order="${o.id}" class="font-medium text-blue-600 hover:underline">${esc(o.code)}</button>
               ${orderWorkKindBadges(o)}
               <span class="text-xs text-slate-500 ml-auto">${esc(o.status || '')}</span>
               <div class="w-full text-slate-700 text-xs">${esc(o.content || '')}</div>
-            </div>`).join('') : '<div class="px-3 py-6 text-center text-xs text-slate-400">Không có phiếu liên kết</div>'}
+            </div>`).join('') : '<div class="px-3 py-6 text-center text-xs text-slate-400">Chưa có phiếu SC · ĐG chỉ tạo sửa chữa, không tạo bảo dưỡng</div>'}
           </div>
         </div>
         <div class="rounded-md border border-slate-200">
@@ -75696,7 +75731,8 @@ function openEvalResultModal(evalId) {
     </div>
     <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-3">
       <button type="button" data-close class="btn btn-outline">Đóng</button>
-      ${v ? `<button type="button" id="btnEvalViewReopen" class="btn btn-primary">Đánh giá lại xe này</button>` : ''}
+      ${canCreateRepairFromEval(ev, ev.vehicleId) ? `<button type="button" id="btnEvalCreateSc" class="btn btn-primary">Tạo phiếu sửa chữa</button>` : ''}
+      ${v ? `<button type="button" id="btnEvalViewReopen" class="btn btn-outline">Đánh giá lại xe này</button>` : ''}
     </div>`, 'max-w-4xl');
 
   $('[data-close]')?.addEventListener('click', closeModal);
@@ -75704,6 +75740,10 @@ function openEvalResultModal(evalId) {
     e.stopPropagation();
     closeModal();
     openOrderDetail(b.dataset.openOrder);
+  });
+  $('#btnEvalCreateSc')?.addEventListener('click', () => {
+    closeModal();
+    openCreateOrderFromEval(ev.vehicleId, ev);
   });
   $('#btnEvalViewReopen')?.addEventListener('click', () => {
     closeModal();
@@ -75924,8 +75964,9 @@ function openEvalModal(vid) {
           <button type="button" id="btnEvalOpenPlanConfirm" class="btn btn-outline !h-auto !whitespace-normal px-3 py-3 text-center text-sm">
             <span class="block font-semibold text-slate-900">Tạo kế hoạch</span>
           </button>
-          <button type="button" data-eval-submit="sc" class="btn btn-outline !h-auto !whitespace-normal px-3 py-3 text-center text-sm !border-sky-300 !bg-sky-50">
-            <span class="block font-semibold text-sky-950">Tạo phiếu BD/SC</span>
+          <button type="button" data-eval-submit="sc" class="btn btn-outline !h-auto !whitespace-normal px-3 py-3 text-center text-sm !border-rose-300 !bg-rose-50">
+            <span class="block font-semibold text-rose-950">Tạo phiếu sửa chữa</span>
+            <span class="mt-0.5 block text-[11px] font-normal text-rose-800/80">Chỉ SC · không tạo bảo dưỡng</span>
           </button>
           <button type="button" data-eval-submit="later" class="btn btn-primary !h-auto !whitespace-normal px-3 py-3 text-center text-sm">
             <span class="block font-semibold">Chỉ nộp đánh giá</span>
@@ -76485,12 +76526,14 @@ function openEvalModal(vid) {
           occurrence: ordersOf(vid).length + 1,
           date, km: veh.km, garage: veh.garage, source: 'PERIODIC_ASSESSMENT',
           system: 'Từ đánh giá', status: 'NOT_STARTED', approvalStatus: 'DRAFT', revision: 0, cost: 0, catalogId: null,
-          content: 'BD/SC từ đánh giá (' + fail + ' hạng mục)',
+          content: 'SC từ đánh giá định kỳ (' + fail + ' hạng mục)',
           createdAt: date,
+          primaryKind: 'REPAIR',
           materials: materialsOut,
-          workItems: workItems.length ? workItems : [{ system: 'Từ đánh giá', content: fd.get('note') || 'Hạng mục không đạt', service: 'Sửa chữa', kind: 'REPAIR', performer: inspector, hours: null }],
+          workItems: (workItems.length ? workItems : [{ system: 'Từ đánh giá', content: fd.get('note') || 'Hạng mục không đạt', service: 'Sửa chữa', kind: 'REPAIR', performer: inspector, hours: null }])
+            .map(w => ({ ...w, kind: 'REPAIR', service: w.service === 'Thay thế' ? 'Thay thế' : 'Sửa chữa' })),
           planIds: [],
-          approvalLog: [{ at: nowStamp(), action: 'CREATE', by: inspector, note: 'Tạo phiếu BD/SC từ đánh giá định kỳ · nháp (không qua kế hoạch)' }],
+          approvalLog: [{ at: nowStamp(), action: 'CREATE', by: inspector, note: 'Tạo phiếu sửa chữa từ đánh giá định kỳ · nháp (không qua kế hoạch)' }],
         };
         DB.orders.unshift(createdOrder);
       }
@@ -76533,18 +76576,18 @@ function openEvalModal(vid) {
             <strong>Đã tạo kế hoạch</strong> · ${createdPlans.length} hạng mục · kỳ <strong>${esc(createdPlans[0].period)}</strong> — trạng thái <em>Mới</em>.
           </div>
           <ul class="space-y-1.5 list-disc pl-5">${planLines}</ul>
-        ` : createdOrder ? `<div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">Không tạo kế hoạch — đã tạo phiếu BD/SC nháp ngay.</div>`
-          : `<div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">Chỉ nộp đánh giá — tạo phiếu BD/SC sau từ danh sách «Đánh giá phương tiện định kỳ».</div>`}
-        ${createdOrder ? `<div class="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">Đã tạo phiếu BD/SC nháp <strong>${esc(createdOrder.code)}</strong>.</div>` : (!createdPlans.length ? `<div class="text-xs text-slate-500">Chưa tạo phiếu — bấm «Tạo phiếu BD/SC» trên danh sách đánh giá khi sẵn sàng.</div>` : `<div class="text-xs text-slate-500">Có thể tạo phiếu BD/SC sau từ kế hoạch.</div>`)}
+        ` : createdOrder ? `<div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">Không tạo kế hoạch — đã tạo phiếu sửa chữa nháp ngay.</div>`
+          : `<div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">Chỉ nộp đánh giá — tạo phiếu sửa chữa sau từ danh sách «Đánh giá phương tiện định kỳ».</div>`}
+        ${createdOrder ? `<div class="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">Đã tạo phiếu SC nháp <strong>${esc(createdOrder.code)}</strong> (chỉ sửa chữa, không bảo dưỡng).</div>` : (!createdPlans.length ? `<div class="text-xs text-slate-500">Chưa tạo phiếu — bấm «Tạo phiếu SC» trên danh sách đánh giá khi sẵn sàng.</div>` : `<div class="text-xs text-slate-500">Có thể tạo phiếu SC sau từ kế hoạch.</div>`)}
         <p class="text-xs text-slate-500 leading-relaxed">${createdPlans.length
-          ? 'Tiếp theo: mở <strong>Kế hoạch</strong> → chỉnh số lượng / đơn giá → tạo phiếu thực tế.'
+          ? 'Tiếp theo: mở <strong>Kế hoạch</strong> → chỉnh số lượng / đơn giá → tạo phiếu sửa chữa.'
           : createdOrder
-            ? 'Phiếu BD/SC nháp đã sẵn — không tạo kế hoạch song song.'
-            : 'Danh sách đánh giá sẽ hiện nút tạo phiếu BD/SC khi phiếu ĐG đã nộp và còn hạng mục lỗi.'}</p>
+            ? 'Phiếu sửa chữa nháp đã sẵn — không tạo kế hoạch song song.'
+            : 'Danh sách đánh giá sẽ hiện nút «Tạo phiếu SC» khi phiếu ĐG đã nộp và còn hạng mục lỗi.'}</p>
       </div>
       <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-3">
         <button type="button" data-close class="btn btn-outline">Đóng</button>
-        ${createdOrder ? `<button type="button" id="btnGotoOrder" class="btn btn-outline">Mở phiếu BD/SC</button>` : ''}
+        ${createdOrder ? `<button type="button" id="btnGotoOrder" class="btn btn-outline">Mở phiếu SC</button>` : ''}
         <button type="button" id="btnGotoPlans" class="btn btn-primary">Xem kế hoạch</button>
       </div>`);
     $('[data-close]').onclick = () => { closeModal(); render(); };
@@ -76608,10 +76651,13 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
   const locked = Number.isFinite(lockedId);
   const prefVeh = locked ? vehicleById(lockedId) : DB.vehicles[0];
   const srcPref = prefSource || 'PLAN';
+  const fromPeriodicEval = srcPref === 'PERIODIC_ASSESSMENT';
   openModal(`
     <div class="border-b border-slate-200 px-5 py-4">
-      <h2 class="text-lg font-bold">Tạo phiếu bảo dưỡng / sửa chữa</h2>
-      <p class="text-xs text-slate-500">Từ đánh giá / danh mục đến hạn: chọn hạng mục và vật tư ngay. Xe đang mở thì phiếu chỉ gắn xe đó.</p>
+      <h2 class="text-lg font-bold">${fromPeriodicEval ? 'Tạo phiếu sửa chữa từ đánh giá' : 'Tạo phiếu bảo dưỡng / sửa chữa'}</h2>
+      <p class="text-xs text-slate-500">${fromPeriodicEval
+        ? 'Đánh giá định kỳ chỉ tạo phiếu sửa chữa (RO) — không tạo bảo dưỡng (PBD).'
+        : 'Từ đánh giá / danh mục đến hạn: chọn hạng mục và vật tư ngay. Xe đang mở thì phiếu chỉ gắn xe đó.'}</p>
     </div>
     <form id="orderForm" class="space-y-3 px-5 py-4">
       ${locked ? `
@@ -76623,9 +76669,9 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
       </label>
       `}
       <div id="fullOrderPair">${quickOrderPairHtml(prefVeh)}</div>
-      <label class="block text-sm" id="catalogWrap">Danh mục bảo dưỡng <span class="field-hint">tuỳ chọn · gắn kỳ BD</span>
+      ${fromPeriodicEval ? '' : `<label class="block text-sm" id="catalogWrap">Danh mục bảo dưỡng <span class="field-hint">tuỳ chọn · gắn kỳ BD</span>
         <select name="catalogId"><option value="">— Không gắn danh mục —</option>${DB.catalog.map(c => `<option value="${c.id}" ${Number(prefCatalogId)===Number(c.id)?'selected':''}>${c.code} · ${c.name}</option>`).join('')}</select>
-      </label>
+      </label>`}
       <div class="rounded border border-slate-200 bg-slate-50/60 p-3 space-y-2">
         <div class="flex items-center justify-between gap-2">
           <div class="text-sm font-semibold text-slate-800">Hạng mục công việc <span class="field-hint font-normal">thêm nhiều dòng</span></div>
@@ -76649,9 +76695,9 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
         </div>
       </label>
       <label class="block text-sm">Nguồn tạo
-        <select name="source">
-          ${orderSourceCreateOptions(srcPref === 'PRE_TRIP' || srcPref === 'REMINDER' ? 'PLAN' : srcPref)}
-        </select>
+        ${fromPeriodicEval
+          ? `<input type="hidden" name="source" value="PERIODIC_ASSESSMENT" /><div class="mt-1 rounded border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-sm font-medium text-rose-900">Đánh giá định kỳ → phiếu sửa chữa</div>`
+          : `<select name="source">${orderSourceCreateOptions(srcPref === 'PRE_TRIP' || srcPref === 'REMINDER' ? 'PLAN' : srcPref)}</select>`}
       </label>
       <label class="block text-sm">Kỹ thuật viên
         <input name="technicianName" type="text" placeholder="Nhập tên KTV (có thể bổ sung sau)" list="createTechList" />
@@ -76690,7 +76736,7 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
       id: o.id || uid('wi'),
       content: name,
       system: o.system || 'Khác',
-      kind: o.kind || (prefType === 'PERIODIC' ? 'MAINT' : 'REPAIR'),
+      kind: fromPeriodicEval ? 'REPAIR' : (o.kind || (prefType === 'PERIODIC' ? 'MAINT' : 'REPAIR')),
       localOnly: o.source === 'local',
       source: o.source || 'master',
     });
@@ -76712,10 +76758,12 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
         <div class="min-w-0 flex-1">
           <div class="text-sm font-medium text-slate-900">${esc(w.content)}${w.localOnly ? ' <span class="local-tag">nội bộ</span>' : ''}</div>
           <div class="text-[11px] text-slate-500">${esc(w.system || '—')}</div>
-          <div class="mt-1 flex gap-3 text-xs">
+          ${fromPeriodicEval
+            ? '<div class="mt-1"><span class="chip border border-rose-300 bg-rose-50 font-semibold text-rose-800">Sửa chữa</span></div>'
+            : `<div class="mt-1 flex gap-3 text-xs">
             <label class="inline-flex items-center gap-1"><input type="radio" name="create-wi-kind-${i}" class="!w-auto" data-create-wi-kind="${i}" value="MAINT" ${w.kind==='MAINT'?'checked':''} /> Bảo dưỡng</label>
             <label class="inline-flex items-center gap-1"><input type="radio" name="create-wi-kind-${i}" class="!w-auto" data-create-wi-kind="${i}" value="REPAIR" ${w.kind!=='MAINT'?'checked':''} /> Sửa chữa</label>
-          </div>
+          </div>`}
         </div>
         <button type="button" class="btn btn-ghost btn-xs text-slate-400 hover:text-rose-600" data-rm-wi="${i}" title="Xóa">×</button>
       </div>`).join('');
@@ -76726,6 +76774,22 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
       el.onchange = () => { createState.workItems[+el.dataset.createWiKind].kind = el.value; };
     });
   };
+  if (fromPeriodicEval && locked) {
+    const ev = window._evalOrderSeed || DB.evaluations[lockedId];
+    const flat = typeof allEvalItemsFlat === 'function' ? allEvalItemsFlat() : [];
+    Object.entries(ev?.items || {}).forEach(([id, a]) => {
+      if (a !== 'repair' && a !== 'replace') return;
+      const it = flat.find(x => x.id === id);
+      const note = (ev.itemNotes && ev.itemNotes[id]) ? String(ev.itemNotes[id]).trim() : '';
+      addWorkItem({
+        id: 'eval-' + id,
+        name: (it?.label || id) + (a === 'replace' ? ' (Thay)' : ' (SC)') + (note ? ' · ' + note : ''),
+        system: it?.group || it?.system || 'Từ đánh giá',
+        kind: 'REPAIR',
+        source: 'eval',
+      });
+    });
+  }
   const renderMatChips = () => {
     const pwms = $('#orderPwmsChips'), ktv = $('#orderKtvChips');
     if (pwms) {
@@ -76892,43 +76956,72 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
     ensureLocalGarageIfNew(garage);
     const content = createState.workItems.map(w => w.content).join(' · ');
     const system = createState.workItems[0]?.system || (cat ? cat.system : 'Khác');
-    const workItems = createState.workItems.map(w => ({
-      system: w.system || system,
-      content: w.content,
-      kind: w.kind === 'MAINT' ? 'MAINT' : 'REPAIR',
-      service: w.kind === 'MAINT' ? 'Bảo dưỡng' : 'Sửa chữa',
-      performer: '—',
-      hours: null,
-      localOnly: !!w.localOnly,
-      catalogId: w.kind === 'MAINT' ? catalogId : null,
-    }));
+    const workItems = createState.workItems.map(w => {
+      const kind = fromPeriodicEval ? 'REPAIR' : (w.kind === 'MAINT' ? 'MAINT' : 'REPAIR');
+      return {
+        system: w.system || system,
+        content: w.content,
+        kind,
+        service: kind === 'MAINT' ? 'Bảo dưỡng' : 'Sửa chữa',
+        performer: '—',
+        hours: null,
+        localOnly: !!w.localOnly,
+        catalogId: kind === 'MAINT' ? catalogId : null,
+      };
+    });
     const veh = vehicleById(vehicleId);
     const pair = relatedPairForVehicle(veh);
     const trailer = pair.trailer;
+    const src = fromPeriodicEval ? 'PERIODIC_ASSESSMENT' : fd.get('source');
     const o = {
       id: uid('o'), code: 'RO-2026-' + (1000 + Math.floor(Math.random() * 900)),
       vehicleId, trailerId: trailer?.id ? Number(trailer.id) : null, trailerPlate: trailer?.plate || '',
       type: 'WORK', occurrence: ordersOf(vehicleId).length + 1,
       date: fd.get('date'), km: Number(fd.get('km')), garage,
-      source: fd.get('source'), system, status: 'NOT_STARTED',
+      source: src, system, status: 'NOT_STARTED',
       approvalStatus: 'DRAFT', revision: 0, cost: 0,
+      primaryKind: fromPeriodicEval ? 'REPAIR' : undefined,
       technicianName: String(fd.get('technicianName') || '').trim(),
-      catalogId, content, createdAt: fd.get('date'), materials, images: [],
+      catalogId: fromPeriodicEval ? null : catalogId,
+      content: fromPeriodicEval ? ('SC từ đánh giá · ' + content) : content,
+      createdAt: fd.get('date'), materials, images: [],
       workItems,
       approvalLog: [{
         at: nowStamp(), action: 'CREATE', by: 'Nguyễn Văn Kỹ thuật',
-        note: `Tạo nháp · ${workItems.length} hạng mục · chưa nộp duyệt`,
+        note: fromPeriodicEval
+          ? `Tạo phiếu SC từ đánh giá định kỳ · ${workItems.length} hạng mục · nháp`
+          : `Tạo nháp · ${workItems.length} hạng mục · chưa nộp duyệt`,
       }],
     };
     DB.orders.unshift(o);
     if (o.source === 'PERIODIC_ASSESSMENT') {
-      const ev = DB.evaluations[vehicleId];
-      if (ev) {
+      const seed = window._evalOrderSeed;
+      const live = DB.evaluations[vehicleId];
+      const targets = [];
+      if (live) targets.push(live);
+      if (seed && seed !== live) targets.push(seed);
+      targets.forEach((ev) => {
         ev.linkedOrderIds = [...new Set([...(ev.linkedOrderIds || []), o.id])];
-      }
+      });
+      ensureEvaluationHistory();
+      const dates = new Set(targets.map(t => t.date).filter(Boolean));
+      (DB.evaluationHistory || []).forEach((h) => {
+        if (Number(h.vehicleId) !== Number(vehicleId)) return;
+        if (seed && String(h.id) === String(seed.id)) {
+          h.linkedOrderIds = [...new Set([...(h.linkedOrderIds || []), o.id])];
+        } else if (dates.has(h.date)) {
+          h.linkedOrderIds = [...new Set([...(h.linkedOrderIds || []), o.id])];
+        }
+      });
+      window._evalOrderSeed = null;
     }
     save();
-    closeModal(); toast(`Đã tạo ${o.code} · ${workItems.length} hạng mục`); view = { ...view, name: 'order', orderId: o.id }; render();
+    closeModal();
+    toast(fromPeriodicEval
+      ? `Đã tạo phiếu SC ${o.code} · ${workItems.length} hạng mục`
+      : `Đã tạo ${o.code} · ${workItems.length} hạng mục`);
+    view = { ...view, name: 'order', orderId: o.id };
+    render();
   };
 }
 
@@ -78705,7 +78798,12 @@ function bind() {
   });
   $$('[data-eval]').forEach(b => b.onclick = () => openEvalModal(Number(b.dataset.eval)));
   $$('[data-view-eval]').forEach(b => b.onclick = () => openEvalResultModal(b.dataset.viewEval));
-  $$('[data-create-order-from-eval]').forEach(b => b.onclick = () => openCreateOrderFromEval(Number(b.dataset.createOrderFromEval)));
+  $$('[data-create-order-from-eval]').forEach(b => b.onclick = () => {
+    const vid = Number(b.dataset.createOrderFromEval);
+    const eid = b.dataset.createOrderEvalId;
+    const fromEv = eid ? evaluationById(eid) : null;
+    openCreateOrderFromEval(vid, fromEv || undefined);
+  });
   $$('[data-create-order-from-due]').forEach(b => b.onclick = () => {
     openCreateOrderFromDueCatalog(Number(b.dataset.createOrderFromDue), Number(b.dataset.cid));
   });
