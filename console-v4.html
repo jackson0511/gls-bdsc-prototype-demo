@@ -70043,6 +70043,13 @@ function pageHistory() {
         lastRepairCostText: lastRepair ? money(lastRepair.cost || 0) : '—',
         orderCount: os.length,
         totalMoney: money(total),
+        evalStatus: v.evalStatus || '',
+        nextEval: v.nextEval || '',
+        evalSortKey: (() => {
+          const st = String(v.evalStatus || '').toLowerCase();
+          const rank = st === 'due' ? '0' : st === 'soon' ? '1' : st === 'ok' ? '2' : '9';
+          return rank + '|' + (v.nextEval || '9999-12-31');
+        })(),
         evalHtml: evalBadge(v.evalStatus) + (v.nextEval ? ' <span class="text-xs text-slate-500">' + esc(v.nextEval) + '</span>' : ''),
       };
     });
@@ -70071,7 +70078,7 @@ function pageHistory() {
           : '<span class="text-slate-400">—</span>' },
       { id: 'orderCount', field: 'orderCount', name: 'Số phiếu', width: 80, minWidth: 64, cssClass: 'r', sortable: true },
       { id: 'totalMoney', field: 'totalMoney', name: 'Tổng tiền', width: 120, minWidth: 96, cssClass: 'r', sortable: true },
-      { id: 'evalHtml', field: 'evalHtml', name: 'Đánh giá', width: 160, minWidth: 120, sortable: false, formatter: (r, c, v, col, item) => item.evalHtml || '—' },
+      { id: 'evalHtml', field: 'evalSortKey', name: 'Đánh giá', width: 160, minWidth: 120, sortable: true, toolTip: 'Sắp xếp: Đến hạn → Sắp đến hạn → Đã ĐG · theo ngày', formatter: (r, c, v, col, item) => item.evalHtml || '—' },
       { id: '_act', field: 'act', name: 'Thao tác', width: 220, minWidth: 180, sortable: false, formatter: (r, c, v, col, item) =>
         `<div class="flex h-full items-center justify-center gap-1">
           <button type="button" data-eval="${item.vehicleId}" class="btn btn-outline btn-xs">Đánh giá</button>
