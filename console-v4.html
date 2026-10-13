@@ -63793,6 +63793,7 @@ function defaultFilters() {
     branch: 'ALL',
     remindStatus: 'ALL',
     assessStatus: 'ALL',
+    evalResult: 'ALL',
     active: 'ALL',
     mapStatus: 'ALL',
     dateFrom: '',
@@ -68181,6 +68182,7 @@ function defaultView(overrides = {}) {
     checkedPlanLineIds: [],
     planSelectMode: 'LINE',
     remindTab: 'dashboard',
+    assessTab: 'vehicles',
     orderId: null, catalogId: null, criteriaGroupId: null, from: null,
     menuScope: null,
     page: 1, pageSize: 10,
@@ -68279,6 +68281,8 @@ function parseViewFromQuery(search) {
       if (q) overrides.planPlateQ = q;
     } else if (page === 'reminder') {
       overrides.remindTab = tab || 'dashboard';
+    } else if (page === 'assessment') {
+      overrides.assessTab = (tab === 'results' || tab === 'vehicles') ? tab : 'vehicles';
     } else if (page === 'planTemplate') {
       overrides.plansTab = 'templates';
     } else if (page === 'tireBattery' && tab) {
@@ -68314,6 +68318,8 @@ function buildViewQuery(v) {
     if (v.planPlateQ) sp.set('q', v.planPlateQ);
   } else if (v.name === 'reminder' && v.remindTab && v.remindTab !== 'dashboard') {
     sp.set('tab', v.remindTab);
+  } else if (v.name === 'assessment' && v.assessTab && v.assessTab !== 'vehicles') {
+    sp.set('tab', v.assessTab);
   } else if (v.name === 'tireBattery' && v.filters && v.filters.tbTab && v.filters.tbTab !== 'TIRE') {
     sp.set('tab', v.filters.tbTab);
   }
@@ -68411,6 +68417,7 @@ function saveViewState() {
       menuScope: view.menuScope ?? null,
       ordersByPlate: view.ordersByPlate || null,
       remindTab: view.remindTab || 'dashboard',
+      assessTab: view.assessTab || 'vehicles',
       planSelectMode: view.planSelectMode || 'LINE',
       page: view.page || 1,
       pageSize: view.pageSize || 10,
@@ -74014,7 +74021,7 @@ function formatEvalPeriodRange(v, ev) {
   if (ev?.dateStart && ev?.dateEnd) {
     return esc(ev.dateStart) + (ev.dateStart !== ev.dateEnd ? ' → ' + esc(ev.dateEnd) : '');
   }
-  const key = (v.nextEval || getEvalAsOfDateKey() || '').slice(0, 7);
+  const key = (v?.nextEval || getEvalAsOfDateKey() || '').slice(0, 7);
   if (/^\d{4}-\d{2}$/.test(key)) {
     const [y, m] = key.split('-');
     const last = new Date(Number(y), Number(m), 0).getDate();
@@ -74022,11 +74029,180 @@ function formatEvalPeriodRange(v, ev) {
   }
   return '—';
 }
+/** Tất cả kết quả ĐG (lịch sử đã nộp + nháp hiện tại) — xem trực tiếp không cần vào từng phiếu */
+function listAllEvaluationResults() {
+  ensureEvaluationHistory();
+  const byId = new Map();
+  (DB.evaluationHistory || []).forEach((e) => {
+    if (!e) return;
+    const id = e.id || ('ev-' + e.vehicleId + '-' + (e.date || ''));
+    byId.set(String(id), { ...e, id, vehicleId: Number(e.vehicleId) });
+  });
+  Object.entries(DB.evaluations || {}).forEach(([vid, ev]) => {
+    if (!ev || (ev.status !== 'DRAFT' && ev.status !== 'SUBMITTED')) return;
+    const id = ev.id || ((ev.status === 'DRAFT' ? 'draft-' : 'live-') + vid);
+    if (ev.status === 'DRAFT') {
+      byId.set(String(id), { ...structuredClone(ev), id, vehicleId: Number(vid) });
+      return;
+    }
+    if (![...byId.values()].some(h => Number(h.vehicleId) === Number(vid) && h.date === ev.date && h.status === 'SUBMITTED')) {
+      byId.set(String(id), { ...structuredClone(ev), id, vehicleId: Number(vid) });
+    }
+  });
+  return [...byId.values()].sort((a, b) => {
+    if (a.status === 'DRAFT' && b.status !== 'DRAFT') return -1;
+    if (b.status === 'DRAFT' && a.status !== 'DRAFT') return 1;
+    return String(b.date || '').localeCompare(String(a.date || ''));
+  });
+}
+function evalFailItemsBrief(ev) {
+  const items = ev?.items || {};
+  const flat = typeof allEvalItemsFlat === 'function' ? allEvalItemsFlat() : [];
+  return Object.entries(items)
+    .filter(([, a]) => a === 'repair' || a === 'replace')
+    .map(([id, a]) => {
+      const it = flat.find(x => x.id === id);
+      const note = (ev.itemNotes && ev.itemNotes[id]) ? (' · ' + ev.itemNotes[id]) : '';
+      return (it?.label || id) + ' (' + (a === 'repair' ? 'SC' : 'Thay') + ')' + note;
+    });
+}
+function renderAssessmentResultsPanel() {
+  const f = F();
+  ensureEvaluationHistory();
+  const all = listAllEvaluationResults();
+  const list = all.filter((ev) => {
+    const v = vehicleById(ev.vehicleId);
+    const plate = v?.plate || ev.identity?.vehicleNumber || '';
+    const failBrief = evalFailItemsBrief(ev).join(' ');
+    if (!matchSearch([plate, v?.area, formatAreaLabel(v?.area), v?.type, ev.inspector, ev.note, failBrief, ev.status].join(' '), f.search)) return false;
+    if (f.area !== 'ALL' && v && v.area !== f.area) return false;
+    if (f.kind === 'vehicle' && v?.isTrailer) return false;
+    if (f.kind === 'trailer' && v && !v.isTrailer) return false;
+    if (f.assessStatus === 'SUBMITTED' && ev.status !== 'SUBMITTED') return false;
+    if (f.assessStatus === 'PENDING' && ev.status === 'SUBMITTED') return false;
+    if (f.assessStatus === 'DRAFT' && ev.status !== 'DRAFT') return false;
+    if (f.evalResult === 'FAIL' && !(evalFailCount(ev) > 0 || ev.periodExempt)) return false;
+    if (f.evalResult === 'PASS' && (evalFailCount(ev) > 0 || ev.periodExempt || ev.status === 'DRAFT')) return false;
+    if (f.evalResult === 'EXEMPT' && !ev.periodExempt) return false;
+    return true;
+  });
+  const pg = paginate(list);
+  const nDraft = all.filter(e => e.status === 'DRAFT').length;
+  const nSub = all.filter(e => e.status === 'SUBMITTED').length;
+  const nFail = all.filter(e => e.status === 'SUBMITTED' && evalFailCount(e) > 0).length;
+  return `
+    <div class="mb-4 grid gap-3 sm:grid-cols-3">
+      <div class="card p-4"><p class="text-xs text-slate-500 m-0">Tổng phiếu ĐG</p><p class="mt-1 text-2xl font-bold tabular-nums">${all.length}</p></div>
+      <div class="card p-4"><p class="text-xs text-slate-500 m-0">Đã nộp · có hạng mục lỗi</p><p class="mt-1 text-2xl font-bold tabular-nums text-rose-700">${nFail}<span class="text-sm font-medium text-slate-400"> / ${nSub}</span></p></div>
+      <div class="card p-4"><p class="text-xs text-slate-500 m-0">Nháp</p><p class="mt-1 text-2xl font-bold tabular-nums text-slate-700">${nDraft}</p></div>
+    </div>
+    <p class="mb-3 text-sm text-slate-600">Xem kết quả đánh giá định kỳ trên một danh sách — hạng mục lỗi hiện ngay trên dòng, không cần mở từng phiếu.</p>
+    ${filterBarShell([
+      filterSearch('flt-search', 'Biển số, KTV, ghi chú, hạng mục lỗi…', f.search),
+      filterSelect('flt-area', 'Khu vực', f.area, [['ALL','Tất cả'], ...areas().map(a => [a, formatAreaLabel(a)])]),
+      filterSelect('flt-kind', 'Loại phương tiện', f.kind, [['ALL','Tất cả'],['vehicle','Xe'],['trailer','Mooc']]),
+      filterSelect('flt-assessStatus', 'Trạng thái phiếu', f.assessStatus, [['ALL','Tất cả'],['SUBMITTED','Đã nộp'],['DRAFT','Nháp'],['PENDING','Chưa nộp / khác']]),
+      filterSelect('flt-evalResult', 'Kết quả', f.evalResult || 'ALL', [['ALL','Tất cả'],['PASS','Đạt (không lỗi)'],['FAIL','Có SC / Thay'],['EXEMPT','Miễn kỳ']]),
+    ].join(''), `${list.length} / ${all.length} phiếu`)}
+    <div class="card overflow-hidden">
+      <div class="border-b border-slate-200 px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-base font-semibold m-0">Kết quả đánh giá định kỳ</h2>
+        <span class="text-xs text-slate-500">${pg.items.length} dòng trang này</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-50 text-slate-600"><tr>
+            <th class="th text-left">Ngày ĐG</th>
+            <th class="th text-left">Biển số</th>
+            <th class="th text-left">Khu vực</th>
+            <th class="th text-left">Kỳ</th>
+            <th class="th text-left">KTV</th>
+            <th class="th text-center">Kết quả</th>
+            <th class="th text-left">Hạng mục lỗi / ghi chú</th>
+            <th class="th text-left">Trạng thái</th>
+            <th class="th text-left">Phiếu BD/SC</th>
+            <th class="th text-right">Thao tác</th>
+          </tr></thead>
+          <tbody>
+            ${pg.items.map((ev) => {
+              const v = vehicleById(ev.vehicleId);
+              const plate = v?.plate || ev.identity?.vehicleNumber || '—';
+              const good = evalGoodCount(ev);
+              const fail = evalFailCount(ev);
+              const total = good + fail;
+              const fails = evalFailItemsBrief(ev);
+              const period = (ev.dateStart && ev.dateEnd)
+                ? (ev.dateStart + (ev.dateStart !== ev.dateEnd ? ' → ' + ev.dateEnd : ''))
+                : formatEvalPeriodRange(v, ev);
+              const orders = ev.status === 'SUBMITTED' ? ordersLinkedToEval(ev, ev.vehicleId) : [];
+              const plans = ev.status === 'SUBMITTED' ? plansLinkedToEval(ev, ev.vehicleId) : [];
+              const resultCell = ev.periodExempt
+                ? '<span class="chip border border-rose-300 bg-rose-50 text-rose-700">Miễn kỳ</span>'
+                : ev.status === 'DRAFT'
+                  ? '<span class="text-slate-400">—</span>'
+                  : (fail
+                    ? `<span class="text-rose-700 font-semibold tabular-nums">${fail} lỗi</span><span class="text-slate-400"> · </span><span class="text-emerald-700 tabular-nums">${good}/${total}</span>`
+                    : `<span class="text-emerald-700 font-semibold">Đạt</span><span class="text-slate-400"> · </span><span class="tabular-nums">${good}/${total || '—'}</span>`);
+              const failCell = fails.length
+                ? `<ul class="m-0 pl-3.5 text-xs text-rose-800 space-y-0.5 list-disc">${fails.slice(0, 6).map(t => `<li>${esc(t)}</li>`).join('')}${fails.length > 6 ? `<li class="text-slate-500">+${fails.length - 6} hạng mục…</li>` : ''}</ul>${ev.note ? `<div class="mt-1 text-[11px] text-slate-500">${esc(ev.note)}</div>` : ''}`
+                : `<span class="text-xs text-slate-500">${esc(ev.note || '—')}</span>`;
+              let orderCell = '<span class="text-slate-300">—</span>';
+              if (orders.length) {
+                orderCell = orders.map(o =>
+                  `<button type="button" data-open-order="${esc(o.id)}" class="block text-left text-xs font-medium text-blue-600 hover:underline">${esc(o.code)}</button>`
+                ).join('');
+              } else if (plans.length) {
+                orderCell = plans.map(p =>
+                  `<button type="button" data-goto-plan-vehicle="${ev.vehicleId}" class="block text-left text-xs font-medium text-violet-700 hover:underline">${esc(p.code || 'KH')}</button>`
+                ).join('');
+              }
+              const action = ev.status === 'DRAFT'
+                ? `<button type="button" data-eval="${ev.vehicleId}" class="btn btn-primary btn-sm">Tiếp tục nháp</button>`
+                : `<button type="button" data-view-eval="${esc(ev.id)}" class="btn btn-outline btn-sm">Xem phiếu</button>
+                   <button type="button" data-open-vehicle="${ev.vehicleId}" class="btn btn-outline btn-sm ml-1">Xe</button>`;
+              return `<tr class="row-h align-top ${ev.status === 'DRAFT' ? 'bg-amber-50/30' : (fail ? 'bg-rose-50/20' : '')}">
+                <td class="td whitespace-nowrap font-medium tabular-nums">${esc(ev.date || '—')}</td>
+                <td class="td"><button type="button" data-open-vehicle="${ev.vehicleId}" class="font-medium text-blue-600 hover:underline">${esc(plate)}</button>
+                  ${v ? ` ${vehicleChip(v)}` : ''}</td>
+                <td class="td text-xs">${esc(formatAreaLabel(v?.area))}</td>
+                <td class="td text-xs tabular-nums whitespace-nowrap">${esc(period)}</td>
+                <td class="td text-xs">${esc(ev.inspector || '—')}</td>
+                <td class="td text-center">${resultCell}</td>
+                <td class="td min-w-[14rem] max-w-sm">${failCell}</td>
+                <td class="td">${evalListStatusChip(ev)}</td>
+                <td class="td">${orderCell}</td>
+                <td class="td text-right whitespace-nowrap">${action}</td>
+              </tr>`;
+            }).join('') || `<tr><td colspan="10" class="px-5 py-12 text-center text-slate-500">Chưa có kết quả đánh giá khớp bộ lọc</td></tr>`}
+          </tbody>
+        </table>
+      </div>
+      ${paginationBar(pg)}
+    </div>`;
+}
 
 function pageAssessment() {
   const f = F();
+  if (f.evalResult == null) f.evalResult = 'ALL';
   const er = getEvalReminder();
   const asOf = getEvalAsOfDateKey();
+  const assessTab = view.assessTab === 'results' ? 'results' : 'vehicles';
+  view.assessTab = assessTab;
+  const tabs = `
+  <div class="mb-4 flex gap-6 border-b border-slate-200">
+    <button type="button" data-assess-tab="vehicles" class="tab-underline border-b-2 px-1 pb-3 text-sm font-medium ${assessTab === 'vehicles' ? 'active' : 'border-transparent text-slate-600'}">Danh sách xe kiểm tra</button>
+    <button type="button" data-assess-tab="results" class="tab-underline border-b-2 px-1 pb-3 text-sm font-medium ${assessTab === 'results' ? 'active' : 'border-transparent text-slate-600'}">Kết quả đánh giá</button>
+  </div>`;
+
+  if (assessTab === 'results') {
+    return pageShell(
+      'Đánh giá phương tiện định kỳ',
+      'Tab Kết quả — xem toàn bộ phiếu ĐG đã nộp / nháp · hạng mục lỗi ngay trên danh sách',
+      `<button data-nav-settings-eval class="btn btn-outline">Cài đặt nhắc đánh giá</button>`,
+      tabs + renderAssessmentResultsPanel()
+    );
+  }
+
   const list = DB.vehicles.filter(v => {
     const ev = DB.evaluations[v.id];
     const enf = resolveEvalEnforcement(v, ev);
@@ -74056,7 +74232,7 @@ function pageAssessment() {
     'Đánh giá phương tiện định kỳ',
     'Cảnh báo ĐG sắp hạn / quá hạn / khóa · cảnh báo vỏ lốp / ắc quy (định mức kép) · tạo phiếu / kế hoạch từ ĐG',
     `<button data-nav-settings-eval class="btn btn-outline">Cài đặt nhắc đánh giá</button>`,
-    `
+    tabs + `
     <div class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <div class="card p-4 ${er.enabled ? 'border-slate-200' : 'border-amber-200 bg-amber-50/50'}">
         <p class="text-xs text-slate-500 m-0">Nhắc đánh giá</p>
@@ -78331,6 +78507,7 @@ function bindFilters() {
     'flt-branch': 'branch',
     'flt-remindStatus': 'remindStatus',
     'flt-assessStatus': 'assessStatus',
+    'flt-evalResult': 'evalResult',
     'flt-active': 'active',
     'flt-mapStatus': 'mapStatus',
     'flt-dateFrom': 'dateFrom',
@@ -78387,6 +78564,11 @@ function bind() {
   });
   $$('[data-remind-tab]').forEach(b => b.onclick = () => {
     view.remindTab = b.dataset.remindTab === 'history' ? 'history' : 'dashboard';
+    view.page = 1;
+    render();
+  });
+  $$('[data-assess-tab]').forEach(b => b.onclick = () => {
+    view.assessTab = b.dataset.assessTab === 'results' ? 'results' : 'vehicles';
     view.page = 1;
     render();
   });
@@ -78975,7 +79157,7 @@ function bind() {
     if (n === 'fleet') { histTab = 'vehicles'; menuScope = null; }
     if (n === 'historyMaint' || n === 'plansMaint') { filters.orderType = 'MAINT'; menuScope = 'MAINT'; histTab = 'orders'; }
     if (n === 'historyRepair') { filters.orderType = 'REPAIR'; menuScope = 'REPAIR'; histTab = 'orders'; }
-    view = { name: n, histTab, vehicleId: null, vehicleTab: 'catalog', plansTab: 'lines', templateId: null, orderId: null, catalogId: null, criteriaGroupId: null, from: null, menuScope, remindTab: 'dashboard', filters, page: 1, pageSize: view.pageSize || 10 };
+    view = { name: n, histTab, vehicleId: null, vehicleTab: 'catalog', plansTab: 'lines', templateId: null, orderId: null, catalogId: null, criteriaGroupId: null, from: null, menuScope, remindTab: 'dashboard', assessTab: 'vehicles', filters, page: 1, pageSize: view.pageSize || 10 };
     render();
   });
   $$('[data-nav-settings-eval]').forEach(b => b.onclick = () => {
@@ -78984,7 +79166,7 @@ function bind() {
   });
   $$('[data-filter-enf]').forEach(b => b.onclick = () => {
     const key = b.getAttribute('data-filter-enf');
-    view = { ...view, name: 'assessment', filters: { ...defaultFilters(), evalStatus: key }, page: 1 };
+    view = { ...view, name: 'assessment', assessTab: 'vehicles', filters: { ...defaultFilters(), evalStatus: key }, page: 1 };
     render();
   });
   $('#settingsForm')?.addEventListener('submit', (e) => {
@@ -79088,7 +79270,7 @@ $$('.nav-item[data-nav]').forEach(a => {
     if (n === 'fleet') { histTab = 'vehicles'; menuScope = null; }
     if (n === 'historyMaint' || n === 'plansMaint') { filters.orderType = 'MAINT'; menuScope = 'MAINT'; histTab = 'orders'; }
     if (n === 'historyRepair') { filters.orderType = 'REPAIR'; menuScope = 'REPAIR'; histTab = 'orders'; }
-    view = { name: n, histTab, vehicleId: null, vehicleTab: 'catalog', plansTab: 'lines', templateId: null, orderId: null, catalogId: null, criteriaGroupId: null, from: null, menuScope, remindTab: 'dashboard', filters, page: 1, pageSize: view.pageSize || 10 };
+    view = { name: n, histTab, vehicleId: null, vehicleTab: 'catalog', plansTab: 'lines', templateId: null, orderId: null, catalogId: null, criteriaGroupId: null, from: null, menuScope, remindTab: 'dashboard', assessTab: 'vehicles', filters, page: 1, pageSize: view.pageSize || 10 };
     render();
   });
 });
