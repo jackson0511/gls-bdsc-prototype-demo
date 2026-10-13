@@ -70028,6 +70028,7 @@ function pageHistory() {
         id: v.id,
         vehicleId: v.id,
         plate: v.plate,
+        kindLabel: v.isTrailer ? 'Mooc' : 'Xe',
         kindHtml: vehicleChip(v),
         gps: v.gps || '—',
         type: v.type || '—',
@@ -70054,10 +70055,12 @@ function pageHistory() {
       };
     });
     registerListGrid('fleetVehicles', rows, [
-      { id: 'plate', field: 'plate', name: 'Số xe / mooc', width: 160, minWidth: 120, sortable: true, formatter: (r, c, v, col, item) =>
-        `<button type="button" class="slick-link" data-open-vehicle="${item.vehicleId}">${esc(item.plate)}</button> ${item.kindHtml || ''}` },
+      { id: 'plate', field: 'plate', name: 'Biển số', width: 120, minWidth: 96, sortable: true, formatter: (r, c, v, col, item) =>
+        `<button type="button" class="slick-link" data-open-vehicle="${item.vehicleId}">${esc(item.plate)}</button>` },
+      { id: 'kind', field: 'kindLabel', name: 'Loại xe', width: 88, minWidth: 72, sortable: true, cssClass: 'c',
+        formatter: (r, c, v, col, item) => item.kindHtml || esc(item.kindLabel || '—') },
       { id: 'gps', field: 'gps', name: 'GPS', width: 110, minWidth: 80, sortable: true },
-      { id: 'type', field: 'type', name: 'Loại xe', width: 130, minWidth: 100, sortable: true },
+      { id: 'type', field: 'type', name: 'Kiểu xe', width: 130, minWidth: 100, sortable: true },
       { id: 'year', field: 'year', name: 'Đời', width: 70, minWidth: 56, cssClass: 'r', sortable: true },
       { id: 'garage', field: 'garage', name: 'Nơi BD gần nhất', width: 160, minWidth: 110, sortable: true },
       { id: 'lastMaintCode', field: 'lastMaintCode', name: 'Phiếu BD gần nhất', width: 150, minWidth: 120, sortable: true,
