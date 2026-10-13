@@ -70471,6 +70471,7 @@ function renderVehicleAssessment(v) {
     : enf === 'upcoming' ? 'bg-orange-50 border-orange-200 text-orange-950'
     : 'bg-emerald-50 border-emerald-200 text-emerald-900';
   const history = evaluationsOfVehicle(v.id);
+  const hasDraft = !!(ev?.status === 'DRAFT' || history.some(h => h.status === 'DRAFT'));
   const tireAlerts = tireBatteryAlertsForVehicle(v);
   const periodLabel = typeof formatEvalPeriodRange === 'function' ? formatEvalPeriodRange(v, ev) : (ev?.dateStart && ev?.dateEnd ? `${ev.dateStart} → ${ev.dateEnd}` : '—');
   return `
@@ -70484,7 +70485,7 @@ function renderVehicleAssessment(v) {
     </div>
   </div>
   <div class="mb-4 flex flex-wrap gap-2">
-    <button type="button" data-eval="${v.id}" class="btn btn-primary btn-sm">${submitted ? 'Đánh giá lại / mở phiếu mới' : '+ Tạo phiếu đánh giá'}</button>
+    <button type="button" data-eval="${v.id}" class="btn btn-primary btn-sm">${hasDraft ? 'Tiếp tục phiếu nháp' : (submitted ? 'Đánh giá lại / mở phiếu mới' : '+ Tạo phiếu đánh giá')}</button>
     <button type="button" data-nav="assessment" class="btn btn-outline btn-sm">Danh sách ĐG đội xe</button>
   </div>
   <div class="card overflow-hidden">
@@ -70497,6 +70498,7 @@ function renderVehicleAssessment(v) {
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-slate-600"><tr>
           <th class="th text-left">Ngày ĐG</th>
+          <th class="th text-left">Trạng thái</th>
           <th class="th text-left">Kỳ</th>
           <th class="th text-left">KTV</th>
           <th class="th text-center">Kết quả hạng mục</th>
@@ -70508,11 +70510,13 @@ function renderVehicleAssessment(v) {
           ${history.map(h => {
             const good = evalGoodCount(h);
             const fail = evalFailCount(h);
-            const orders = ordersLinkedToEval(h, v.id);
-            const plans = plansLinkedToEval(h, v.id);
+            const isDraftRow = h.status === 'DRAFT';
+            const orders = isDraftRow ? [] : ordersLinkedToEval(h, v.id);
+            const plans = isDraftRow ? [] : plansLinkedToEval(h, v.id);
             const ky = (h.dateStart && h.dateEnd) ? `${h.dateStart} → ${h.dateEnd}` : (h.date || '—');
-            return `<tr class="row-h align-top">
+            return `<tr class="row-h align-top ${isDraftRow ? 'bg-amber-50/40' : ''}">
               <td class="td whitespace-nowrap font-medium">${esc(h.date || '—')}</td>
+              <td class="td">${evalListStatusChip(h)}</td>
               <td class="td text-xs text-slate-600">${esc(ky)}</td>
               <td class="td">${esc(h.inspector || '—')}</td>
               <td class="td text-center tabular-nums">
@@ -70531,11 +70535,13 @@ function renderVehicleAssessment(v) {
                 ).join('') : '<span class="text-xs text-slate-400">—</span>'}
               </td>
               <td class="td text-right whitespace-nowrap">
-                <button type="button" data-view-eval="${esc(h.id)}" class="btn btn-outline btn-sm">Xem phiếu ĐG</button>
+                ${isDraftRow
+                  ? `<button type="button" data-eval="${v.id}" class="btn btn-primary btn-sm">Tiếp tục nháp</button>`
+                  : `<button type="button" data-view-eval="${esc(h.id)}" class="btn btn-outline btn-sm">Xem phiếu ĐG</button>`}
               </td>
             </tr>
-            <tr class="border-b border-slate-100">
-              <td colspan="7" class="px-4 pb-3 pt-0">
+            <tr class="border-b border-slate-100 ${isDraftRow ? 'bg-amber-50/20' : ''}">
+              <td colspan="8" class="px-4 pb-3 pt-0">
                 <div class="rounded-md border border-slate-100 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
                   <span class="font-medium text-slate-700">Ghi chú:</span> ${esc(h.note || '—')}
                   ${fail ? ` · Hạng mục lỗi: ${Object.entries(h.items || {}).filter(([,a]) => a === 'repair' || a === 'replace').map(([id,a]) => {
@@ -70549,7 +70555,7 @@ function renderVehicleAssessment(v) {
         </tbody>
       </table>
     </div>` : `
-    <div class="px-5 py-12 text-center text-sm text-slate-500">Chưa có lịch sử đánh giá đã nộp cho xe này.</div>`}
+    <div class="px-5 py-12 text-center text-sm text-slate-500">Chưa có phiếu đánh giá (nháp hoặc đã nộp) cho xe này.</div>`}
   </div>`;
 }
 
@@ -73154,28 +73160,56 @@ function ensureEvaluationHistory() {
   });
 }
 function archiveEvaluation(vid, ev) {
-  if (!ev || ev.status !== 'SUBMITTED') return;
+  if (!ev || (ev.status !== 'SUBMITTED' && ev.status !== 'DRAFT')) return null;
   ensureEvaluationHistory();
-  const id = ev.id || ('ev-' + vid + '-' + (ev.date || todayDateKey()) + '-' + Date.now().toString(36));
+  const isDraft = ev.status === 'DRAFT';
+  const id = ev.id || ('ev-' + vid + '-' + (ev.date || todayDateKey()) + '-' + (isDraft ? 'draft' : Date.now().toString(36)));
   const copy = { ...structuredClone(ev), id, vehicleId: Number(vid) };
-  const idx = DB.evaluationHistory.findIndex(h =>
-    h.id === id || (Number(h.vehicleId) === Number(vid) && h.date === copy.date && (h.inspector || '') === (copy.inspector || ''))
-  );
+  let idx = -1;
+  if (isDraft) {
+    idx = DB.evaluationHistory.findIndex(h =>
+      Number(h.vehicleId) === Number(vid) && h.status === 'DRAFT'
+    );
+  }
+  if (idx < 0) {
+    idx = DB.evaluationHistory.findIndex(h =>
+      h.id === id || (Number(h.vehicleId) === Number(vid) && h.date === copy.date && (h.inspector || '') === (copy.inspector || '') && h.status === copy.status)
+    );
+  }
   if (idx >= 0) DB.evaluationHistory[idx] = { ...DB.evaluationHistory[idx], ...copy, id: DB.evaluationHistory[idx].id };
   else DB.evaluationHistory.unshift(copy);
+  /* Khi nộp: bỏ bản nháp cũ của cùng xe trong lịch sử */
+  if (!isDraft) {
+    DB.evaluationHistory = DB.evaluationHistory.filter(h =>
+      !(Number(h.vehicleId) === Number(vid) && h.status === 'DRAFT' && String(h.id) !== String(copy.id))
+    );
+  }
   DB.evaluations[vid] = { ...DB.evaluations[vid], id: copy.id };
   save();
+  return copy;
 }
 function evaluationById(id) {
   ensureEvaluationHistory();
-  return (DB.evaluationHistory || []).find(e => String(e.id) === String(id)) || null;
+  const fromHist = (DB.evaluationHistory || []).find(e => String(e.id) === String(id));
+  if (fromHist) return fromHist;
+  const live = Object.entries(DB.evaluations || {}).find(([, ev]) => ev && String(ev.id) === String(id));
+  return live ? { ...live[1], vehicleId: Number(live[0]) } : null;
 }
 function evaluationsOfVehicle(vid) {
   ensureEvaluationHistory();
-  return (DB.evaluationHistory || [])
-    .filter(e => Number(e.vehicleId) === Number(vid) && e.status === 'SUBMITTED')
-    .slice()
-    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  const list = (DB.evaluationHistory || [])
+    .filter(e => Number(e.vehicleId) === Number(vid) && (e.status === 'SUBMITTED' || e.status === 'DRAFT'))
+    .slice();
+  const cur = DB.evaluations[vid];
+  if (cur && cur.status === 'DRAFT') {
+    const hasDraft = list.some(h => h.status === 'DRAFT' || (cur.id && String(h.id) === String(cur.id)));
+    if (!hasDraft) list.unshift({ ...structuredClone(cur), vehicleId: Number(vid), id: cur.id || ('ev-draft-' + vid) });
+  }
+  return list.sort((a, b) => {
+    if (a.status === 'DRAFT' && b.status !== 'DRAFT') return -1;
+    if (b.status === 'DRAFT' && a.status !== 'DRAFT') return 1;
+    return String(b.date || '').localeCompare(String(a.date || ''));
+  });
 }
 function openCreateOrderFromEval(vid) {
   openCreateOrderModal(Number(vid), 'INCIDENTAL', 'PERIODIC_ASSESSMENT');
@@ -75707,12 +75741,13 @@ function openEvalModal(vid) {
       DB.evaluations[vid].linkedOrderIds = createdOrder ? [createdOrder.id] : [];
       DB.evaluations[vid].postEvalAction = postAction;
     }
-    if (formStatus === 'SUBMITTED') archiveEvaluation(vid, DB.evaluations[vid]);
+    if (formStatus === 'SUBMITTED' || formStatus === 'DRAFT') archiveEvaluation(vid, DB.evaluations[vid]);
 
     closeModal();
 
     if (formStatus === 'DRAFT') {
       toast('Đã lưu nháp phiếu đánh giá');
+      if (view.name === 'vehicle') view.vehicleTab = 'assessment';
       render();
       return;
     }
