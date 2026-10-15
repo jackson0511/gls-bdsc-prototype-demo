@@ -80,22 +80,53 @@
       text-overflow: ellipsis;
       max-width: 0; /* force fixed-layout clip */
     }
-    .assess-fail-workspace .slick-row.assess-group-row .slick-cell {
+    .assess-fail-workspace .slick-row.assess-group-row .slick-cell,
+    .remind-workspace .slick-row.remind-group-row .slick-cell {
       background: #f1f5f9 !important;
       font-weight: 600;
       color: #0f172a;
       border-top: 1px solid #cbd5e1 !important;
       cursor: pointer;
     }
-    .assess-fail-workspace .slick-row.assess-group-row:hover .slick-cell { background: #e2e8f0 !important; }
+    .assess-fail-workspace .slick-row.assess-group-row:hover .slick-cell,
+    .remind-workspace .slick-row.remind-group-row:hover .slick-cell { background: #e2e8f0 !important; }
     .assess-fail-workspace .slick-row.assess-fail-row .slick-cell { background: #fff7f7; }
     .assess-fail-workspace .slick-row.assess-fail-row:hover .slick-cell { background: #ffe4e6 !important; }
+    .remind-workspace .slick-row.remind-due-row .slick-cell { background: #fffbeb; }
+    .remind-workspace .slick-row.remind-overdue-row .slick-cell { background: #fff7f7; }
     .assess-fail-workspace .slick-row.list-row-sel .slick-cell,
-    .assess-fail-workspace .slick-row.plan-row-sel .slick-cell { background: #eff6ff !important; }
+    .assess-fail-workspace .slick-row.plan-row-sel .slick-cell,
+    .remind-workspace .slick-row.list-row-sel .slick-cell { background: #eff6ff !important; }
     .assess-fail-workspace .slick-row.assess-group-row.list-row-sel .slick-cell,
-    .assess-fail-workspace .slick-row.assess-group-row.plan-row-sel .slick-cell {
+    .assess-fail-workspace .slick-row.assess-group-row.plan-row-sel .slick-cell,
+    .remind-workspace .slick-row.remind-group-row.list-row-sel .slick-cell {
       background: #dbeafe !important;
       box-shadow: inset 0 0 0 2px #0078d4;
+    }
+    /* Nhắc BD: giữ đường kẻ cột (không nhìn như merge), 1 dòng / cell */
+    .remind-workspace .slick-row.remind-group-row .slick-cell {
+      border-right: 1px solid #cbd5e1 !important;
+    }
+    .remind-workspace .slick-viewport .slick-row .slick-cell {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.35;
+      vertical-align: middle;
+    }
+    .remind-workspace .plan-group-title-cell {
+      display: inline-flex;
+      align-items: center;
+      min-width: 0;
+      max-width: 100%;
+      font-weight: 600;
+      color: #1e3a8a;
+      cursor: pointer;
+    }
+    .remind-workspace .plan-group-title-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .assess-fail-item-chip {
       display: inline-flex; align-items: center; gap: 4px;
@@ -253,10 +284,10 @@
     .list-slick-workspace .slick-headerrow {
       width: 100% !important;
     }
+    /* Không ép header-columns = 100% — khi nhiều cột / tắt forceFit cần width = tổng cột để scroll + hiện tên header */
     .list-slick-workspace .slick-header-columns,
     .list-slick-workspace .slick-headerrow-columns {
-      width: 100% !important;
-      min-width: 100% !important;
+      min-width: 100%;
     }
     .list-slick-workspace .slick-headerrow-column .slick-filter,
     .list-slick-workspace .slick-headerrow-column input.search-filter,
@@ -266,7 +297,24 @@
       flex: 1 1 auto;
     }
     .list-slick-workspace .slick-header-columns { border-bottom: 1px solid #cbd5e1; background: #f8fafc; }
-    .list-slick-workspace .slick-header-column { font-size: 12px; font-weight: 600; color: #334155; }
+    .list-slick-workspace .slick-header-column {
+      font-size: 11px;
+      font-weight: 600;
+      color: #334155 !important;
+      line-height: 1.25;
+      white-space: normal;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      vertical-align: middle;
+    }
+    .list-slick-workspace .slick-header-column .slick-column-name {
+      display: inline !important;
+      visibility: visible !important;
+      opacity: 1 !important;
+      color: inherit !important;
+      white-space: normal;
+      word-break: break-word;
+    }
     .list-slick-workspace .slick-header-column,
     .list-slick-workspace .slick-cell {
       border-right: 1px solid #e2e8f0 !important;
@@ -1828,15 +1876,10 @@ const DEFAULT_EVAL_REMINDER = {
   cadence: 'MONTHLY', // MONTHLY | WEEKLY
   preset: 'recommended', // recommended | gentle | strict | custom
   deadlineDayOfMonth: 15,
-  lockDayOfMonth: 30,
   deadlineWeekday: 4, // 1=T2 … 7=CN
-  lockWeekday: 7,
   remindDaysBefore: 5,
   remindIncludeDeadlineDay: true,
   overdueRemindEveryDays: 1,
-  continueRemindAfterLock: false,
-  unlockOnAssessmentSubmitted: true,
-  unlockAlsoWhenMaintenanceDone: true,
   notifyRoles: ['Quản lý xưởng', 'Điều phối'],
   filterByVehicleArea: true,
 };
@@ -1845,35 +1888,35 @@ const EVAL_REMINDER_PRESETS = {
   MONTHLY: {
     recommended: {
       tag: 'Khuyến nghị', title: 'Cân bằng',
-      desc: 'Hết hạn ngày 15, khóa ngày 30. Nhắc trước 5 ngày; quá hạn nhắc mỗi ngày đến khi khóa. Mở xe khi đã nộp đánh giá hoặc xong bảo dưỡng.',
-      values: { deadlineDayOfMonth: 15, lockDayOfMonth: 30, remindDaysBefore: 5, overdueRemindEveryDays: 1, unlockAlsoWhenMaintenanceDone: true },
+      desc: 'Hết hạn ngày 15. Nhắc trước 5 ngày (gần tới hạn); ngày hết hạn = tới hạn; quá hạn nhắc mỗi ngày.',
+      values: { deadlineDayOfMonth: 15, remindDaysBefore: 5, overdueRemindEveryDays: 1 },
     },
     gentle: {
-      tag: 'Nhẹ', title: 'Nhắc nhiều · khóa muộn',
-      desc: 'Hết hạn ngày 15, khóa ngày 30. Nhắc mỗi ngày trước hạn; quá hạn nhắc thưa hơn.',
-      values: { deadlineDayOfMonth: 15, lockDayOfMonth: 30, remindDaysBefore: 14, overdueRemindEveryDays: 2, unlockAlsoWhenMaintenanceDone: true },
+      tag: 'Nhẹ', title: 'Nhắc sớm hơn',
+      desc: 'Hết hạn ngày 15. Nhắc trước 14 ngày; quá hạn nhắc thưa hơn (mỗi 2 ngày).',
+      values: { deadlineDayOfMonth: 15, remindDaysBefore: 14, overdueRemindEveryDays: 2 },
     },
     strict: {
-      tag: 'Siết', title: 'Khóa sớm hơn',
-      desc: 'Hết hạn ngày 20, khóa ngày 25. Nhắc dày; ưu tiên mở xe khi hoàn thành bảo dưỡng (nếu có).',
-      values: { deadlineDayOfMonth: 20, lockDayOfMonth: 25, remindDaysBefore: 3, overdueRemindEveryDays: 1, unlockAlsoWhenMaintenanceDone: true },
+      tag: 'Siết', title: 'Nhắc sát hạn',
+      desc: 'Hết hạn ngày 20. Nhắc trước 3 ngày; quá hạn nhắc mỗi ngày.',
+      values: { deadlineDayOfMonth: 20, remindDaysBefore: 3, overdueRemindEveryDays: 1 },
     },
   },
   WEEKLY: {
     recommended: {
       tag: 'Khuyến nghị', title: 'Cân bằng',
-      desc: 'Hết hạn Thứ 5, khóa Chủ nhật cùng tuần. Nhắc trước 2 ngày; quá hạn nhắc đến khi khóa. Mở xe khi đã nộp đánh giá hoặc xong bảo dưỡng.',
-      values: { deadlineWeekday: 4, lockWeekday: 7, remindDaysBefore: 2, overdueRemindEveryDays: 1, unlockAlsoWhenMaintenanceDone: true },
+      desc: 'Hết hạn Thứ 5. Nhắc trước 2 ngày; quá hạn nhắc mỗi ngày.',
+      values: { deadlineWeekday: 4, remindDaysBefore: 2, overdueRemindEveryDays: 1 },
     },
     gentle: {
-      tag: 'Nhẹ', title: 'Nhắc sớm · khóa muộn',
-      desc: 'Hết hạn Thứ 4, khóa Chủ nhật. Nhắc trước 3 ngày; quá hạn nhắc cách ngày.',
-      values: { deadlineWeekday: 3, lockWeekday: 7, remindDaysBefore: 3, overdueRemindEveryDays: 2, unlockAlsoWhenMaintenanceDone: true },
+      tag: 'Nhẹ', title: 'Nhắc sớm hơn',
+      desc: 'Hết hạn Thứ 4. Nhắc trước 3 ngày; quá hạn nhắc cách ngày.',
+      values: { deadlineWeekday: 3, remindDaysBefore: 3, overdueRemindEveryDays: 2 },
     },
     strict: {
       tag: 'Siết', title: 'Nhắc sát hạn',
-      desc: 'Hết hạn Thứ 6, khóa Chủ nhật. Nhắc trước 1 ngày.',
-      values: { deadlineWeekday: 5, lockWeekday: 7, remindDaysBefore: 1, overdueRemindEveryDays: 1, unlockAlsoWhenMaintenanceDone: false },
+      desc: 'Hết hạn Thứ 6. Nhắc trước 1 ngày; quá hạn nhắc mỗi ngày.',
+      values: { deadlineWeekday: 5, remindDaysBefore: 1, overdueRemindEveryDays: 1 },
     },
   },
 };
@@ -3056,8 +3099,7 @@ const DEFAULT_BAREM_HOURS = [
 
 const DEFAULT = {
   settings: {
-    evalRemindDaysBefore: 3,
-    evalLockAfterDays: 7,
+    evalRemindDaysBefore: 5,
     maintenanceRemindKmBefore: 500,
     maintenanceRemindDaysBefore: 14,
     evalDemoAsOf: '2026-09-28',
@@ -64046,7 +64088,7 @@ const DEFAULT = {
         c16: { repairs: [{ id: 'ri5', name: 'Công kiểm tra', system: 'Hệ Thống Máy Xe' }], materials: [] },
       },
     },
-    /* 51C-41767 · chỉ có ĐG tháng 8 + phiếu SC; tháng 9 chưa nộp → xe bị khóa (demo) */
+    /* 51C-41767 · chỉ có ĐG tháng 8 + phiếu SC; tháng 9 chưa nộp → quá hạn (demo) */
     {
       id: 'ev-103-20260817', vehicleId: 103, date: '2026-08-17', status: 'SUBMITTED', note: 'SC phát sinh · kiểm tra tình trạng xe',
       inspector: 'Vũ KTV', dateStart: '2026-08-01', dateEnd: '2026-08-31',
@@ -67207,6 +67249,32 @@ function showListCtx(ev, key, item) {
       plate: item.plate,
       code: item.plate || '',
     };
+  } else if (key === 'remindDashboard') {
+    const group = item.__group ? item : (window._listGridPacks?.remindDashboard?.rows || []).find(r => r.__group && String(r.groupKey) === String(item.groupKey));
+    if (item.vehicleId != null) bits.push(slickMenuItem('open-vehicle', 'truck', 'Mở xe ' + (item.plate || '')));
+    bits.push(slickMenuItem('remind-open-catalog', 'file', 'Sửa kỳ / danh mục xe'));
+    if (!item.__group && item.rowKind === 'CATALOG' && item.catalogId) {
+      bits.push(slickMenuItem('remind-push-one', 'plus', 'Đưa hạng mục này → KH'));
+      bits.push(slickMenuItem('remind-create-order', 'calCheck', 'Tạo phiếu từ danh mục'));
+    }
+    if (!item.__group && item.rowKind === 'TIRE_BATTERY' && item.tbId) {
+      bits.push(slickMenuItem('remind-push-tb', 'plus', 'Đưa lốp/ắc → KH'));
+    }
+    if (group) {
+      bits.push(slickMenuItem('remind-collapse-one', 'chev', group._collapsed ? 'Mở rộng nhóm này' : 'Thu gọn nhóm này'));
+    }
+    bits.push(slickMenuItem('remind-collapse-all', 'dens', 'Thu gọn tất cả nhóm'));
+    bits.push(slickMenuItem('remind-expand-all', 'cols', 'Mở rộng tất cả nhóm'));
+    bits.push(slickMenuItem('copy-code', 'copy', 'Sao chép biển số'));
+    el._listCtx = {
+      key, item,
+      groupKey: group?.groupKey || item.groupKey,
+      vehicleId: item.vehicleId,
+      catalogId: item.catalogId,
+      tbId: item.tbId,
+      plate: item.plate,
+      code: item.plate || '',
+    };
   } else {
     bits.push(slickMenuItem('copy-code', 'copy', 'Sao chép'));
     el._listCtx = { key, item, code: item.code || item.plate || item.name || '' };
@@ -67250,6 +67318,52 @@ function showListCtx(ev, key, item) {
         setAllAssessGroupsCollapsed(false);
         return;
       }
+      if (act === 'remind-collapse-one' && ctx.groupKey) {
+        toggleRemindGroupCollapse(ctx.groupKey);
+        return;
+      }
+      if (act === 'remind-collapse-all') {
+        setAllRemindGroupsCollapsed(true);
+        return;
+      }
+      if (act === 'remind-expand-all') {
+        setAllRemindGroupsCollapsed(false);
+        return;
+      }
+      if (act === 'remind-open-catalog' && ctx.vehicleId != null) {
+        view = { ...view, name: 'vehicle', vehicleId: Number(ctx.vehicleId), vehicleTab: 'catalog', from: 'reminder', filters: defaultFilters(), page: 1 };
+        render(); return;
+      }
+      if (act === 'remind-push-one' && ctx.vehicleId != null && ctx.catalogId != null) {
+        openSchedulePlanModal({
+          title: 'Đưa vào kế hoạch bảo dưỡng',
+          onConfirm: ({ period, scheduleDate }) => {
+            const n = pushReminderRowsToPlan([{ dataset: { vid: ctx.vehicleId, cid: ctx.catalogId } }], period, scheduleDate, 'Từ nhắc BD · chuột phải');
+            save();
+            toast(n ? ('Đã đưa ' + n + ' dòng vào KH ' + period) : 'Dòng đã có trên kế hoạch kỳ này');
+            if (n) { view.name = menuPlansNav(); view.plansTab = 'lines'; }
+            render();
+          },
+        });
+        return;
+      }
+      if (act === 'remind-push-tb' && ctx.tbId) {
+        openSchedulePlanModal({
+          title: 'Đưa lốp / ắc vào kế hoạch',
+          onConfirm: ({ period, scheduleDate }) => {
+            const n = pushTireBatteryUnitsToPlan([ctx.tbId], period, scheduleDate, 'Từ nhắc BD · chuột phải');
+            save();
+            toast(n ? ('Đã đưa ' + n + ' dòng vào KH ' + period) : 'Dòng đã có trên kế hoạch kỳ này');
+            if (n) { view.name = menuPlansNav(); view.plansTab = 'lines'; }
+            render();
+          },
+        });
+        return;
+      }
+      if (act === 'remind-create-order' && ctx.vehicleId != null && ctx.catalogId != null) {
+        openCreateOrderFromDueCatalog(Number(ctx.vehicleId), Number(ctx.catalogId));
+        return;
+      }
       if (act === 'view-eval' && ctx.evalId) {
         openEvalResultModal(ctx.evalId);
         return;
@@ -67278,14 +67392,55 @@ function stripCellPlainText(html) {
   return (d.textContent || '').replace(/\s+/g, ' ').trim();
 }
 function compareGridValues(a, b, asc) {
-  const av = a == null ? '' : a;
-  const bv = b == null ? '' : b;
+  const av = a == null || a === '—' ? '' : a;
+  const bv = b == null || b === '—' ? '' : b;
   const an = av !== '' && !isNaN(Number(av)) && String(av).trim() !== '';
   const bn = bv !== '' && !isNaN(Number(bv)) && String(bv).trim() !== '';
   let cmp = 0;
   if (an && bn) cmp = Number(av) - Number(bv);
   else cmp = String(av).localeCompare(String(bv), 'vi', { numeric: true, sensitivity: 'base' });
   return asc ? cmp : -cmp;
+}
+/** Sort lưới group (nhắc BD / kết quả ĐG): sắp nhóm theo giá trị header (hoặc leaf đại diện), rồi sắp hạng mục trong nhóm — giữ cấu trúc group → children. */
+function sortGroupedListRows(rows, field, asc) {
+  if (!field || !rows || !rows.length) return rows || [];
+  const groups = [];
+  const byKey = new Map();
+  (rows || []).forEach((r) => {
+    if (!r) return;
+    if (r.__group) {
+      const g = { header: r, kids: [] };
+      groups.push(g);
+      byKey.set(String(r.groupKey), g);
+      return;
+    }
+    const g = byKey.get(String(r.groupKey));
+    if (g) g.kids.push(r);
+    else groups.push({ header: null, kids: [r] });
+  });
+  const groupKeyVal = (g) => {
+    const h = g.header;
+    if (h) {
+      const hv = h[field];
+      if (hv != null && hv !== '' && hv !== '—') return hv;
+    }
+    const kids = g.kids || [];
+    if (!kids.length) return '';
+    let best = kids[0][field];
+    for (let i = 1; i < kids.length; i++) {
+      const v = kids[i][field];
+      if (compareGridValues(v, best, asc) < 0) best = v;
+    }
+    return best;
+  };
+  groups.sort((ga, gb) => compareGridValues(groupKeyVal(ga), groupKeyVal(gb), asc));
+  const out = [];
+  groups.forEach((g) => {
+    if (g.header) out.push(g.header);
+    (g.kids || []).sort((a, b) => compareGridValues(a[field], b[field], asc));
+    out.push(...(g.kids || []));
+  });
+  return out;
 }
 function matchLookupOption(options, text) {
   const q = String(text || '').trim().toLowerCase();
@@ -67672,6 +67827,17 @@ function mountListSlickGrid(host, rows, cols, opts) {
           columns: { 1: { colspan: Math.max(1, colCount - 1) } },
         };
       }
+      if (key === 'remindDashboard' && item.__group) {
+        return {
+          cssClasses: 'remind-group-row' + (sel ? ' list-row-sel' : ''),
+        };
+      }
+      if (key === 'remindDashboard' && !item.__group) {
+        const tone = item.status === 'overdue' ? 'remind-overdue-row' : item.status === 'dueSoon' ? 'remind-due-row' : '';
+        return {
+          cssClasses: [tone, sel ? 'list-row-sel' : ''].filter(Boolean).join(' '),
+        };
+      }
       const classes = [];
       if (sel) classes.push('list-row-sel');
       return classes.length ? { cssClasses: classes.join(' ') } : null;
@@ -67752,7 +67918,7 @@ function mountListSlickGrid(host, rows, cols, opts) {
       return true;
     };
     let matched = allRows.filter(rowMatches);
-    if (key === 'assessResults') {
+    if (key === 'assessResults' || key === 'remindDashboard') {
       const groupByKey = {};
       allRows.forEach((r) => {
         if (r && r.__group) groupByKey[String(r.groupKey)] = r;
@@ -67762,14 +67928,21 @@ function mountListSlickGrid(host, rows, cols, opts) {
         if (r.__group) return keepKeys.has(r.groupKey);
         if (!keepKeys.has(r.groupKey) || !rowMatches(r)) return false;
         const g = groupByKey[String(r.groupKey)];
-        if (g && g._collapsed) return false;
+        const collapsedFlag = !!(g && g._collapsed)
+          || (key === 'remindDashboard' && typeof isRemindGroupCollapsed === 'function' && isRemindGroupCollapsed(r.groupKey))
+          || (key === 'assessResults' && typeof isAssessGroupCollapsed === 'function' && isAssessGroupCollapsed(r.groupKey));
+        if (collapsedFlag) return false;
         return true;
       });
     }
     visibleRows = matched;
     const sortState = view.listGridSort[key];
-    if (sortState && sortState.field && key !== 'assessResults') {
-      visibleRows.sort((a, b) => compareGridValues(a[sortState.field], b[sortState.field], sortState.asc !== false));
+    if (sortState && sortState.field) {
+      if (key === 'assessResults' || key === 'remindDashboard') {
+        visibleRows = sortGroupedListRows(visibleRows, sortState.field, sortState.asc !== false);
+      } else {
+        visibleRows.sort((a, b) => compareGridValues(a[sortState.field], b[sortState.field], sortState.asc !== false));
+      }
     }
     window._listGridRows[key] = visibleRows;
     try { grid.invalidate(); grid.render(); } catch (_) {}
@@ -67919,7 +68092,8 @@ function mountListSlickGrid(host, rows, cols, opts) {
         grid.setOptions({ forceFitColumns: true, fullWidthRows: true });
       }
       if (typeof grid.resizeCanvas === 'function') grid.resizeCanvas();
-      if (typeof grid.autosizeColumns === 'function') grid.autosizeColumns();
+      /* autosize khi tắt forceFit sẽ bóp cột theo cell → header dài bị mất chữ */
+      if (o.forceFitColumns !== false && typeof grid.autosizeColumns === 'function') grid.autosizeColumns();
     } catch (_) {}
   };
   fit();
@@ -67982,6 +68156,12 @@ function mountListSlickGrid(host, rows, cols, opts) {
           if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
           return;
         }
+        const remindToggle = t.closest('[data-remind-tree-toggle], [data-remind-group-toggle-row]');
+        if (key === 'remindDashboard' && remindToggle) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
+          return;
+        }
         const openFail = t.closest('[data-assess-fail-open]');
         if (openFail) {
           if (native && native.stopPropagation) native.stopPropagation();
@@ -68002,6 +68182,72 @@ function mountListSlickGrid(host, rows, cols, opts) {
           refreshAssessFailChecks();
           return;
         }
+        const remindCk = t.closest('.rem-row, .rem-group-ck');
+        if (key === 'remindDashboard' && remindCk) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          if (remindCk.classList.contains('rem-group-ck')) {
+            setRemindGroupChecked(remindCk.getAttribute('data-remind-group-key'), remindCk.checked, visibleRows);
+          } else {
+            const lk = remindCk.getAttribute('data-remind-leaf-key');
+            setRemindLeafChecked(lk, remindCk.checked);
+          }
+          try { grid.invalidate(); grid.render(); } catch (_) {}
+          return;
+        }
+        const pushPlanRow = t.closest('[data-push-plan-row]');
+        if (pushPlanRow) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          const vid = pushPlanRow.getAttribute('data-push-plan-row');
+          const cid = pushPlanRow.getAttribute('data-cid');
+          if (typeof openSchedulePlanModal === 'function') {
+            openSchedulePlanModal({
+              title: 'Đưa danh mục vào kế hoạch',
+              onConfirm: ({ period, scheduleDate }) => {
+                const n = pushReminderRowsToPlan([{ dataset: { vid, cid } }], period, scheduleDate, 'Từ nhắc BD · chỉ định');
+                save();
+                toast(n ? ('Đã đưa ' + n + ' dòng vào KH ' + period) : 'Dòng đã có trong KH kỳ này');
+                view.name = menuPlansNav(); view.plansTab = 'lines';
+                render();
+              },
+            });
+          }
+          return;
+        }
+        const pushTbRow = t.closest('[data-push-tb-row]');
+        if (pushTbRow) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          const uid = pushTbRow.getAttribute('data-push-tb-row');
+          if (typeof openSchedulePlanModal === 'function') {
+            openSchedulePlanModal({
+              title: 'Đưa lốp/ắc vào kế hoạch',
+              onConfirm: ({ period, scheduleDate }) => {
+                const n = pushTireBatteryUnitsToPlan([uid], period, scheduleDate, 'Từ nhắc BD · lốp/ắc');
+                save();
+                toast(n ? ('Đã đưa ' + n + ' dòng vào KH ' + period) : 'Dòng đã có trong KH kỳ này');
+                view.name = menuPlansNav(); view.plansTab = 'lines';
+                render();
+              },
+            });
+          }
+          return;
+        }
+        const createDue = t.closest('[data-create-order-from-due]');
+        if (createDue) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          if (typeof openCreateOrderFromDueCatalog === 'function') {
+            openCreateOrderFromDueCatalog(Number(createDue.getAttribute('data-create-order-from-due')), Number(createDue.getAttribute('data-cid')));
+          }
+          return;
+        }
+        const openCat = t.closest('[data-open-vehicle-catalog]');
+        if (openCat) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          const vid = Number(openCat.getAttribute('data-open-vehicle-catalog'));
+          view = { ...view, name: 'vehicle', vehicleId: vid, vehicleTab: 'catalog', from: 'reminder', filters: defaultFilters(), page: 1 };
+          render();
+          return;
+        }
+        /* data-open-tire-battery: để document listener xử lý (cùng luồng trang Vỏ lốp / ắc quy) */
         const viewOrders = t.closest('[data-view-orders-plate]');
         if (viewOrders) {
           if (native && native.stopPropagation) native.stopPropagation();
@@ -68076,6 +68322,52 @@ function mountListSlickGrid(host, rows, cols, opts) {
     bindAssessHeaderCheck();
     setTimeout(bindAssessHeaderCheck, 50);
     setTimeout(bindAssessHeaderCheck, 200);
+  }
+  if (key === 'remindDashboard') {
+    if (host._remindTreeToggleBound) {
+      host.removeEventListener('click', host._remindTreeToggleBound, true);
+    }
+    host._remindTreeToggleAt = 0;
+    host._remindTreeToggleBound = (ev) => {
+      const t = ev.target;
+      const toggleEl = t && t.closest && t.closest('[data-remind-tree-toggle], [data-remind-group-toggle-row]');
+      if (!toggleEl) return;
+      if (t.closest && (t.closest('[data-open-vehicle]') || t.closest('input.rem-row') || t.closest('input.rem-group-ck') || t.closest('input[type="checkbox"]'))) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+      const now = Date.now();
+      if (now - (host._remindTreeToggleAt || 0) < 350) return;
+      host._remindTreeToggleAt = now;
+      const gk = toggleEl.getAttribute('data-remind-group-key');
+      if (gk) toggleRemindGroupCollapse(gk);
+    };
+    host.addEventListener('click', host._remindTreeToggleBound, true);
+    const bindRemindHeaderCheck = () => {
+      const headers = host.querySelectorAll('.slick-header:not(.slick-preheader-panel) .slick-header-column');
+      const ckHeader = [...headers].find(el => String(el.id || '').includes('_ck')) || headers[0];
+      if (!ckHeader) return;
+      if (!ckHeader.querySelector('#remCheckAll')) {
+        ckHeader.innerHTML = '';
+        ckHeader.style.display = 'flex';
+        ckHeader.style.alignItems = 'center';
+        ckHeader.style.justifyContent = 'center';
+        const all = document.createElement('input');
+        all.type = 'checkbox';
+        all.id = 'remCheckAll';
+        all.className = 'order-grid-select-all-checkbox';
+        all.setAttribute('aria-label', 'Chọn tất cả dòng nhắc');
+        all.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setAllRemindLeavesChecked(all.checked, visibleRows);
+          try { grid.invalidate(); grid.render(); } catch (_) {}
+        });
+        ckHeader.appendChild(all);
+      }
+    };
+    bindRemindHeaderCheck();
+    setTimeout(bindRemindHeaderCheck, 50);
+    setTimeout(bindRemindHeaderCheck, 200);
   }
   host.oncontextmenu = (e) => {
     const cell = grid.getCellFromEvent && grid.getCellFromEvent(e);
@@ -70086,7 +70378,7 @@ function evalMountedTireBatteryHtml(vid, kind) {
   </div>`;
 }
 
-/** Tiêu chí ĐG thuộc lốp / ắc → dùng để chọn seri + lọc vật tư */
+/** Tiêu chí ĐG thuộc lốp / ắc → dùng để lọc vật tư gợi ý */
 function evalItemTireBatteryKind(itemId) {
   const id = String(itemId || '');
   if (id === 'c14' || id === 'c15' || id === 'tm6') return 'TIRE';
@@ -70149,29 +70441,6 @@ function repairsSuggestedForEvalItem(itemId, vehicleId) {
     return { r, score };
   }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
   return scored.map((x) => x.r);
-}
-function evalSerialPickHtml(itemId, vid, stateRow) {
-  const kind = evalItemTireBatteryKind(itemId);
-  if (!kind) return '';
-  ensureTireBatteryUnits(false);
-  const units = sortTireBatteryUnits(
-    (DB.tireBatteryUnits || []).filter((u) => Number(u.vehicleId) === Number(vid) && u.kind === kind)
-  );
-  const label = kind === 'BATTERY' ? 'ắc quy' : 'vỏ lốp';
-  if (!units.length) {
-    return `<div class="mb-2 rounded border border-dashed border-amber-200 bg-amber-50/60 px-2 py-1.5 text-[11px] text-amber-950">Chưa có ${label} gắn xe — mở «Vỏ lốp / ắc quy» để kiểm tra.</div>`;
-  }
-  const sel = stateRow?.unitId || '';
-  return `<label class="mb-2 block text-sm font-semibold text-slate-900">Số seri ${label} đang gắn
-    <select class="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-2 font-mono text-sm font-semibold text-slate-900" data-eval-pick-unit="${esc(itemId)}">
-      <option value="">— Chọn số seri để điền —</option>
-      ${units.map((u) => {
-        const lv = tireBatteryWarnLevel(u);
-        const warn = lv === 'overdue' ? ' · quá hạn' : lv === 'dueSoon' ? ' · sắp hạn' : '';
-        return `<option value="${esc(u.id)}" ${String(sel) === String(u.id) ? 'selected' : ''}>${esc(u.serial || 'CHƯA CÓ SERI')}${warn} · ${esc(u.name || '')}</option>`;
-      }).join('')}
-    </select>
-  </label>`;
 }
 function evalSuggestedMatChipsHtml(itemId, vid) {
   const list = materialsSuggestedForEvalItem(itemId, vid).slice(0, 8);
@@ -70899,8 +71168,8 @@ function vehicleChip(v) {
 function evalBadge(s) {
   const m = {
     ok: ['bg-emerald-100 text-emerald-800', 'Đúng hạn'],
-    soon: ['bg-amber-100 text-amber-800', 'Sắp đến hạn'],
-    due: ['bg-rose-100 text-rose-800', 'Đến hạn'],
+    soon: ['bg-orange-100 text-orange-800', 'Gần tới hạn'],
+    due: ['bg-amber-100 text-amber-900', 'Tới hạn'],
     overdue: ['bg-rose-100 text-rose-800 border border-rose-300', 'Quá hạn'],
   }[s] || ['bg-slate-100 text-slate-600', '—'];
   return `<span class="chip ${m[0]}">${m[1]}</span>`;
@@ -71350,6 +71619,9 @@ function render() {
         refreshAssessFailChecks();
       }
       if (view.assessFailPanelOpen) bindAssessFailPanel();
+      if (view.name === 'reminder' && view.remindTab !== 'history') {
+        bindRemindDashboardToolbar();
+      }
     } catch (_) {}
     saveViewState();
     if (focusId) {
@@ -72146,9 +72418,9 @@ function renderVehicleAssessment(v) {
   const ev = DB.evaluations[v.id];
   const submitted = ev?.status === 'SUBMITTED';
   const enf = resolveEvalEnforcement(v, ev);
-  const enfLabel = enf === 'locked' ? 'Đã khóa' : enf === 'overdue' ? 'Quá hạn' : enf === 'upcoming' ? 'Sắp đến hạn' : (submitted ? 'Đã nộp / đúng hạn' : 'Chưa nộp');
-  const enfCls = enf === 'locked' ? 'bg-rose-50 border-rose-200 text-rose-900'
-    : enf === 'overdue' ? 'bg-amber-50 border-amber-200 text-amber-950'
+  const enfLabel = enf === 'overdue' ? 'Quá hạn' : enf === 'due' ? 'Tới hạn' : enf === 'upcoming' ? 'Gần tới hạn' : (submitted ? 'Đã nộp / đúng hạn' : 'Chưa nộp');
+  const enfCls = enf === 'overdue' ? 'bg-rose-50 border-rose-200 text-rose-900'
+    : enf === 'due' ? 'bg-amber-50 border-amber-200 text-amber-950'
     : enf === 'upcoming' ? 'bg-orange-50 border-orange-200 text-orange-950'
     : 'bg-emerald-50 border-emerald-200 text-emerald-900';
   const history = evaluationsOfVehicle(v.id);
@@ -74582,13 +74854,160 @@ function pushTireBatteryUnitsToPlan(unitIds, period, scheduleDate, note) {
   });
   return n;
 }
-function pageReminder() {
-  const f = F();
+function remindLeafKey(item) {
+  if (!item || item.__group) return '';
+  if (item.rowKind === 'TIRE_BATTERY') return 'TB:' + String(item.tbId || '');
+  return 'CAT:' + String(item.vehicleId) + ':' + String(item.catalogId || '');
+}
+function remindCheckedKeys() {
+  if (!Array.isArray(view.checkedRemindKeys)) view.checkedRemindKeys = [];
+  return view.checkedRemindKeys.map(String);
+}
+function isRemindLeafChecked(itemOrKey) {
+  const k = typeof itemOrKey === 'string' ? itemOrKey : remindLeafKey(itemOrKey);
+  return !!k && remindCheckedKeys().includes(String(k));
+}
+function setRemindLeafChecked(itemOrKey, on) {
+  const k = typeof itemOrKey === 'string' ? itemOrKey : remindLeafKey(itemOrKey);
+  if (!k) return;
+  const cur = new Set(remindCheckedKeys());
+  if (on) cur.add(String(k)); else cur.delete(String(k));
+  view.checkedRemindKeys = [...cur];
+}
+function remindSelectableLeaves(rows) {
+  return (rows || []).filter(r => r && !r.__group && !r.isEmpty);
+}
+function setRemindGroupChecked(groupKey, on, rows) {
+  remindSelectableLeaves(rows || window._listGridPacks?.remindDashboard?.rows || [])
+    .filter(r => String(r.groupKey) === String(groupKey))
+    .forEach(r => setRemindLeafChecked(r, on));
+}
+function setAllRemindLeavesChecked(on, rows) {
+  remindSelectableLeaves(rows || window._listGridRows?.remindDashboard || window._listGridPacks?.remindDashboard?.rows || [])
+    .forEach(r => setRemindLeafChecked(r, on));
+}
+function isRemindGroupCollapsed(groupKey) {
+  return !!(view.remindCollapsedByGroupKey || {})[String(groupKey)];
+}
+function setRemindGroupCollapsed(groupKey, collapsed) {
+  if (!view.remindCollapsedByGroupKey) view.remindCollapsedByGroupKey = {};
+  const k = String(groupKey);
+  if (collapsed) view.remindCollapsedByGroupKey[k] = true;
+  else delete view.remindCollapsedByGroupKey[k];
+}
+function remindGroupToggleHtml(item) {
+  if (!item || !item.__group) return '';
+  const collapsed = !!item._collapsed;
+  const cls = collapsed ? 'slick-group-toggle collapsed' : 'slick-group-toggle expanded';
+  const glyph = collapsed ? '▸' : '▾';
+  const title = collapsed ? 'Mở rộng nhóm' : 'Thu gọn nhóm';
+  return `<span class="${cls}" data-remind-tree-toggle="1" data-remind-group-key="${esc(item.groupKey)}" title="${esc(title)}" role="button" tabindex="0" aria-label="${esc(title)}">${glyph}</span>`;
+}
+function remindGroupTitleCellHtml(item) {
+  if (!item || !item.__group) return '';
+  const title = item.groupTitle || '';
+  return `<span class="plan-group-title-text" title="${esc(title)}">${esc(title)}</span>`;
+}
+/** Chevron thu/mở + biển số — nút collapse nằm ở cột Số xe. */
+function remindPlateCellHtml(item) {
+  if (!item) return '—';
+  const plateBtn = `<button type="button" class="slick-link" data-open-vehicle="${item.vehicleId}">${esc(item.plate || '—')}</button>`;
+  if (!item.__group) return plateBtn;
+  return `<span class="plan-group-title-cell" data-remind-group-toggle-row="1" data-remind-group-key="${esc(item.groupKey)}">${remindGroupToggleHtml(item)}<span class="plan-group-title-text">${plateBtn}</span></span>`;
+}
+function toggleRemindGroupCollapse(groupKeyOrItem) {
+  let groupKey = groupKeyOrItem;
+  if (groupKeyOrItem && typeof groupKeyOrItem === 'object') {
+    groupKey = groupKeyOrItem.groupKey;
+  }
+  if (groupKey == null || groupKey === '') return false;
+  const next = !isRemindGroupCollapsed(groupKey);
+  setRemindGroupCollapsed(groupKey, next);
+  const packRows = window._listGridPacks?.remindDashboard?.rows || [];
+  const allRows = window._listGridAllRows?.remindDashboard || packRows;
+  [packRows, allRows].forEach((list) => {
+    (list || []).forEach((r) => {
+      if (r && r.__group && String(r.groupKey) === String(groupKey)) r._collapsed = next;
+    });
+  });
+  if (typeof window._listApplyColFilters?.remindDashboard === 'function') {
+    window._listApplyColFilters.remindDashboard();
+  } else {
+    const grid = window._listGrids?.remindDashboard;
+    try { grid && grid.invalidate(); grid && grid.render(); } catch (_) {}
+  }
+  return true;
+}
+function setAllRemindGroupsCollapsed(collapsed) {
+  const packRows = window._listGridPacks?.remindDashboard?.rows || [];
+  const allRows = window._listGridAllRows?.remindDashboard || [];
+  const visRows = window._listGridRows?.remindDashboard || [];
+  let n = 0;
+  const seen = new Set();
+  [packRows, allRows, visRows].forEach((list) => {
+    (list || []).forEach((r) => {
+      if (!r || !r.__group) return;
+      r._collapsed = !!collapsed;
+      setRemindGroupCollapsed(r.groupKey, !!collapsed);
+      if (!seen.has(String(r.groupKey))) {
+        seen.add(String(r.groupKey));
+        n++;
+      }
+    });
+  });
+  if (typeof window._listApplyColFilters?.remindDashboard === 'function') window._listApplyColFilters.remindDashboard();
+  else {
+    const grid = window._listGrids?.remindDashboard;
+    try { grid && grid.invalidate(); grid && grid.render(); } catch (_) {}
+  }
+  toast(collapsed ? ('Đã thu gọn ' + n + ' nhóm xe') : ('Đã mở rộng ' + n + ' nhóm xe'));
+}
+/** Trừ/cộng ngày trên chuỗi YYYY-MM-DD. */
+function shiftDateKey(iso, days) {
+  const s = String(iso || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
+  const d = new Date(s + 'T12:00:00');
+  if (Number.isNaN(d.getTime())) return '';
+  d.setDate(d.getDate() + Number(days || 0));
+  return d.toISOString().slice(0, 10);
+}
+/**
+ * Mốc danh mục BD:
+ * - remindPlan = mốc đến hạn (đưa KH khi quá hạn) = nextKm / nextDate
+ * - remindMaint = mốc bắt đầu nhắc BD = next − maintenanceRemindKmBefore / DaysBefore
+ */
+function catalogRemindMilestoneFields(next) {
+  const kmBefore = Math.max(0, Number(DB.settings?.maintenanceRemindKmBefore) || 0);
+  const daysBefore = Math.max(0, Number(DB.settings?.maintenanceRemindDaysBefore) || 0);
+  const planBits = [];
+  const maintBits = [];
+  if (next?.km != null && next.km !== '') {
+    const dueKm = Number(next.km);
+    planBits.push(kmFmt(dueKm) + ' km');
+    maintBits.push(kmFmt(Math.max(0, dueKm - kmBefore)) + ' km');
+  }
+  if (next?.date) {
+    planBits.push(String(next.date).slice(0, 10));
+    const remindDate = daysBefore > 0 ? shiftDateKey(next.date, -daysBefore) : String(next.date).slice(0, 10);
+    if (remindDate) maintBits.push(remindDate);
+  }
+  return {
+    remindPlanText: planBits.join(' · ') || '—',
+    remindMaintText: maintBits.join(' · ') || '—',
+    milestoneText: planBits.join(' · ') || '—',
+  };
+}
+function collectRemindDueLeaves(filters) {
+  const f = filters || F();
   ensureVehicleCatalogAssign();
   ensureTireBatteryUnits(false);
-  const catRows = DB.vehicles.map((v) => {
+  const leaves = [];
+  (DB.vehicles || []).forEach((v) => {
+    if (f.area !== 'ALL' && v.area !== f.area) return;
+    if (f.kind === 'vehicle' && v.isTrailer) return;
+    if (f.kind === 'trailer' && !v.isTrailer) return;
     const assigned = new Set(vehicleAssignedCatalogIds(v.id).map(Number));
-    const dues = DB.catalog.filter((c) => assigned.has(Number(c.id))).map((c) => {
+    (DB.catalog || []).filter((c) => assigned.has(Number(c.id))).forEach((c) => {
       const st = getCatState(v.id, c.id);
       const next = { km: st.nextKm, date: st.nextDate };
       if (next.km == null && next.date == null) {
@@ -74599,58 +75018,294 @@ function pageReminder() {
       let status = 'normal';
       if (kmLeft != null && kmLeft <= 0) status = 'overdue';
       else if (kmLeft != null && kmLeft <= DB.settings.maintenanceRemindKmBefore) status = 'dueSoon';
-      return { cat: c, ...next, kmLeft, status };
-    });
-    const worst = dues.find((d) => d.status === 'overdue') || dues.find((d) => d.status === 'dueSoon') || dues[0];
-    return {
-      rowKind: 'CATALOG',
-      v,
-      status: worst?.status || 'normal',
-      worst,
-      searchBlob: [v.plate, v.type, worst?.cat?.name, worst?.cat?.code].join(' '),
-    };
-  });
-  const tbRows = (DB.vehicles || []).flatMap((v) =>
-    tireBatteryAlertsForVehicle(v).map((a) => {
-      const kmLeft = (Number(a.maxKm) || 0) - (Number(a.usedKm) || 0);
-      const moLeft = (Number(a.maxMonth) || 0) - (Number(a.usedMonth) || 0);
-      return {
-        rowKind: 'TIRE_BATTERY',
-        v,
-        status: a.level === 'overdue' ? 'overdue' : 'dueSoon',
-        alert: a,
+      const isDue = status === 'overdue' || status === 'dueSoon';
+      const marks = catalogRemindMilestoneFields(next);
+      const itemLabel = c.name || c.code || '—';
+      const searchBlob = [v.plate, v.type, c.name, c.code, v.area, marks.remindMaintText, marks.remindPlanText].join(' ');
+      if (!matchSearch(searchBlob, f.search)) return;
+      if (f.remindStatus !== 'ALL' && status !== f.remindStatus) return;
+      if (f.catalogId === '__TIRE__' || f.catalogId === '__BATTERY__') return;
+      if (f.catalogId !== 'ALL' && String(c.id) !== String(f.catalogId)) return;
+      leaves.push({
+        rowKind: 'CATALOG',
+        groupKey: String(v.id),
+        vehicleId: v.id,
+        catalogId: c.id,
+        plate: v.plate || '—',
+        areaLabel: formatAreaLabel(v.area),
+        odoText: kmFmt(v.km),
+        odoNum: Number(v.km) || 0,
+        itemLabel,
+        itemSub: c.code || '',
+        vehicleKindLabel: v.isTrailer ? 'Mooc' : 'Xe',
+        kindLabel: c.system || 'Danh mục BD',
+        milestoneText: marks.milestoneText,
+        remindMaintText: marks.remindMaintText,
+        remindPlanText: marks.remindPlanText,
+        usedKmNum: null,
+        maxKmNum: null,
+        usedMonthNum: null,
+        maxMonthNum: null,
+        usedKmText: '—',
+        maxKmText: '—',
+        usedMonthText: '—',
+        maxMonthText: '—',
         kmLeft,
-        moLeft,
-        searchBlob: [v.plate, v.type, a.kind === 'BATTERY' ? 'ắc quy' : 'vỏ lốp', a.name, a.code, a.serial, 'gắn xe'].join(' '),
-      };
-    })
-  );
-  const allRows = [...catRows, ...tbRows];
-  const filtered = allRows.filter((r) => {
-    const v = r.v;
-    if (!matchSearch(r.searchBlob, f.search)) return false;
-    if (f.area !== 'ALL' && v.area !== f.area) return false;
-    if (f.kind === 'vehicle' && v.isTrailer) return false;
-    if (f.kind === 'trailer' && !v.isTrailer) return false;
-    if (f.remindStatus !== 'ALL' && r.status !== f.remindStatus) return false;
-    if (f.catalogId === '__TIRE__') return r.rowKind === 'TIRE_BATTERY' && r.alert?.kind === 'TIRE';
-    if (f.catalogId === '__BATTERY__') return r.rowKind === 'TIRE_BATTERY' && r.alert?.kind === 'BATTERY';
-    if (f.catalogId !== 'ALL') {
-      if (r.rowKind !== 'CATALOG') return false;
-      return String(r.worst?.cat?.id) === String(f.catalogId);
-    }
-    return true;
-  }).sort((a, b) => {
-    const rank = (s) => (s === 'overdue' ? 0 : s === 'dueSoon' ? 1 : 2);
+        kmLeftText: kmLeft != null ? (kmFmt(kmLeft) + ' km') : '—',
+        status,
+        statusText: status === 'overdue' ? 'Quá hạn' : status === 'dueSoon' ? 'Sắp đến hạn' : 'Bình thường',
+        isDue,
+        isTrailer: !!v.isTrailer,
+        searchBlob,
+      });
+    });
+    tireBatteryAlertsForVehicle(v).forEach((a) => {
+      const usedKm = Number(a.usedKm) || 0;
+      const maxKm = Number(a.maxKm) || 0;
+      const usedMonth = Number(a.usedMonth) || 0;
+      const maxMonth = Number(a.maxMonth) || 0;
+      const kmLeft = maxKm - usedKm;
+      const status = a.level === 'overdue' ? 'overdue' : 'dueSoon';
+      const kindLabel = a.kind === 'BATTERY' ? 'Ắc quy' : 'Vỏ lốp';
+      const itemLabel = (a.serial || a.name || kindLabel);
+      const milestoneText = `${kmFmt(usedKm)}/${kmFmt(maxKm)} km · ${usedMonth}/${maxMonth} th`;
+      const searchBlob = [v.plate, v.type, kindLabel, a.name, a.code, a.serial, 'gắn xe'].join(' ');
+      if (!matchSearch(searchBlob, f.search)) return;
+      if (f.remindStatus !== 'ALL' && status !== f.remindStatus) return;
+      if (f.catalogId === '__TIRE__' && a.kind !== 'TIRE') return;
+      if (f.catalogId === '__BATTERY__' && a.kind !== 'BATTERY') return;
+      if (f.catalogId !== 'ALL' && f.catalogId !== '__TIRE__' && f.catalogId !== '__BATTERY__') return;
+      leaves.push({
+        rowKind: 'TIRE_BATTERY',
+        groupKey: String(v.id),
+        vehicleId: v.id,
+        tbId: a.id,
+        tbKind: a.kind,
+        plate: v.plate || '—',
+        areaLabel: formatAreaLabel(v.area),
+        odoText: kmFmt(v.km),
+        odoNum: Number(v.km) || 0,
+        itemLabel,
+        itemSub: a.code || '',
+        vehicleKindLabel: v.isTrailer ? 'Mooc' : 'Xe',
+        kindLabel,
+        milestoneText,
+        remindMaintText: '—',
+        remindPlanText: '—',
+        usedKmNum: usedKm,
+        maxKmNum: maxKm,
+        usedMonthNum: usedMonth,
+        maxMonthNum: maxMonth,
+        usedKmText: kmFmt(usedKm),
+        maxKmText: kmFmt(maxKm),
+        usedMonthText: String(usedMonth),
+        maxMonthText: String(maxMonth),
+        kmLeft,
+        kmLeftText: kmFmt(kmLeft) + ' km',
+        status,
+        statusText: status === 'overdue' ? 'Quá hạn' : 'Sắp đến hạn',
+        isDue: true,
+        isTrailer: !!v.isTrailer,
+        searchBlob,
+      });
+    });
+  });
+  const rank = (s) => (s === 'overdue' ? 0 : s === 'dueSoon' ? 1 : 2);
+  leaves.sort((a, b) => {
     const d = rank(a.status) - rank(b.status);
     if (d) return d;
-    return String(a.v.plate || '').localeCompare(String(b.v.plate || ''), 'vi');
+    const p = String(a.plate || '').localeCompare(String(b.plate || ''), 'vi');
+    if (p) return p;
+    return String(a.itemLabel || '').localeCompare(String(b.itemLabel || ''), 'vi');
   });
+  return leaves;
+}
+function buildRemindDashboardGridRows(leaves) {
+  const byVeh = new Map();
+  (leaves || []).forEach((leaf) => {
+    const k = String(leaf.groupKey);
+    if (!byVeh.has(k)) byVeh.set(k, []);
+    byVeh.get(k).push(leaf);
+  });
+  const rows = [];
+  [...byVeh.entries()].forEach(([groupKey, kids]) => {
+    const first = kids[0];
+    const nOver = kids.filter(k => k.status === 'overdue').length;
+    const nSoon = kids.filter(k => k.status === 'dueSoon').length;
+    const nDue = kids.filter(k => k.isDue).length;
+    const worst = nOver ? 'overdue' : nSoon ? 'dueSoon' : 'normal';
+    const groupTitle = [
+      kids.length + ' hạng mục',
+      nOver ? (nOver + ' quá hạn') : (nSoon ? (nSoon + ' sắp hạn') : 'ổn'),
+    ].join(' · ');
+    rows.push({
+      id: 'g-' + groupKey,
+      __group: true,
+      groupKey,
+      groupTitle,
+      vehicleId: first.vehicleId,
+      plate: first.plate,
+      areaLabel: first.areaLabel,
+      odoText: first.odoText,
+      odoNum: first.odoNum,
+      itemLabel: groupTitle,
+      vehicleKindLabel: first.isTrailer ? 'Mooc' : 'Xe',
+      kindLabel: '—',
+      milestoneText: nDue ? (nDue + ' đến hạn') : '—',
+      remindMaintText: '—',
+      remindPlanText: '—',
+      usedKmText: '—',
+      maxKmText: '—',
+      usedMonthText: '—',
+      maxMonthText: '—',
+      usedKmNum: null,
+      maxKmNum: null,
+      usedMonthNum: null,
+      maxMonthNum: null,
+      kmLeftText: '',
+      status: worst,
+      statusText: worst === 'overdue' ? 'Quá hạn' : worst === 'dueSoon' ? 'Sắp đến hạn' : 'Bình thường',
+      leafCount: kids.length,
+      dueCount: nDue,
+      isTrailer: first.isTrailer,
+      _collapsed: isRemindGroupCollapsed(groupKey),
+    });
+    kids.forEach((leaf) => {
+      rows.push({
+        ...leaf,
+        id: remindLeafKey(leaf) || (groupKey + '-' + Math.random().toString(36).slice(2, 7)),
+        __group: false,
+      });
+    });
+  });
+  return rows;
+}
+function registerRemindDashboardGrid(leaves) {
+  const rows = buildRemindDashboardGridRows(leaves);
+  const leafCount = rows.filter(r => !r.__group).length;
+  if (!Array.isArray(view.checkedRemindKeys)) {
+    view.checkedRemindKeys = remindSelectableLeaves(rows).filter(r => r.isDue).map(remindLeafKey);
+  }
+  const checkFmt = (r, c, v, col, item) => {
+    if (item.__group) {
+      const kids = remindSelectableLeaves(rows).filter(x => String(x.groupKey) === String(item.groupKey));
+      if (!kids.length) return '';
+      const n = kids.filter(x => isRemindLeafChecked(x)).length;
+      const checked = n && n === kids.length ? 'checked' : '';
+      return `<div class="flex h-full items-center justify-center"><input type="checkbox" class="rem-group-ck order-grid-row-checkbox" data-remind-group-key="${esc(item.groupKey)}" ${checked} aria-label="Chọn cả xe" /></div>`;
+    }
+    const k = remindLeafKey(item);
+    return `<div class="flex h-full items-center justify-center"><input type="checkbox" class="rem-row order-grid-row-checkbox" data-remind-leaf-key="${esc(k)}" data-kind="${esc(item.rowKind || 'CATALOG')}" data-vid="${esc(item.vehicleId)}" data-cid="${esc(item.catalogId || '')}" data-tb-id="${esc(item.tbId || '')}" data-due="${item.isDue ? '1' : '0'}" ${isRemindLeafChecked(item) ? 'checked' : ''} aria-label="Chọn dòng nhắc" /></div>`;
+  };
+  const statusFmt = (r, c, v, col, item) => {
+    if (item.__group) {
+      return item.status === 'overdue' ? evalBadge('overdue') : item.status === 'dueSoon' ? evalBadge('soon') : evalBadge('ok');
+    }
+    return item.status === 'overdue' ? evalBadge('overdue') : item.status === 'dueSoon' ? evalBadge('soon') : evalBadge('ok');
+  };
+  registerListGrid('remindDashboard', rows, [
+    { id: '_ck', field: 'checked', name: '', width: 36, minWidth: 36, maxWidth: 40, cssClass: 'c', sortable: false, filterable: false, resizable: false, formatter: checkFmt },
+    { id: 'plate', field: 'plate', name: 'Số xe', width: 140, minWidth: 110, sortable: true, toolTip: 'Biển số xe / mooc · ▾/▸ thu nhóm',
+      formatter: (r, c, v, col, item) => remindPlateCellHtml(item) },
+    { id: 'vehicleKindLabel', field: 'vehicleKindLabel', name: 'Loại xe/mooc', width: 100, minWidth: 88, sortable: true, filterType: 'select', cssClass: 'c',
+      formatter: (r, c, v, col, item) => {
+        const trailer = item.isTrailer || item.vehicleKindLabel === 'Mooc';
+        return trailer ? vehicleChip({ isTrailer: true }) : vehicleChip({ isTrailer: false });
+      } },
+    { id: 'itemLabel', field: 'itemLabel', name: 'Danh mục', width: 220, minWidth: 140, sortable: true,
+      formatter: (r, c, v, col, item) => {
+        if (item.__group) return remindGroupTitleCellHtml(item);
+        const main = item.itemLabel || '—';
+        const sub = item.itemSub ? (' · ' + item.itemSub) : '';
+        const cls = item.rowKind === 'TIRE_BATTERY' ? 'font-mono text-xs font-bold text-slate-900' : 'text-sm text-slate-900';
+        return `<span class="${cls}" title="${esc(main + sub)}">${esc(main)}${esc(sub)}</span>`;
+      } },
+    { id: 'kindLabel', field: 'kindLabel', name: 'Hệ thống', width: 130, minWidth: 100, sortable: true, filterType: 'select',
+      formatter: (r, c, v, col, item) => {
+        if (item.__group) return '<span class="text-slate-300">—</span>';
+        return `<span class="text-xs text-slate-700" title="${esc(item.kindLabel || '')}">${esc(item.kindLabel || '—')}</span>`;
+      } },
+    { id: 'odoText', field: 'odoNum', name: 'Số km xe', width: 100, minWidth: 88, sortable: true, cssClass: 'r', toolTip: 'Số km trên đồng hồ xe / mooc',
+      formatter: (r, c, v, col, item) => `<span class="tabular-nums">${esc(item.odoText || '—')}</span>` },
+    { id: 'areaLabel', field: 'areaLabel', name: 'Khu vực', width: 110, minWidth: 80, sortable: true,
+      formatter: (r, c, v, col, item) => esc(item.areaLabel || '—') },
+    { id: 'usedKmText', field: 'usedKmNum', name: 'Đã dùng (km)', width: 120, minWidth: 100, sortable: true, cssClass: 'r', toolTip: 'Lốp/ắc — km đã dùng',
+      formatter: (r, c, v, col, item) => {
+        if (item.__group || item.rowKind !== 'TIRE_BATTERY') return '<span class="text-slate-300">—</span>';
+        return `<span class="tabular-nums text-xs">${esc(item.usedKmText || '—')}</span>`;
+      } },
+    { id: 'maxKmText', field: 'maxKmNum', name: 'Định mức (km)', width: 120, minWidth: 100, sortable: true, cssClass: 'r', toolTip: 'Lốp/ắc — định mức km',
+      formatter: (r, c, v, col, item) => {
+        if (item.__group || item.rowKind !== 'TIRE_BATTERY') return '<span class="text-slate-300">—</span>';
+        return `<span class="tabular-nums text-xs" title="Định mức km">${esc(item.maxKmText || '—')}</span>`;
+      } },
+    { id: 'usedMonthText', field: 'usedMonthNum', name: 'Đã dùng (tháng)', width: 130, minWidth: 110, sortable: true, cssClass: 'c', toolTip: 'Lốp/ắc — tháng đã dùng',
+      formatter: (r, c, v, col, item) => {
+        if (item.__group || item.rowKind !== 'TIRE_BATTERY') return '<span class="text-slate-300">—</span>';
+        return `<span class="tabular-nums text-xs">${esc(item.usedMonthText || '—')}</span>`;
+      } },
+    { id: 'maxMonthText', field: 'maxMonthNum', name: 'Định mức (tháng)', width: 130, minWidth: 110, sortable: true, cssClass: 'c', toolTip: 'Lốp/ắc — định mức tháng',
+      formatter: (r, c, v, col, item) => {
+        if (item.__group || item.rowKind !== 'TIRE_BATTERY') return '<span class="text-slate-300">—</span>';
+        return `<span class="tabular-nums text-xs" title="Định mức tháng">${esc(item.maxMonthText || '—')}</span>`;
+      } },
+    { id: 'remindMaintText', field: 'remindMaintText', name: 'Mốc nhắc bảo dưỡng', width: 160, minWidth: 130, sortable: true, toolTip: 'Mốc bắt đầu nhắc bảo dưỡng',
+      formatter: (r, c, v, col, item) => {
+        if (item.__group || item.rowKind !== 'CATALOG') return '<span class="text-slate-300">—</span>';
+        return `<span class="text-xs tabular-nums text-amber-800" title="Bắt đầu nhắc bảo dưỡng (trước hạn ${esc(String(DB.settings?.maintenanceRemindKmBefore ?? 0))} km / ${esc(String(DB.settings?.maintenanceRemindDaysBefore ?? 0))} ngày)">${esc(item.remindMaintText || '—')}</span>`;
+      } },
+    { id: 'remindPlanText', field: 'remindPlanText', name: 'Mốc nhắc kế hoạch', width: 160, minWidth: 130, sortable: true, toolTip: 'Mốc đến hạn — đưa vào kế hoạch',
+      formatter: (r, c, v, col, item) => {
+        if (item.__group || item.rowKind !== 'CATALOG') return '<span class="text-slate-300">—</span>';
+        return `<span class="text-xs tabular-nums text-sky-800" title="Mốc đến hạn — đưa vào kế hoạch khi quá hạn">${esc(item.remindPlanText || '—')}</span>`;
+      } },
+    { id: 'kmLeftText', field: 'kmLeft', name: 'Còn lại (km)', width: 110, minWidth: 96, sortable: true, cssClass: 'r',
+      formatter: (r, c, v, col, item) => {
+        if (item.__group) return '<span class="text-slate-400">—</span>';
+        const cls = item.status === 'overdue' ? 'text-rose-700 font-semibold' : item.status === 'dueSoon' ? 'text-amber-700' : 'text-slate-700';
+        return `<span class="tabular-nums ${cls}">${esc(item.kmLeftText || '—')}</span>`;
+      } },
+    { id: 'statusText', field: 'statusText', name: 'Trạng thái', width: 120, minWidth: 100, sortable: true, filterType: 'select', cssClass: 'c', formatter: statusFmt },
+    { id: '_act', field: 'act', name: 'Thao tác', width: 168, minWidth: 140, sortable: false, filterable: false,
+      formatter: (r, c, v, col, item) => {
+        if (item.__group) {
+          return `<button type="button" class="btn btn-outline btn-xs" data-open-vehicle-catalog="${item.vehicleId}">Sửa kỳ</button>`;
+        }
+        if (item.rowKind === 'TIRE_BATTERY') {
+          return `<div class="inline-flex flex-nowrap gap-1">
+            <button type="button" class="btn btn-outline btn-xs" data-open-tire-battery="1" data-tb-vid="${item.vehicleId}" data-tb-tab="${item.tbKind === 'BATTERY' ? 'BATTERY' : 'TIRE'}">Chi tiết</button>
+            <button type="button" class="btn btn-primary btn-xs" data-push-tb-row="${esc(item.tbId)}">→ KH</button>
+          </div>`;
+        }
+        return `<div class="inline-flex flex-nowrap gap-1">
+          <button type="button" class="btn btn-primary btn-xs" data-push-plan-row="${item.vehicleId}" data-cid="${item.catalogId}">→ KH</button>
+          <button type="button" class="btn btn-outline btn-xs" data-create-order-from-due="${item.vehicleId}" data-cid="${item.catalogId}">Tạo phiếu</button>
+        </div>`;
+      } },
+  ], { forceFitColumns: false, fullWidthRows: true, colFilters: true, rowHeight: 36, headerHeight: 48 });
+  return { rows, leafCount };
+}
+function bindRemindDashboardToolbar() {
+  $('#btnRemindExpandAll')?.addEventListener('click', () => setAllRemindGroupsCollapsed(false));
+  $('#btnRemindCollapseAll')?.addEventListener('click', () => setAllRemindGroupsCollapsed(true));
+  $('#btnRemindClearSel')?.addEventListener('click', () => {
+    view.checkedRemindKeys = [];
+    const grid = window._listGrids?.remindDashboard;
+    try { grid && grid.invalidate(); grid && grid.render(); } catch (_) {}
+  });
+}
+function pageReminder() {
+  const f = F();
+  const leaves = collectRemindDueLeaves(f);
+  const allLeafCount = (() => {
+    const fAll = { ...f, search: '', area: 'ALL', kind: 'ALL', remindStatus: 'ALL', catalogId: 'ALL' };
+    return collectRemindDueLeaves(fAll).length;
+  })();
   const kpis = {
-    total: filtered.length,
-    normal: filtered.filter((r) => r.status === 'normal').length,
-    dueSoon: filtered.filter((r) => r.status === 'dueSoon').length,
-    overdue: filtered.filter((r) => r.status === 'overdue').length,
+    total: leaves.length,
+    normal: leaves.filter((r) => r.status === 'normal').length,
+    dueSoon: leaves.filter((r) => r.status === 'dueSoon').length,
+    overdue: leaves.filter((r) => r.status === 'overdue').length,
   };
   const catalogFilterOpts = [
     ['ALL', 'Tất cả'],
@@ -74658,49 +75313,6 @@ function pageReminder() {
     ['__BATTERY__', 'Ắc quy (seri)'],
     ...DB.catalog.map((c) => [String(c.id), c.code + ' · ' + c.name]),
   ];
-  const renderRemRow = (r) => {
-    const v = r.v;
-    const due = r.status === 'overdue' || r.status === 'dueSoon';
-    if (r.rowKind === 'TIRE_BATTERY') {
-      const a = r.alert;
-      const label = a.kind === 'BATTERY' ? 'Ắc quy' : 'Vỏ lốp';
-      return `<tr class="row-h">
-        <td class="td text-center"><input type="checkbox" class="rem-row" data-kind="TIRE_BATTERY" data-tb-id="${esc(a.id)}" data-vid="${v.id}" data-due="${due ? '1' : '0'}" data-status="${r.status}" ${due ? 'checked' : ''} /></td>
-        <td class="td"><button data-open-vehicle="${v.id}" class="font-medium text-blue-600 hover:underline">${esc(v.plate)}</button> ${vehicleChip(v)}</td>
-        <td class="td text-right tabular-nums">${kmFmt(v.km)}</td>
-        <td class="td">
-          <div class="font-mono text-sm font-bold tracking-wide text-slate-900">${esc(a.serial || '—')}</div>
-          <div class="mt-0.5 text-xs text-slate-700">${label} · gắn xe ${esc(v.plate)} · ${esc(a.code || '')}</div>
-        </td>
-        <td class="td text-xs text-slate-600">${kmFmt(a.usedKm)}/${kmFmt(a.maxKm)} km · ${a.usedMonth}/${a.maxMonth} th</td>
-        <td class="td text-right tabular-nums ${r.status === 'overdue' ? 'text-rose-700 font-semibold' : 'text-amber-700'}">${kmFmt(r.kmLeft)} km</td>
-        <td class="td text-center">${r.status === 'overdue' ? evalBadge('overdue') : evalBadge('soon')}</td>
-        <td class="td text-center">
-          <div class="inline-flex flex-wrap justify-center gap-1">
-            <button type="button" data-open-tire-battery="1" data-tb-vid="${v.id}" data-tb-tab="${a.kind === 'BATTERY' ? 'BATTERY' : 'TIRE'}" class="btn btn-outline btn-sm">Chi tiết lốp / ắc</button>
-            <button type="button" data-push-tb-row="${esc(a.id)}" class="btn btn-primary btn-sm">Đưa vào KH</button>
-          </div>
-        </td>
-      </tr>`;
-    }
-    const worst = r.worst;
-    return `<tr class="row-h">
-      <td class="td text-center"><input type="checkbox" class="rem-row" data-kind="CATALOG" data-vid="${v.id}" data-cid="${worst?.cat?.id || ''}" data-due="${due ? '1' : '0'}" data-status="${r.status || ''}" ${due ? 'checked' : ''} /></td>
-      <td class="td"><button data-open-vehicle="${v.id}" class="font-medium text-blue-600 hover:underline">${esc(v.plate)}</button> ${vehicleChip(v)}</td>
-      <td class="td text-right tabular-nums">${kmFmt(v.km)}</td>
-      <td class="td">${worst ? esc(worst.cat.name) : '—'}</td>
-      <td class="td text-xs">${worst?.km != null ? kmFmt(worst.km) + ' km' : ''}${worst?.date ? (worst.km ? ' · ' : '') + worst.date : ''}</td>
-      <td class="td text-right tabular-nums ${worst?.status === 'overdue' ? 'text-rose-700 font-semibold' : worst?.status === 'dueSoon' ? 'text-amber-700' : ''}">${worst?.kmLeft != null ? kmFmt(worst.kmLeft) : '—'}</td>
-      <td class="td text-center">${worst?.status === 'overdue' ? evalBadge('overdue') : worst?.status === 'dueSoon' ? evalBadge('soon') : evalBadge('ok')}</td>
-      <td class="td text-center">
-        <div class="inline-flex flex-wrap justify-center gap-1">
-          <button data-open-vehicle-catalog="${v.id}" class="btn btn-outline btn-sm">Sửa kỳ / danh mục</button>
-          ${worst?.cat ? `<button type="button" data-push-plan-row="${v.id}" data-cid="${worst.cat.id}" class="btn btn-primary btn-sm">Đưa vào KH</button>` : ''}
-          ${worst?.cat ? `<button type="button" data-create-order-from-due="${v.id}" data-cid="${worst.cat.id}" class="btn btn-outline btn-sm">Tạo phiếu</button>` : ''}
-        </div>
-      </td>
-    </tr>`;
-  };
   if (view.remindTab !== 'history') view.remindTab = 'dashboard';
   const remindTabs = `
   <div class="mb-4 flex gap-6 border-b border-slate-200">
@@ -74734,43 +75346,57 @@ function pageReminder() {
     })}
     ${paginationBar(pgHist)}`;
   } else {
-    remindActions = `<button type="button" id="btnPushRemindPlanAll" class="btn btn-primary btn-sm">Đưa tất cả sắp/quá hạn → KH</button>
-     <button type="button" id="btnPushRemindPlan" class="btn btn-outline btn-sm">Đưa dòng đã chọn → KH</button>
-     <button type="button" data-remind-tab="history" class="btn btn-outline btn-sm">Xem lịch sử BD</button>`;
+    const { rows, leafCount } = registerRemindDashboardGrid(leaves);
+    const nSel = remindCheckedKeys().length;
+    const nGroups = rows.filter(r => r.__group).length;
+    remindActions = `<button type="button" data-remind-tab="history" class="btn btn-outline btn-sm">Xem lịch sử BD</button>`;
     remindBody = `
     ${remindTabs}
-    <div class="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950">Luồng BD: danh mục gắn xe · mốc km → <strong>quá hạn tự vào kế hoạch</strong> · sắp đến hạn / <strong>lốp·ắc đến hạn</strong> thì <strong>Đưa vào KH</strong>. Chi tiết seri: menu <em>Vỏ lốp / ắc quy</em>. Lịch sử Lần N: tab <strong>Lịch sử</strong>.</div>
-    <div class="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-      ${[
-        ['Tổng dòng', kpis.total, 'bg-blue-50 text-blue-600'],
-        ['Bình thường', kpis.normal, 'bg-emerald-50 text-emerald-600'],
-        ['Sắp đến hạn', kpis.dueSoon, 'bg-amber-50 text-amber-600'],
-        ['Quá hạn', kpis.overdue, 'bg-rose-50 text-rose-600'],
-      ].map(([l, v, ic]) => `<div class="card flex items-center justify-between p-4">
-        <div><p class="text-sm text-slate-600">${l}</p><p class="mt-1 text-2xl font-bold">${v}</p></div>
-        <div class="flex size-10 items-center justify-center rounded-md ${ic}">●</div>
-      </div>`).join('')}
-    </div>
+    <div class="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950">Luồng BD: danh mục gắn xe · mốc km → <strong>quá hạn tự vào kế hoạch</strong> · sắp đến hạn / <strong>lốp·ắc đến hạn</strong> thì <strong>Đưa vào KH</strong>. Lưới group theo xe · ▾/▸ thu nhóm. Lịch sử Lần N: tab <strong>Lịch sử</strong>.</div>
     ${filterBarShell([
       filterSearch('flt-search', 'Biển số, danh mục, seri…', f.search),
       filterSelect('flt-kind', 'Loại phương tiện', f.kind, [['ALL', 'Tất cả'], ['vehicle', 'Xe'], ['trailer', 'Mooc']]),
       filterSelect('flt-area', 'Khu vực', f.area, [['ALL', 'Tất cả'], ...areas().map((a) => [a, a])]),
       filterSelect('flt-remindStatus', 'Mức nhắc', f.remindStatus, [['ALL', 'Tất cả'], ['normal', 'Bình thường'], ['dueSoon', 'Sắp đến hạn'], ['overdue', 'Quá hạn']]),
       filterSelect('flt-catalogId', 'Danh mục / loại', f.catalogId, catalogFilterOpts),
-    ].join(''), `${filtered.length} / ${allRows.length} dòng`)}
-    <div class="card overflow-hidden">
-      <table class="min-w-full text-sm">
-        <thead class="bg-slate-50 text-slate-600"><tr>
-          <th class="th"><input type="checkbox" id="remCheckAll" /></th>
-          <th class="th text-left">Xe / mooc</th><th class="th text-right">Odo</th>
-          <th class="th text-left">Danh mục / lốp·ắc</th><th class="th text-left">Mốc / đã dùng</th>
-          <th class="th text-right">Còn (km)</th><th class="th text-center">TT</th><th class="th text-center">Thao tác</th>
-        </tr></thead>
-        <tbody>
-          ${(pgRem = paginate(filtered)).items.map(renderRemRow).join('') || `<tr><td colspan="8" class="px-5 py-12 text-center text-slate-500">Không có dòng khớp bộ lọc</td></tr>`}
-        </tbody>
-      </table>
-      ${paginationBar(pgRem)}
+    ].join(''), `${leafCount} / ${allLeafCount} hạng mục · ${nGroups} xe`)}
+    <div class="plan-workspace list-slick-workspace remind-workspace" data-list-workspace="remindDashboard">
+      <div class="plan-grid-pane">
+        <div class="plan-period-bar">
+          <div class="flex items-center gap-2 flex-wrap min-w-0">
+            <span class="plan-period-label">Nhắc bảo dưỡng theo xe</span>
+            <span class="text-xs text-slate-500">${nGroups} xe · ${leafCount} hạng mục</span>
+          </div>
+          <div class="plan-kpi-strip" aria-label="Tóm tắt lưới">
+            <div class="plan-kpi-chip" title="Hạng mục"><span class="plan-kpi-ico">Σ</span><span class="plan-kpi-val">${kpis.total}</span></div>
+            <div class="plan-kpi-chip" title="Bình thường"><span class="plan-kpi-ico">✓</span><span class="plan-kpi-val text-emerald-700">${kpis.normal}</span></div>
+            <div class="plan-kpi-chip" title="Sắp đến hạn"><span class="plan-kpi-ico">!</span><span class="plan-kpi-val text-amber-700">${kpis.dueSoon}</span></div>
+            <div class="plan-kpi-chip" title="Quá hạn"><span class="plan-kpi-ico">‼</span><span class="plan-kpi-val text-rose-700">${kpis.overdue}</span></div>
+          </div>
+        </div>
+        <div class="plan-grid-toolbar ${nSel ? 'has-sel' : ''}">
+          <div class="plan-grid-toolbar-left">
+            <button type="button" class="plan-tb-btn is-success" id="btnPushRemindPlan" title="Đưa dòng đã chọn vào kế hoạch">${planTbIco('plus')} Đưa đã chọn → KH</button>
+            <button type="button" class="plan-tb-btn" id="btnPushRemindPlanAll" title="Đưa tất cả sắp/quá hạn vào KH">Tất cả sắp/quá hạn</button>
+            <button type="button" class="plan-tb-btn" id="btnRemindClearSel" ${nSel ? '' : 'disabled'}>${planTbIco('x')} Bỏ chọn</button>
+            <span class="plan-tb-divider"></span>
+            <button type="button" class="plan-tb-btn" id="btnRemindExpandAll" title="Mở rộng tất cả nhóm xe">Mở nhóm</button>
+            <button type="button" class="plan-tb-btn" id="btnRemindCollapseAll" title="Thu gọn tất cả nhóm xe">Thu nhóm</button>
+            <span class="plan-tb-divider"></span>
+            <span class="text-xs text-slate-500 hidden md:inline">▾/▸ thu nhóm · chuột phải thao tác</span>
+          </div>
+          <div class="plan-grid-toolbar-right">
+            <span class="text-xs font-medium text-slate-600 tabular-nums">${nSel ? ('Đã chọn ' + nSel) : ''}</span>
+            <span class="text-xs text-slate-500 tabular-nums" data-list-vis-count="remindDashboard">${leafCount} dòng</span>
+            <button type="button" class="plan-tb-btn" data-clear-list-col-filters="remindDashboard" title="Xóa lọc theo cột">Xóa lọc cột</button>
+            <span class="plan-tb-divider"></span>
+            <button type="button" class="plan-tb-btn is-ghost" title="Tải lại" data-list-reload="remindDashboard" aria-label="Tải lại">${planTbIco('refresh')}</button>
+          </div>
+        </div>
+        <div class="list-grid-container">
+          <div id="listSlick-remindDashboard" data-list-slick="remindDashboard" class="list-slick-host slickgrid-container"></div>
+        </div>
+      </div>
     </div>`;
   }
 
@@ -74778,7 +75404,7 @@ function pageReminder() {
     'Nhắc bảo dưỡng',
     view.remindTab === 'history'
       ? 'Tab Lịch sử · bảng theo dõi bảo dưỡng theo xe (Lần N) — giống Fleet.'
-      : 'Danh mục BD + vỏ lốp / ắc quy đến hạn · bấm «Đưa vào KH» (tháng này / tháng sau / ngày cụ thể).',
+      : 'Danh mục BD + vỏ lốp / ắc quy · group theo xe · thu/mở nhóm · đưa vào KH.',
     remindActions,
     remindBody
   );
@@ -75094,7 +75720,7 @@ function openQuickCreateOrderModal(prefVehicleId) {
   };
 }
 
-/** Ngày mô phỏng để tính nhắc/khóa (seed demo = gần cuối kỳ). */
+/** Ngày mô phỏng để tính nhắc ĐG (seed demo = gần cuối kỳ). */
 function getEvalAsOfDateKey() {
   return DB.settings?.evalDemoAsOf || todayDateKey();
 }
@@ -75105,35 +75731,45 @@ function formatAreaLabel(area) {
 }
 
 /**
- * Trạng thái enforcement giống Fleet khi nhắc ĐG đang bật.
- * submitted / period_exempt → none; còn lại: locked | overdue | upcoming | none.
+ * Trạng thái nhắc ĐG khi đang bật.
+ * submitted / period_exempt → none; còn lại: upcoming | due | overdue | none.
+ * (Không còn khóa xe.)
  */
 function resolveEvalEnforcement(v, ev) {
   const er = getEvalReminder();
   if (!er.enabled) return 'none';
   if (ev?.status === 'SUBMITTED' || ev?.periodExempt) return 'none';
   // Ưu tiên cờ seed / trạng thái xe để demo đủ case trong cùng một kỳ
-  if (v.evalLocked || v.evalStatus === 'overdue') return 'locked';
-  if (v.evalStatus === 'due') return 'overdue';
+  if (v.evalStatus === 'overdue' || v.evalLocked) return 'overdue';
+  if (v.evalStatus === 'due') return 'due';
   if (v.evalStatus === 'soon') return 'upcoming';
-  // Fallback theo lịch (ngày trong tháng)
+  // Fallback theo lịch (ngày trong tháng / thứ trong tuần)
   const asOf = getEvalAsOfDateKey();
-  const day = Number(String(asOf).slice(8, 10)) || 1;
   if (er.cadence === 'MONTHLY') {
+    const day = Number(String(asOf).slice(8, 10)) || 1;
     const deadline = Number(er.deadlineDayOfMonth) || 15;
-    const lock = Number(er.lockDayOfMonth) || 30;
     const upcomingStart = Math.max(1, deadline - (Number(er.remindDaysBefore) || 0));
-    if (day >= lock) return 'locked';
-    if (day >= deadline) return 'overdue';
+    if (day > deadline) return 'overdue';
+    if (day === deadline) return 'due';
     if (day >= upcomingStart) return 'upcoming';
+  } else if (er.cadence === 'WEEKLY') {
+    const d = new Date(String(asOf).slice(0, 10) + 'T12:00:00');
+    const jsDow = d.getDay(); // 0=CN … 6=T7
+    const wd = jsDow === 0 ? 7 : jsDow; // 1=T2 … 7=CN
+    const deadline = Number(er.deadlineWeekday) || 4;
+    const remindBefore = Number(er.remindDaysBefore) || 0;
+    const daysUntil = (deadline - wd + 7) % 7;
+    if (wd > deadline) return 'overdue';
+    if (wd === deadline) return 'due';
+    if (daysUntil > 0 && daysUntil <= remindBefore) return 'upcoming';
   }
   return 'none';
 }
 
 function evalEnforcementChip(status) {
-  if (status === 'locked') return '<span class="chip border border-slate-700 bg-slate-900 text-white">Đã khóa</span>';
-  if (status === 'overdue') return '<span class="chip border border-amber-400 bg-amber-50 text-amber-800">Quá hạn</span>';
-  if (status === 'upcoming') return '<span class="chip border border-orange-400 bg-orange-50 text-orange-800">Sắp đến hạn</span>';
+  if (status === 'overdue') return '<span class="chip border border-rose-400 bg-rose-50 text-rose-800">Quá hạn</span>';
+  if (status === 'due') return '<span class="chip border border-amber-400 bg-amber-50 text-amber-900">Tới hạn</span>';
+  if (status === 'upcoming') return '<span class="chip border border-orange-400 bg-orange-50 text-orange-800">Gần tới hạn</span>';
   return '';
 }
 
@@ -75149,8 +75785,8 @@ function evalListStatusChip(ev) {
 }
 
 function evalRowHighlightClass(enforcement) {
-  if (enforcement === 'locked') return 'border-l-4 border-l-rose-500 bg-rose-50/80';
-  if (enforcement === 'overdue') return 'border-l-4 border-l-amber-500 bg-amber-50/80';
+  if (enforcement === 'overdue') return 'border-l-4 border-l-rose-500 bg-rose-50/80';
+  if (enforcement === 'due') return 'border-l-4 border-l-amber-500 bg-amber-50/80';
   if (enforcement === 'upcoming') return 'border-l-4 border-l-orange-500 bg-orange-50/80';
   return '';
 }
@@ -75241,14 +75877,28 @@ function formatAssessPeriodHtml(ev, v) {
   if (start === end) return `<span class="block tabular-nums">${esc(start)}</span>`;
   return `<span class="block tabular-nums leading-tight">${esc(start)}<br><span class="text-slate-400">→</span> ${esc(end)}</span>`;
 }
-function formatAssessPeriodPlain(ev, v) {
+function assessPeriodParts(ev, v) {
   let start = ev?.dateStart || '';
   let end = ev?.dateEnd || '';
   if (!start || !end) {
-    const raw = typeof formatEvalPeriodRange === 'function' ? formatEvalPeriodRange(v, ev) : '—';
-    return String(raw).replace(/<[^>]+>/g, '').replace(/\s*→\s*/g, ' → ').trim() || '—';
+    const raw = typeof formatEvalPeriodRange === 'function' ? formatEvalPeriodRange(v, ev) : '';
+    const plain = String(raw).replace(/<[^>]+>/g, '').trim();
+    const parts = plain.split(/\s*→\s*/);
+    if (parts.length === 2) {
+      start = parts[0].trim();
+      end = parts[1].trim();
+    } else if (plain && plain !== '—') {
+      start = plain;
+      end = plain;
+    }
   }
-  return start === end ? start : (start + ' → ' + end);
+  return { from: start || '', to: end || '' };
+}
+function formatAssessPeriodPlain(ev, v) {
+  const { from, to } = assessPeriodParts(ev, v);
+  if (!from && !to) return '—';
+  if (!to || from === to) return from || to || '—';
+  return from + ' → ' + to;
 }
 function findAssessFailRowById(id) {
   const rows = (window._listGridPacks && window._listGridPacks.assessResults && window._listGridPacks.assessResults.rows) || [];
@@ -75302,15 +75952,27 @@ function toggleAssessGroupCollapse(groupKeyOrItem) {
   return true;
 }
 function setAllAssessGroupsCollapsed(collapsed) {
-  const rows = window._listGridPacks?.assessResults?.rows || window._listGridAllRows?.assessResults || [];
+  const packRows = window._listGridPacks?.assessResults?.rows || [];
+  const allRows = window._listGridAllRows?.assessResults || [];
+  const visRows = window._listGridRows?.assessResults || [];
   let n = 0;
-  rows.forEach((r) => {
-    if (!r || !r.__group) return;
-    r._collapsed = !!collapsed;
-    setAssessGroupCollapsed(r.groupKey, !!collapsed);
-    n++;
+  const seen = new Set();
+  [packRows, allRows, visRows].forEach((list) => {
+    (list || []).forEach((r) => {
+      if (!r || !r.__group) return;
+      r._collapsed = !!collapsed;
+      setAssessGroupCollapsed(r.groupKey, !!collapsed);
+      if (!seen.has(String(r.groupKey))) {
+        seen.add(String(r.groupKey));
+        n++;
+      }
+    });
   });
   if (typeof window._listApplyColFilters?.assessResults === 'function') window._listApplyColFilters.assessResults();
+  else {
+    const grid = window._listGrids?.assessResults;
+    try { grid && grid.invalidate(); grid && grid.render(); } catch (_) {}
+  }
   toast(collapsed ? ('Đã thu gọn ' + n + ' nhóm ĐG') : ('Đã mở rộng ' + n + ' nhóm ĐG'));
 }
 function assessSelectableFailRows(rows) {
@@ -75394,6 +76056,102 @@ function syncEvalLinkedOrders(ev, orderId) {
   ensureEvaluationHistory();
   const h = (DB.evaluationHistory || []).find(x => String(x.id) === String(ev.id));
   if (h) h.linkedOrderIds = ids.slice();
+}
+/** Đẩy hạng mục SC / Thay từ ĐG → kế hoạch, workKind = REPAIR (một lần bấm). */
+function pushEvalFailsToPlan(vid, workItems, materialsOut, opts) {
+  opts = opts || {};
+  const per = opts.period || new Date().toISOString().slice(0, 7);
+  const scheduleDate = opts.scheduleDate || null;
+  const noteBase = opts.note || 'Từ đánh giá định kỳ';
+  const v = vehicleById(vid);
+  const planIds = [];
+  let n = 0;
+  const nextId = () => Math.max(0, ...(DB.plans || []).map((p) => Number(p.id) || 0)) + 1 + n;
+  const existsKey = (key) => (DB.plans || []).some((p) =>
+    p.source === 'PERIODIC_ASSESSMENT'
+    && Number(p.vehicleId) === Number(vid)
+    && String(p.period) === String(per)
+    && !p.deferredTo
+    && String(p._evalPushKey || '') === String(key)
+  );
+  (workItems || []).forEach((w, i) => {
+    const key = 'wi:' + String(w.fromCheck || w.content || i);
+    if (existsKey(key)) return;
+    const id = nextId();
+    DB.plans.push({
+      id,
+      code: 'KH-SC-' + String(id).padStart(4, '0'),
+      vehicleId: Number(vid),
+      catalogId: null,
+      period: per,
+      scheduleDate,
+      qty: 1,
+      uom: 'Lần',
+      unitPrice: 0,
+      vat: 8,
+      vendor: '',
+      system: w.system || 'Từ đánh giá',
+      status: 'PLANNED',
+      source: 'PERIODIC_ASSESSMENT',
+      workKind: 'REPAIR',
+      service: w.content || w.fromCheck || 'Sửa chữa từ ĐG',
+      note: [noteBase, w.fromCheck ? ('tiêu chí: ' + w.fromCheck) : '', w.service || 'Sửa chữa'].filter(Boolean).join(' · '),
+      costKind: 'Tiền Công',
+      applyTo: v?.type || '',
+      soMooc: v?.trailerPlate || '',
+      ptId: v?.pwmsCode || '',
+      _evalPushKey: key,
+    });
+    planIds.push(id);
+    n++;
+  });
+  (materialsOut || []).forEach((m, i) => {
+    const key = 'mat:' + String(m.code || m.name || i) + ':' + String(m.serial || '');
+    if (existsKey(key)) return;
+    const id = nextId();
+    DB.plans.push({
+      id,
+      code: 'KH-SC-' + String(id).padStart(4, '0'),
+      vehicleId: Number(vid),
+      catalogId: null,
+      period: per,
+      scheduleDate,
+      qty: Number(m.qty) || 1,
+      uom: m.uom || 'Cái',
+      unitPrice: Number(m.price) || 0,
+      vat: 8,
+      vendor: '',
+      system: 'Từ đánh giá',
+      status: 'PLANNED',
+      source: 'PERIODIC_ASSESSMENT',
+      workKind: 'REPAIR',
+      service: m.name || m.code || 'Vật tư thay từ ĐG',
+      note: [noteBase, m.code ? ('mã ' + m.code) : '', m.serial ? ('seri ' + m.serial) : ''].filter(Boolean).join(' · '),
+      costKind: 'Tiền Vật Tư',
+      applyTo: v?.type || '',
+      soMooc: v?.trailerPlate || '',
+      ptId: v?.pwmsCode || '',
+      _evalPushKey: key,
+    });
+    planIds.push(id);
+    n++;
+  });
+  return { n, planIds };
+}
+function syncEvalLinkedPlans(ev, planIds) {
+  if (!ev || !planIds || !planIds.length) return;
+  const ids = Array.isArray(ev.linkedPlanIds) ? ev.linkedPlanIds.map(String) : [];
+  planIds.forEach((pid) => {
+    if (!ids.includes(String(pid))) ids.push(String(pid));
+  });
+  ev.linkedPlanIds = ids;
+  const vid = Number(ev.vehicleId != null ? ev.vehicleId : Object.keys(DB.evaluations || {}).find((k) => DB.evaluations[k] === ev));
+  if (Number.isFinite(vid) && DB.evaluations && DB.evaluations[vid]) {
+    DB.evaluations[vid].linkedPlanIds = ids.slice();
+  }
+  ensureEvaluationHistory();
+  const h = (DB.evaluationHistory || []).find((x) => String(x.id) === String(ev.id));
+  if (h) h.linkedPlanIds = ids.slice();
 }
 function createRepairOrdersFromAssessFailSelection() {
   const picked = assessCheckedFailRows();
@@ -75789,6 +76547,7 @@ function buildAssessResultsGridRows(evals) {
     const fail = evalFailCount(ev);
     const total = good + fail;
     const fails = evalFailItemsBrief(ev, { asObjects: true, maxNote: 60 });
+    const periodParts = assessPeriodParts(ev, v);
     const periodText = formatAssessPeriodPlain(ev, v);
     const areaLabel = formatAreaLabel(v?.area);
     const orders = ev.status === 'SUBMITTED' ? ordersLinkedToEval(ev, ev.vehicleId) : [];
@@ -75812,6 +76571,8 @@ function buildAssessResultsGridRows(evals) {
       plate,
       areaLabel: areaLabel || '—',
       periodText,
+      periodFrom: periodParts.from || '',
+      periodTo: periodParts.to || '',
       inspector: ev.inspector || '—',
       resultText,
       statusHtml,
@@ -75917,11 +76678,15 @@ function registerAssessResultsGrid(evals) {
         : leafDash },
     { id: 'areaLabel', field: 'areaLabel', name: 'Khu vực', width: 120, minWidth: 90, sortable: true,
       formatter: (r, c, v, col, item) => vehOnly(item) ? esc(item.areaLabel || '—') : leafDash },
-    { id: 'periodText', field: 'periodText', name: 'Kỳ', width: 150, minWidth: 110, sortable: true,
+    { id: 'periodFrom', field: 'periodFrom', name: 'Ngày bắt đầu kỳ', width: 158, minWidth: 158, sortable: true, cssClass: 'r',
       formatter: (r, c, v, col, item) => vehOnly(item)
-        ? `<span class="text-xs tabular-nums" title="${esc(item.periodText || '')}">${esc(item.periodText || '—')}</span>`
+        ? `<span class="tabular-nums">${esc(item.periodFrom || '—')}</span>`
         : leafDash },
-    { id: 'inspector', field: 'inspector', name: 'KTV', width: 130, minWidth: 90, sortable: true,
+    { id: 'periodTo', field: 'periodTo', name: 'Ngày kết thúc kỳ', width: 165, minWidth: 165, sortable: true, cssClass: 'r',
+      formatter: (r, c, v, col, item) => vehOnly(item)
+        ? `<span class="tabular-nums">${esc(item.periodTo || '—')}</span>`
+        : leafDash },
+    { id: 'inspector', field: 'inspector', name: 'Kỹ thuật viên', width: 150, minWidth: 140, sortable: true,
       formatter: (r, c, v, col, item) => vehOnly(item)
         ? `<span class="text-xs" title="${esc(item.inspector || '')}">${esc(item.inspector || '—')}</span>`
         : leafDash },
@@ -75933,7 +76698,7 @@ function registerAssessResultsGrid(evals) {
       formatter: (r, c, v, col, item) => vehOnly(item)
         ? (item.statusHtml || esc(item.statusText || '—'))
         : leafDash },
-    { id: 'orderCount', field: 'orderCount', name: 'Số phiếu SC', width: 100, minWidth: 80, sortable: true, cssClass: 'c',
+    { id: 'orderCount', field: 'orderCount', name: 'Số phiếu SC', width: 118, minWidth: 118, sortable: true, cssClass: 'c',
       formatter: (r, c, v, col, item) => {
         if (!vehOnly(item)) return leafDash;
         const n = Number(item.orderCount) || 0;
@@ -75953,7 +76718,7 @@ function registerAssessResultsGrid(evals) {
         }
         return leafDash;
       } },
-  ], { forceFitColumns: true, fullWidthRows: true, colFilters: true, rowHeight: 34 });
+  ], { forceFitColumns: false, fullWidthRows: true, colFilters: true, rowHeight: 34 });
   return { rows, leafCount };
 }
 function renderAssessmentResultsPanel() {
@@ -76073,31 +76838,43 @@ function pageAssessment() {
   const list = DB.vehicles.filter(v => {
     const ev = DB.evaluations[v.id];
     const enf = resolveEvalEnforcement(v, ev);
-    if (!matchSearch([v.plate, v.area, formatAreaLabel(v.area), v.type, ev?.inspector].join(' '), f.search)) return false;
+    const pair = relatedPairForVehicle(v);
+    const pairPlates = [pair.tractor?.plate, pair.trailer?.plate, v.plate, v.trailerPlate].filter(Boolean).join(' ');
+    if (!matchSearch([pairPlates, v.area, formatAreaLabel(v.area), v.type, ev?.inspector].join(' '), f.search)) return false;
     if (f.area !== 'ALL' && v.area !== f.area) return false;
     if (f.kind === 'vehicle' && v.isTrailer) return false;
     if (f.kind === 'trailer' && !v.isTrailer) return false;
     if (f.assessStatus === 'SUBMITTED' && ev?.status !== 'SUBMITTED') return false;
     if (f.assessStatus === 'PENDING' && ev?.status === 'SUBMITTED') return false;
-    if (f.evalStatus === 'locked') return enf === 'locked';
     if (f.evalStatus === 'overdue') return enf === 'overdue';
+    if (f.evalStatus === 'due') return enf === 'due';
     if (f.evalStatus === 'soon') return enf === 'upcoming';
     if (f.evalStatus === 'ok') return ev?.status === 'SUBMITTED' && enf === 'none';
-    if (f.evalStatus === 'due') return enf === 'overdue';
+    if (f.evalStatus === 'locked') return enf === 'overdue'; // legacy filter → quá hạn
     if (f.evalStatus !== 'ALL') return v.evalStatus === f.evalStatus;
     return true;
   });
-  let kpiLocked = 0, kpiOverdue = 0, kpiUpcoming = 0;
+  // Mặc định: cảnh báo lên đầu — quá hạn → tới hạn → gần tới hạn → còn lại
+  const enfRank = { overdue: 0, due: 1, upcoming: 2, none: 3 };
+  list.sort((a, b) => {
+    const ea = resolveEvalEnforcement(a, DB.evaluations[a.id]);
+    const eb = resolveEvalEnforcement(b, DB.evaluations[b.id]);
+    const ra = enfRank[ea] != null ? enfRank[ea] : 3;
+    const rb = enfRank[eb] != null ? enfRank[eb] : 3;
+    if (ra !== rb) return ra - rb;
+    return String(a.plate || '').localeCompare(String(b.plate || ''), 'vi');
+  });
+  let kpiDue = 0, kpiOverdue = 0, kpiUpcoming = 0;
   DB.vehicles.forEach(v => {
     const enf = resolveEvalEnforcement(v, DB.evaluations[v.id]);
-    if (enf === 'locked') kpiLocked += 1;
-    else if (enf === 'overdue') kpiOverdue += 1;
+    if (enf === 'overdue') kpiOverdue += 1;
+    else if (enf === 'due') kpiDue += 1;
     else if (enf === 'upcoming') kpiUpcoming += 1;
   });
   const pgAsm = paginate(list);
   return pageShell(
     'Đánh giá phương tiện định kỳ',
-    'Cảnh báo ĐG sắp hạn / quá hạn / khóa · cảnh báo vỏ lốp / ắc quy · từ ĐG chỉ tạo phiếu sửa chữa',
+    'Cảnh báo ĐG gần tới hạn / tới hạn / quá hạn · cảnh báo vỏ lốp / ắc quy · từ ĐG chỉ tạo phiếu sửa chữa',
     `<button data-nav-settings-eval class="btn btn-outline">Cài đặt nhắc đánh giá</button>`,
     tabs + `
     <div class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -76108,16 +76885,16 @@ function pageAssessment() {
         <p class="mt-1 text-[10px] text-slate-400">Ngày mô phỏng: <strong>${esc(asOf)}</strong></p>
       </div>
       <button type="button" data-filter-enf="soon" class="card p-4 text-left border-l-4 border-l-orange-500 bg-orange-50/50 hover:bg-orange-50">
-        <p class="text-xs text-orange-800/80 m-0">Sắp đến hạn</p>
+        <p class="text-xs text-orange-800/80 m-0">Gần tới hạn</p>
         <p class="mt-1 text-2xl font-bold text-orange-800 tabular-nums">${kpiUpcoming}</p>
       </button>
-      <button type="button" data-filter-enf="overdue" class="card p-4 text-left border-l-4 border-l-amber-500 bg-amber-50/50 hover:bg-amber-50">
-        <p class="text-xs text-amber-800/80 m-0">Quá hạn</p>
-        <p class="mt-1 text-2xl font-bold text-amber-800 tabular-nums">${kpiOverdue}</p>
+      <button type="button" data-filter-enf="due" class="card p-4 text-left border-l-4 border-l-amber-500 bg-amber-50/50 hover:bg-amber-50">
+        <p class="text-xs text-amber-800/80 m-0">Tới hạn</p>
+        <p class="mt-1 text-2xl font-bold text-amber-800 tabular-nums">${kpiDue}</p>
       </button>
-      <button type="button" data-filter-enf="locked" class="card p-4 text-left border-l-4 border-l-rose-500 bg-rose-50/50 hover:bg-rose-50">
-        <p class="text-xs text-rose-800/80 m-0">Đã khóa</p>
-        <p class="mt-1 text-2xl font-bold text-rose-800 tabular-nums">${kpiLocked}</p>
+      <button type="button" data-filter-enf="overdue" class="card p-4 text-left border-l-4 border-l-rose-500 bg-rose-50/50 hover:bg-rose-50">
+        <p class="text-xs text-rose-800/80 m-0">Quá hạn</p>
+        <p class="mt-1 text-2xl font-bold text-rose-800 tabular-nums">${kpiOverdue}</p>
       </button>
     </div>
     ${(() => {
@@ -76125,19 +76902,19 @@ function pageAssessment() {
       return tireAlertBannerHtml(allTire, { extra: allTire.length ? ` · ${allTire.length} dòng đến hạn trên đội xe (demo gắn theo biển số).` : '' });
     })()}
     <div class="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700 leading-relaxed">
-      <strong>Mẫu cảnh báo:</strong> hàng <span class="text-rose-700 font-medium">đỏ</span> = Đã khóa ·
-      <span class="text-amber-700 font-medium">vàng</span> = Quá hạn ·
-      <span class="text-orange-700 font-medium">cam</span> = Sắp đến hạn ·
+      <strong>Mẫu cảnh báo:</strong> hàng <span class="text-rose-700 font-medium">đỏ</span> = Quá hạn ·
+      <span class="text-amber-700 font-medium">vàng</span> = Tới hạn ·
+      <span class="text-orange-700 font-medium">cam</span> = Gần tới hạn ·
       trắng = đã nộp / không cảnh báo.
       Xe mẫu: <code>51C-29273</code> đã nộp · <code>50H-87033</code> chờ tạo phiếu SC · <code>50H-69138</code> phiếu SC ·
-      <code>51C-41767</code> đã khóa · <code>50E-21624</code> quá hạn · <code>50E-36177</code> sắp đến hạn.
+      <code>51C-41767</code> quá hạn · <code>50E-21624</code> tới hạn · <code>50E-36177</code> gần tới hạn.
     </div>
     ${filterBarShell([
       filterSearch('flt-search', 'Biển số, khu vực, KTV…', f.search),
       filterSelect('flt-area', 'Khu vực', f.area, [['ALL','Tất cả'], ...areas().map(a => [a, formatAreaLabel(a)])]),
       filterSelect('flt-kind', 'Loại phương tiện', f.kind, [['ALL','Tất cả'],['vehicle','Xe'],['trailer','Mooc']]),
       filterSelect('flt-assessStatus', 'Nộp phiếu', f.assessStatus, [['ALL','Tất cả'],['SUBMITTED','Đã nộp'],['PENDING','Chưa nộp']]),
-      filterSelect('flt-evalStatus', 'Cảnh báo', f.evalStatus, [['ALL','Tất cả'],['soon','Sắp đến hạn'],['overdue','Quá hạn'],['locked','Đã khóa'],['ok','Đã nộp / không cảnh báo']]),
+      filterSelect('flt-evalStatus', 'Cảnh báo', f.evalStatus, [['ALL','Tất cả'],['soon','Gần tới hạn'],['due','Tới hạn'],['overdue','Quá hạn'],['ok','Đã nộp / không cảnh báo']]),
     ].join(''), `${list.length} / ${DB.vehicles.length} xe`)}
     <div class="card overflow-hidden">
       <div class="border-b border-slate-200 px-5 py-4"><h2 class="text-base font-semibold">Danh sách xe kiểm tra</h2></div>
@@ -76146,6 +76923,7 @@ function pageAssessment() {
         <thead class="bg-slate-50 text-slate-600"><tr>
           <th class="th text-left">Khu vực</th>
           <th class="th text-left">Biển số xe</th>
+          <th class="th text-left">Biển số rơ mooc</th>
           <th class="th text-left">Kỳ kiểm tra</th>
           <th class="th text-left">Ngày tạo phiếu</th>
           <th class="th text-left">Kỹ thuật viên</th>
@@ -76166,6 +76944,16 @@ function pageAssessment() {
             const enf = resolveEvalEnforcement(v, ev);
             const rowCls = evalRowHighlightClass(enf);
             const periodLabel = formatEvalPeriodRange(v, ev);
+            const pair = relatedPairForVehicle(v);
+            // Cặp xe–mooc: mooc chưa gắn xe → để trống biển số xe
+            const truckPlate = pair.tractor?.plate || '';
+            const moocPlate = pair.trailer?.plate || '';
+            const truckCell = truckPlate
+              ? `<span class="font-medium">${esc(truckPlate)}</span>`
+              : '<span class="text-slate-300">—</span>';
+            const moocCell = moocPlate
+              ? `<span class="font-medium ${v.isTrailer ? '' : 'text-slate-700'}">${esc(moocPlate)}</span>`
+              : '<span class="text-slate-300">—</span>';
             const statusHtml = `<div class="flex flex-wrap items-center gap-1.5">${evalListStatusChip(ev)}${evalEnforcementChip(enf)}</div>`;
             let orderCell = '<span class="text-slate-300">—</span>';
             if (orders.length) {
@@ -76180,7 +76968,8 @@ function pageAssessment() {
               : `<button data-eval="${v.id}" class="btn btn-outline btn-sm inline-flex items-center gap-1 text-blue-600 !border-blue-300">+ Đánh giá</button>`;
             return `<tr class="row-h ${rowCls}">
               <td class="td">${esc(formatAreaLabel(v.area))}</td>
-              <td class="td font-medium">${esc(v.plate)}</td>
+              <td class="td">${truckCell}</td>
+              <td class="td">${moocCell}</td>
               <td class="td text-xs tabular-nums whitespace-nowrap">${periodLabel}</td>
               <td class="td tabular-nums">${esc(ev?.date || '—')}</td>
               <td class="td text-xs">${esc(ev?.inspector || '—')}</td>
@@ -76189,7 +76978,7 @@ function pageAssessment() {
               <td class="td">${orderCell}</td>
               <td class="td text-right whitespace-nowrap">${actionBtn}</td>
             </tr>`;
-          }).join('') || `<tr><td colspan="9" class="px-5 py-12 text-center text-slate-500">Không có xe khớp bộ lọc</td></tr>`}
+          }).join('') || `<tr><td colspan="10" class="px-5 py-12 text-center text-slate-500">Không có xe khớp bộ lọc</td></tr>`}
         </tbody>
       </table>
       </div>
@@ -77233,37 +78022,32 @@ function getEvalReminder() {
 }
 function evalReminderSummary(er) {
   er = er || getEvalReminder();
-  if (!er.enabled) return 'Đang tắt nhắc và khóa xe theo đánh giá định kỳ.';
+  if (!er.enabled) return 'Đang tắt nhắc đánh giá định kỳ.';
   if (er.cadence === 'WEEKLY') {
-    return `Chu kỳ tuần · hết hạn ${WEEKDAY_VI[er.deadlineWeekday] || '—'}, khóa ${WEEKDAY_VI[er.lockWeekday] || '—'} · nhắc trước ${er.remindDaysBefore} ngày` +
-      (er.overdueRemindEveryDays > 0 ? ` · quá hạn nhắc mỗi ${er.overdueRemindEveryDays} ngày` : '') +
-      ` · mở xe khi đã nộp đánh giá${er.unlockAlsoWhenMaintenanceDone ? ' hoặc xong bảo dưỡng' : ''}.`;
+    return `Chu kỳ tuần · hết hạn ${WEEKDAY_VI[er.deadlineWeekday] || '—'} · gần tới hạn trước ${er.remindDaysBefore} ngày` +
+      (er.overdueRemindEveryDays > 0 ? ` · quá hạn nhắc mỗi ${er.overdueRemindEveryDays} ngày` : '') + '.';
   }
-  return `Chu kỳ tháng · hết hạn ngày ${er.deadlineDayOfMonth}, khóa ngày ${er.lockDayOfMonth} · nhắc trước ${er.remindDaysBefore} ngày` +
-    (er.overdueRemindEveryDays > 0 ? ` · quá hạn nhắc mỗi ${er.overdueRemindEveryDays} ngày` : '') +
-    ` · mở xe khi đã nộp đánh giá${er.unlockAlsoWhenMaintenanceDone ? ' hoặc xong bảo dưỡng' : ''}.`;
+  return `Chu kỳ tháng · hết hạn ngày ${er.deadlineDayOfMonth} · gần tới hạn trước ${er.remindDaysBefore} ngày` +
+    (er.overdueRemindEveryDays > 0 ? ` · quá hạn nhắc mỗi ${er.overdueRemindEveryDays} ngày` : '') + '.';
 }
 function evalReminderPreviewLines(er) {
   er = er || getEvalReminder();
   if (!er.enabled) {
-    return ['Nhắc đánh giá đang tắt — xe không bị nhắc / khóa theo cấu hình này.'];
+    return ['Nhắc đánh giá đang tắt — không cảnh báo gần tới hạn / tới hạn / quá hạn theo cấu hình này.'];
   }
   const lines = [];
   if (er.cadence === 'WEEKLY') {
-    lines.push(`Mỗi tuần: hạn nộp ${WEEKDAY_VI[er.deadlineWeekday]}, khóa xe ${WEEKDAY_VI[er.lockWeekday]} (cùng tuần).`);
+    lines.push(`Mỗi tuần: hạn nộp ${WEEKDAY_VI[er.deadlineWeekday]}.`);
   } else {
-    lines.push(`Mỗi tháng: hạn nộp ngày ${er.deadlineDayOfMonth}, khóa xe ngày ${er.lockDayOfMonth}.`);
+    lines.push(`Mỗi tháng: hạn nộp ngày ${er.deadlineDayOfMonth}.`);
   }
-  lines.push(`Trước hạn: bắt đầu nhắc từ ${er.remindDaysBefore} ngày trước ngày hết hạn${er.remindIncludeDeadlineDay ? ' (kể cả ngày hết hạn)' : ''}.`);
+  lines.push(`Gần tới hạn: bắt đầu nhắc từ ${er.remindDaysBefore} ngày trước ngày hết hạn.`);
+  lines.push(`Tới hạn: ngày hết hạn nộp${er.remindIncludeDeadlineDay ? ' (vẫn gửi nhắc trong ngày)' : ''}.`);
   if (er.overdueRemindEveryDays > 0) {
-    lines.push(`Quá hạn: nhắc mỗi ${er.overdueRemindEveryDays} ngày cho đến ngày khóa.`);
+    lines.push(`Quá hạn: nhắc mỗi ${er.overdueRemindEveryDays} ngày cho đến khi nộp đánh giá.`);
   } else {
-    lines.push('Quá hạn: không nhắc lặp (chỉ khóa khi đến hạn khóa).');
+    lines.push('Quá hạn: không nhắc lặp — chỉ giữ trạng thái quá hạn trên danh sách.');
   }
-  lines.push(er.continueRemindAfterLock
-    ? 'Sau khi khóa: vẫn tiếp tục gửi nhắc.'
-    : 'Sau khi khóa: dừng nhắc định kỳ (đã có sự kiện khóa).');
-  lines.push(`Mở khóa xe: khi đã nộp phiếu đánh giá${er.unlockAlsoWhenMaintenanceDone ? ' hoặc khi hoàn thành bảo dưỡng liên quan' : ''}.`);
   lines.push(`Người nhận nhắc: ${(er.notifyRoles || []).join(', ') || '—'}${er.filterByVehicleArea ? ' · lọc theo khu vực xe' : ''}.`);
   return lines;
 }
@@ -77289,7 +78073,7 @@ function pageSettings() {
 
   return pageShell(
     'Cài đặt nhắc đánh giá phương tiện',
-    'Cấu hình hạn nộp · nhắc trước/quá hạn · khóa / mở xe theo đánh giá định kỳ',
+    'Cấu hình hạn nộp · gần tới hạn / tới hạn / quá hạn theo đánh giá định kỳ',
     '',
     `
     <div class="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
@@ -77300,11 +78084,11 @@ function pageSettings() {
       <div class="card space-y-4 p-5">
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h3 class="text-base font-semibold text-slate-900">Nhắc &amp; khóa theo đánh giá định kỳ</h3>
-            <p class="mt-1 text-sm text-slate-600">Áp dụng cho toàn bộ xe/mooc thuộc đơn vị · ảnh hưởng màn Đánh giá phương tiện định kỳ</p>
+            <h3 class="text-base font-semibold text-slate-900">Nhắc đánh giá định kỳ</h3>
+            <p class="mt-1 text-sm text-slate-600">Áp dụng cho toàn bộ xe/mooc thuộc đơn vị · ảnh hưởng màn Đánh giá phương tiện định kỳ (không khóa xe)</p>
           </div>
           <label class="inline-flex items-center gap-2 text-sm font-medium text-slate-800">
-            <input type="checkbox" name="evalEnabled" class="!w-auto" ${er.enabled ? 'checked' : ''} /> Bật nhắc / khóa
+            <input type="checkbox" name="evalEnabled" class="!w-auto" ${er.enabled ? 'checked' : ''} /> Bật nhắc
           </label>
         </div>
 
@@ -77327,13 +78111,10 @@ function pageSettings() {
       </div>
 
       <div class="card space-y-4 p-5" id="evalDeadlineCard">
-        <h3 class="text-base font-semibold text-slate-900">Hạn nộp &amp; ngày khóa xe</h3>
+        <h3 class="text-base font-semibold text-slate-900">Hạn nộp</h3>
         <div class="grid gap-4 sm:grid-cols-2 ${cadence==='MONTHLY'?'':'hidden'}" data-cadence-panel="MONTHLY">
           <label class="field">Ngày hết hạn nộp trong tháng
             <input class="form-control" name="deadlineDayOfMonth" type="number" min="1" max="28" value="${er.deadlineDayOfMonth}" />
-          </label>
-          <label class="field">Ngày khóa xe trong tháng
-            <input class="form-control" name="lockDayOfMonth" type="number" min="1" max="31" value="${er.lockDayOfMonth}" />
           </label>
         </div>
         <div class="grid gap-4 sm:grid-cols-2 ${cadence==='WEEKLY'?'':'hidden'}" data-cadence-panel="WEEKLY">
@@ -77342,19 +78123,14 @@ function pageSettings() {
               `<option value="${d}" ${er.deadlineWeekday===d?'selected':''}>${WEEKDAY_VI[d]}</option>`
             ).join('')}</select>
           </label>
-          <label class="field">Ngày khóa xe trong tuần
-            <select name="lockWeekday">${[1,2,3,4,5,6,7].map(d =>
-              `<option value="${d}" ${er.lockWeekday===d?'selected':''}>${WEEKDAY_VI[d]}</option>`
-            ).join('')}</select>
-          </label>
         </div>
-        <p class="text-xs text-slate-500">Khóa xe: phương tiện bị dừng vận hành trên hệ thống đến khi đánh giá đạt điều kiện mở khóa.</p>
+        <p class="text-xs text-slate-500">Ngày hết hạn = <strong>Tới hạn</strong>. Sau ngày đó = <strong>Quá hạn</strong>. Trước đó trong cửa sổ nhắc = <strong>Gần tới hạn</strong>.</p>
       </div>
 
       <div class="card space-y-4 p-5">
         <h3 class="text-base font-semibold text-slate-900">Lịch nhắc</h3>
         <div class="grid gap-4 sm:grid-cols-2">
-          <label class="field">Nhắc trước hạn (số ngày)
+          <label class="field">Gần tới hạn: nhắc trước (số ngày)
             <input class="form-control" name="remindDaysBefore" type="number" min="0" max="30" value="${er.remindDaysBefore}" />
           </label>
           <label class="field">Quá hạn: nhắc mỗi (ngày)
@@ -77362,14 +78138,11 @@ function pageSettings() {
             <span class="mt-1 block text-[11px] text-slate-500">0 = không nhắc lặp khi quá hạn</span>
           </label>
         </div>
-        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="remindIncludeDeadlineDay" class="!w-auto" ${er.remindIncludeDeadlineDay?'checked':''} /> Nhắc cả ngày hết hạn</label>
-        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="continueRemindAfterLock" class="!w-auto" ${er.continueRemindAfterLock?'checked':''} /> Tiếp tục nhắc sau khi đã khóa xe</label>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="remindIncludeDeadlineDay" class="!w-auto" ${er.remindIncludeDeadlineDay?'checked':''} /> Gửi nhắc cả ngày tới hạn</label>
       </div>
 
       <div class="card space-y-4 p-5">
-        <h3 class="text-base font-semibold text-slate-900">Mở khóa xe &amp; người nhận nhắc</h3>
-        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="unlockOnAssessmentSubmitted" class="!w-auto" ${er.unlockOnAssessmentSubmitted?'checked':''} /> Mở xe khi đã nộp phiếu đánh giá</label>
-        <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="unlockAlsoWhenMaintenanceDone" class="!w-auto" ${er.unlockAlsoWhenMaintenanceDone?'checked':''} /> Hoặc mở xe khi hoàn thành bảo dưỡng / sửa chữa liên quan</label>
+        <h3 class="text-base font-semibold text-slate-900">Người nhận nhắc</h3>
         <div>
           <p class="mb-2 text-sm font-medium text-slate-700">Vai trò nhận nhắc</p>
           <div class="flex flex-wrap gap-3 text-sm">
@@ -77666,9 +78439,6 @@ function openEvalModal(vid) {
                         ? `<span class="text-[10px] text-sky-700">theo danh mục</span>` : ''}
                     </div>
                     <input type="text" class="w-full text-xs" data-item-note="${it.id}" value="${esc(state[it.id].note)}" placeholder="${cur==='ok' || !cur ? 'Ghi chú (tùy chọn)' : 'Ghi chú / hạn xử lý…'}" />
-                    <div class="${(cur==='repair'||cur==='replace') && evalItemTireBatteryKind(it.id) ? '' : 'hidden'}" data-eval-serial-wrap="${it.id}">
-                      ${evalSerialPickHtml(it.id, vid, state[it.id])}
-                    </div>
                     <div class="eval-detail ${cur==='repair'?'show':''}" data-detail-repair="${it.id}">
                       <div class="mb-2 text-xs font-semibold text-amber-800">Hạng mục cần sửa (SC)</div>
                       <div class="mb-2 flex flex-wrap gap-1.5" data-chips-repair="${it.id}">${renderChips(it.id, 'repair')}</div>
@@ -77770,14 +78540,18 @@ function openEvalModal(vid) {
 
       <div id="evalPostActionsWrap" class="mb-4 space-y-2">
         <p class="text-sm font-semibold text-slate-900">Nộp đánh giá</p>
-        <div class="grid gap-2 sm:grid-cols-2">
+        <div class="grid gap-2 sm:grid-cols-3">
           <button type="button" data-eval-submit="sc" class="btn btn-outline !h-auto !whitespace-normal px-3 py-3 text-center text-sm !border-rose-300 !bg-rose-50">
             <span class="block font-semibold text-rose-950">Tạo phiếu sửa chữa</span>
-            <span class="mt-0.5 block text-[11px] font-normal text-rose-800/80">Chỉ SC · không tạo bảo dưỡng / kế hoạch</span>
+            <span class="mt-0.5 block text-[11px] font-normal text-rose-800/80">Phiếu SC nháp · làm ngay</span>
+          </button>
+          <button type="button" data-eval-submit="plan" class="btn btn-outline !h-auto !whitespace-normal px-3 py-3 text-center text-sm !border-amber-300 !bg-amber-50">
+            <span class="block font-semibold text-amber-950">Đẩy vào kế hoạch SC</span>
+            <span class="mt-0.5 block text-[11px] font-normal text-amber-900/80">Một lần bấm · dòng KH loại Sửa chữa</span>
           </button>
           <button type="button" data-eval-submit="later" class="btn btn-primary !h-auto !whitespace-normal px-3 py-3 text-center text-sm">
-            <span class="block font-semibold">Chỉ nộp đánh giá</span>
-            <span class="mt-0.5 block text-[11px] font-normal text-slate-500">Tạo phiếu SC sau từ danh sách</span>
+            <span class="block font-semibold text-white">Chỉ nộp đánh giá</span>
+            <span class="mt-0.5 block text-[11px] font-normal text-white/85">Tạo phiếu SC / đẩy KH sau</span>
           </button>
         </div>
       </div>
@@ -77815,11 +78589,6 @@ function openEvalModal(vid) {
     const a = state[itemId].assessment;
     $(`[data-detail-repair="${itemId}"]`)?.classList.toggle('show', a === 'repair');
     $(`[data-detail-replace="${itemId}"]`)?.classList.toggle('show', a === 'replace');
-    const serialWrap = $(`[data-eval-serial-wrap="${itemId}"]`);
-    if (serialWrap) {
-      const needSeri = evalItemTireBatteryKind(itemId) && (a === 'repair' || a === 'replace');
-      serialWrap.classList.toggle('hidden', !needSeri);
-    }
     const noteEl = $(`[data-item-note="${itemId}"]`);
     if (noteEl) noteEl.placeholder = (a === 'ok' || !a) ? 'Ghi chú (tùy chọn)' : 'Ghi chú / hạn xử lý…';
   };
@@ -77944,51 +78713,6 @@ function openEvalModal(vid) {
     refreshChips(itemId);
   };
 
-  const applyEvalUnitPick = (itemId, unitId) => {
-    if (!state[itemId]) return;
-    if (!unitId) {
-      state[itemId].unitId = null;
-      state[itemId].serial = '';
-      state[itemId].position = '';
-      return;
-    }
-    const u = tireBatteryUnitById(unitId);
-    if (!u) return;
-    state[itemId].unitId = u.id;
-    state[itemId].serial = u.serial || '';
-    state[itemId].position = tireBatteryAttachLabel(u);
-    const fill = [tireBatteryAttachLabel(u), u.serial ? ('Seri ' + u.serial) : null, u.name].filter(Boolean).join(' · ');
-    const noteEl = $(`[data-item-note="${itemId}"]`);
-    if (noteEl) {
-      const cur = String(noteEl.value || '').trim();
-      if (!cur || /Seri\s/i.test(cur) || cur === state[itemId].note) {
-        noteEl.value = fill;
-        state[itemId].note = fill;
-      } else if (!cur.includes(u.serial || '___')) {
-        noteEl.value = cur + (cur ? ' · ' : '') + fill;
-        state[itemId].note = noteEl.value;
-      }
-    }
-    // Thay: gắn luôn vật tư trùng mã SKU của seri đang chọn (nếu có)
-    if (state[itemId].assessment === 'replace' && u.code) {
-      let m = (DB.materials || []).find((x) => x.code === u.code);
-      if (!m) {
-        m = {
-          id: 'sku-' + u.code,
-          code: u.code,
-          name: u.name || u.code,
-          uom: u.uom || 'Cái',
-          source: 'master',
-        };
-      }
-      pushMatToState(itemId, m, 'master');
-    }
-    toast('Đã điền seri ' + (u.serial || u.position || ''));
-  };
-
-  $$('[data-eval-pick-unit]').forEach((sel) => {
-    sel.addEventListener('change', () => applyEvalUnitPick(sel.getAttribute('data-eval-pick-unit'), sel.value));
-  });
   const bindAc = (inputSel, kind) => {
     $$(inputSel).forEach(input => {
       const itemId = kind === 'repair' ? input.dataset.acRepair : input.dataset.acMat;
@@ -78168,9 +78892,10 @@ function openEvalModal(vid) {
     }
 
     const date = fd.get('inspectionDate') || fd.get('dateStart') || today;
-    const postAction = formStatus === 'SUBMITTED' && fail > 0 && !periodExempt
+    const postActionRaw = formStatus === 'SUBMITTED' && fail > 0 && !periodExempt
       ? String(postActionOverride || 'later')
       : 'later';
+    const postAction = postActionRaw === 'sc' || postActionRaw === 'plan' ? postActionRaw : 'later';
     DB.evaluations[vid] = {
       date,
       dateStart: fd.get('dateStart'),
@@ -78180,7 +78905,7 @@ function openEvalModal(vid) {
       inspector: fd.get('inspector'),
       periodExempt,
       periodExemptReason: fd.get('periodExemptReason') || '',
-      postEvalAction: postAction === 'sc' ? 'sc' : 'later',
+      postEvalAction: postAction,
       goodCount: Object.values(items).filter(a => a === 'ok').length,
       failCount: fail,
       linkedOrderIds: [],
@@ -78212,6 +78937,7 @@ function openEvalModal(vid) {
     }
 
     let createdOrder = null;
+    let createdPlans = { n: 0, planIds: [] };
     if (formStatus === 'SUBMITTED' && fail > 0 && !periodExempt && postAction === 'sc') {
       const inspector = fd.get('inspector') || 'KTV';
       createdOrder = {
@@ -78227,11 +78953,26 @@ function openEvalModal(vid) {
         workItems: (workItems.length ? workItems : [{ system: 'Từ đánh giá', content: fd.get('note') || 'Hạng mục không đạt', service: 'Sửa chữa', kind: 'REPAIR', performer: inspector, hours: null }])
           .map(w => ({ ...w, kind: 'REPAIR', service: w.service === 'Thay thế' ? 'Thay thế' : 'Sửa chữa' })),
         planIds: [],
-        approvalLog: [{ at: nowStamp(), action: 'CREATE', by: inspector, note: 'Tạo phiếu sửa chữa từ đánh giá định kỳ · nháp (không qua kế hoạch)' }],
+        approvalLog: [{ at: nowStamp(), action: 'CREATE', by: inspector, note: 'Tạo phiếu sửa chữa từ đánh giá định kỳ · nháp' }],
       };
       DB.orders.unshift(createdOrder);
       DB.evaluations[vid].linkedOrderIds = [createdOrder.id];
       DB.evaluations[vid].postEvalAction = 'sc';
+    }
+    if (formStatus === 'SUBMITTED' && fail > 0 && !periodExempt && postAction === 'plan') {
+      const period = String(fd.get('dateStart') || date || today).slice(0, 7);
+      const scheduleDate = String(fd.get('inspectionDate') || date || today).slice(0, 10);
+      createdPlans = pushEvalFailsToPlan(vid, workItems, materialsOut, {
+        period,
+        scheduleDate,
+        note: 'Từ đánh giá định kỳ · ' + (veh.plate || ''),
+      });
+      DB.evaluations[vid].linkedPlanIds = (createdPlans.planIds || []).slice();
+      DB.evaluations[vid].postEvalAction = 'plan';
+      DB.evaluations[vid].vehicleId = Number(vid);
+      syncEvalLinkedPlans(DB.evaluations[vid], createdPlans.planIds || []);
+      if (!createdPlans.n) toast('Hạng mục đã có trên kế hoạch kỳ này — không thêm dòng mới');
+      else toast('Đã đẩy ' + createdPlans.n + ' dòng vào kế hoạch · loại Sửa chữa');
     }
     if (formStatus === 'SUBMITTED' || formStatus === 'DRAFT') archiveEvaluation(vid, DB.evaluations[vid]);
 
@@ -78254,6 +78995,9 @@ function openEvalModal(vid) {
       return;
     }
 
+    const planMsg = createdPlans.n
+      ? `<div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">Đã đẩy <strong>${createdPlans.n}</strong> dòng vào kế hoạch · <strong>loại Sửa chữa</strong> (kỳ ${esc(String(fd.get('dateStart') || date).slice(0, 7))}).</div>`
+      : '';
     openModal(`
       <div class="border-b border-slate-200 px-5 py-4">
         <h2 class="text-lg font-bold text-slate-900">Đã nộp đánh giá</h2>
@@ -78261,20 +79005,25 @@ function openEvalModal(vid) {
       </div>
       <div class="px-5 py-4 space-y-3">
         ${createdOrder
-          ? `<div class="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">Đã tạo phiếu SC nháp <strong>${esc(createdOrder.code)}</strong> (chỉ sửa chữa, không bảo dưỡng / kế hoạch).</div>`
-          : `<div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">Chỉ nộp đánh giá — tạo phiếu sửa chữa sau từ cột «Phiếu SC» trên danh sách.</div>`}
-        <p class="text-xs text-slate-500 leading-relaxed">${createdOrder
-          ? 'Phiếu sửa chữa nháp đã sẵn sàng để mở và chỉnh.'
-          : 'Danh sách đánh giá sẽ hiện nút «+ Tạo phiếu SC» ở cột Phiếu SC khi phiếu ĐG đã nộp và còn hạng mục lỗi.'}</p>
+          ? `<div class="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-950">Đã tạo phiếu SC nháp <strong>${esc(createdOrder.code)}</strong>.</div>`
+          : (planMsg || `<div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">Chỉ nộp đánh giá — tạo phiếu SC hoặc đẩy vào kế hoạch SC sau từ danh sách.</div>`)}
+        ${createdOrder ? '' : (createdPlans.n ? `<p class="text-xs text-slate-500 leading-relaxed">Mở màn Kế hoạch để xem / chỉnh các dòng vừa đẩy (workKind = Sửa chữa).</p>` : `<p class="text-xs text-slate-500 leading-relaxed">Danh sách đánh giá sẽ hiện nút «+ Tạo phiếu SC» khi phiếu ĐG đã nộp và còn hạng mục lỗi.</p>`)}
+        ${createdOrder ? `<p class="text-xs text-slate-500 leading-relaxed">Phiếu sửa chữa nháp đã sẵn sàng để mở và chỉnh.</p>` : ''}
       </div>
       <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-3">
         <button type="button" data-close class="btn btn-outline">Đóng</button>
         ${createdOrder ? `<button type="button" id="btnGotoOrder" class="btn btn-primary">Mở phiếu SC</button>` : ''}
+        ${createdPlans.n ? `<button type="button" id="btnGotoPlans" class="btn btn-primary">Mở kế hoạch</button>` : ''}
       </div>`);
     $('[data-close]').onclick = () => { closeModal(); render(); };
     $('#btnGotoOrder')?.addEventListener('click', () => {
       closeModal();
       view = { ...view, name: 'order', orderId: createdOrder.id, from: 'vehicle', vehicleId: Number(vid) };
+      render();
+    });
+    $('#btnGotoPlans')?.addEventListener('click', () => {
+      closeModal();
+      view = { ...view, name: menuPlansNav(), plansTab: 'lines', filters: defaultFilters(), page: 1 };
       render();
     });
   };
@@ -80337,10 +81086,13 @@ function bind() {
     view = { ...view, name: 'vehicle', from, vehicleId: Number(b.dataset.openVehicle), vehicleTab: 'catalog', filters: defaultFilters(), page: 1 };
     render();
   });
-  $$('[data-open-vehicle-catalog]').forEach(b => b.onclick = () => {
-    const from = view.name === 'fleet' || isHistoryNav(view.name) || isPlansNav(view.name) ? view.name : (view.from || menuHomeNav());
-    view = { ...view, name: 'vehicle', from, vehicleId: Number(b.dataset.openVehicleCatalog), vehicleTab: 'catalog', filters: defaultFilters(), page: 1 };
-    render();
+  $$('[data-open-vehicle-catalog]').forEach(b => {
+    if (b.closest && b.closest('[data-list-slick]')) return;
+    b.onclick = () => {
+      const from = view.name === 'fleet' || isHistoryNav(view.name) || isPlansNav(view.name) ? view.name : (view.from || menuHomeNav());
+      view = { ...view, name: 'vehicle', from, vehicleId: Number(b.dataset.openVehicleCatalog), vehicleTab: 'catalog', filters: defaultFilters(), page: 1 };
+      render();
+    };
   });
   $$('[data-open-catalog]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();
@@ -80456,8 +81208,11 @@ function bind() {
     const fromEv = eid ? evaluationById(eid) : null;
     openCreateOrderFromEval(vid, fromEv || undefined);
   });
-  $$('[data-create-order-from-due]').forEach(b => b.onclick = () => {
-    openCreateOrderFromDueCatalog(Number(b.dataset.createOrderFromDue), Number(b.dataset.cid));
+  $$('[data-create-order-from-due]').forEach(b => {
+    if (b.closest && b.closest('[data-list-slick]')) return;
+    b.onclick = () => {
+      openCreateOrderFromDueCatalog(Number(b.dataset.createOrderFromDue), Number(b.dataset.cid));
+    };
   });
   $$('[data-goto-plan-vehicle]').forEach(b => b.onclick = () => {
     view = { ...view, name: 'vehicle', vehicleId: Number(b.dataset.gotoPlanVehicle), vehicleTab: 'catalog', from: 'assessment', filters: defaultFilters(), page: 1 };
@@ -80514,34 +81269,40 @@ function bind() {
       });
     }
   }
-  $$('[data-push-plan-row]').forEach(b => b.onclick = () => {
-    const vid = b.getAttribute('data-push-plan-row');
-    const cid = b.getAttribute('data-cid');
-    openSchedulePlanModal({
-      title: 'Đưa vào kế hoạch bảo dưỡng',
-      subtitle: 'Chọn tháng này / tháng sau / ngày cụ thể cho danh mục đang nhắc.',
-      onConfirm: ({ period, scheduleDate }) => {
-        const n = pushReminderRowsToPlan([{ dataset: { vid, cid } }], period, scheduleDate, 'Từ nhắc BD · chỉ định');
-        save();
-        toast(n ? ('Đã đưa ' + n + ' dòng vào KH ' + period + (scheduleDate ? ' · ngày ' + scheduleDate : '')) : 'Dòng đã có trên kế hoạch kỳ này');
-        if (n) { view.name = menuPlansNav(); view.plansTab = 'lines'; }
-        render();
-      },
-    });
+  $$('[data-push-plan-row]').forEach(b => {
+    if (b.closest && b.closest('[data-list-slick]')) return; /* SlickGrid: xử lý trong onClick lưới */
+    b.onclick = () => {
+      const vid = b.getAttribute('data-push-plan-row');
+      const cid = b.getAttribute('data-cid');
+      openSchedulePlanModal({
+        title: 'Đưa vào kế hoạch bảo dưỡng',
+        subtitle: 'Chọn tháng này / tháng sau / ngày cụ thể cho danh mục đang nhắc.',
+        onConfirm: ({ period, scheduleDate }) => {
+          const n = pushReminderRowsToPlan([{ dataset: { vid, cid } }], period, scheduleDate, 'Từ nhắc BD · chỉ định');
+          save();
+          toast(n ? ('Đã đưa ' + n + ' dòng vào KH ' + period + (scheduleDate ? ' · ngày ' + scheduleDate : '')) : 'Dòng đã có trên kế hoạch kỳ này');
+          if (n) { view.name = menuPlansNav(); view.plansTab = 'lines'; }
+          render();
+        },
+      });
+    };
   });
-  $$('[data-push-tb-row]').forEach((b) => b.onclick = () => {
-    const uid = b.getAttribute('data-push-tb-row');
-    openSchedulePlanModal({
-      title: 'Đưa lốp / ắc vào kế hoạch',
-      subtitle: 'Chọn tháng này / tháng sau / ngày cụ thể cho seri đang nhắc.',
-      onConfirm: ({ period, scheduleDate }) => {
-        const n = pushTireBatteryUnitsToPlan([uid], period, scheduleDate, 'Từ nhắc BD · lốp/ắc');
-        save();
-        toast(n ? ('Đã đưa ' + n + ' dòng vào KH ' + period) : 'Dòng đã có trên kế hoạch kỳ này');
-        if (n) { view.name = menuPlansNav(); view.plansTab = 'lines'; }
-        render();
-      },
-    });
+  $$('[data-push-tb-row]').forEach((b) => {
+    if (b.closest && b.closest('[data-list-slick]')) return;
+    b.onclick = () => {
+      const uid = b.getAttribute('data-push-tb-row');
+      openSchedulePlanModal({
+        title: 'Đưa lốp / ắc vào kế hoạch',
+        subtitle: 'Chọn tháng này / tháng sau / ngày cụ thể cho seri đang nhắc.',
+        onConfirm: ({ period, scheduleDate }) => {
+          const n = pushTireBatteryUnitsToPlan([uid], period, scheduleDate, 'Từ nhắc BD · lốp/ắc');
+          save();
+          toast(n ? ('Đã đưa ' + n + ' dòng vào KH ' + period) : 'Dòng đã có trên kế hoạch kỳ này');
+          if (n) { view.name = menuPlansNav(); view.plansTab = 'lines'; }
+          render();
+        },
+      });
+    };
   });
   $$('[data-plan-schedule]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();
@@ -80934,27 +81695,22 @@ function bind() {
     er.enabled = !!fd.get('evalEnabled');
     er.cadence = fd.get('evalCadence') === 'WEEKLY' ? 'WEEKLY' : 'MONTHLY';
     er.deadlineDayOfMonth = Number(fd.get('deadlineDayOfMonth')) || 15;
-    er.lockDayOfMonth = Number(fd.get('lockDayOfMonth')) || 30;
     er.deadlineWeekday = Number(fd.get('deadlineWeekday')) || 4;
-    er.lockWeekday = Number(fd.get('lockWeekday')) || 7;
     er.remindDaysBefore = Number(fd.get('remindDaysBefore')) || 0;
     er.overdueRemindEveryDays = Number(fd.get('overdueRemindEveryDays')) || 0;
     er.remindIncludeDeadlineDay = !!fd.get('remindIncludeDeadlineDay');
-    er.continueRemindAfterLock = !!fd.get('continueRemindAfterLock');
-    er.unlockOnAssessmentSubmitted = !!fd.get('unlockOnAssessmentSubmitted');
-    er.unlockAlsoWhenMaintenanceDone = !!fd.get('unlockAlsoWhenMaintenanceDone');
     er.filterByVehicleArea = !!fd.get('filterByVehicleArea');
     er.notifyRoles = fd.getAll('notifyRole').map(String);
-    if (er.preset !== 'custom') {
-      // giữ preset nếu người dùng chưa đổi tay — khi submit từ custom fields vẫn có thể là custom
-    }
+    // bỏ cấu hình khóa xe (legacy)
+    delete er.lockDayOfMonth;
+    delete er.lockWeekday;
+    delete er.continueRemindAfterLock;
+    delete er.unlockOnAssessmentSubmitted;
+    delete er.unlockAlsoWhenMaintenanceDone;
     DB.settings.maintenanceRemindKmBefore = Number(fd.get('maintenanceRemindKmBefore'));
     DB.settings.maintenanceRemindDaysBefore = Number(fd.get('maintenanceRemindDaysBefore'));
-    // sync legacy fields used elsewhere
     DB.settings.evalRemindDaysBefore = er.remindDaysBefore;
-    DB.settings.evalLockAfterDays = er.cadence === 'MONTHLY'
-      ? Math.max(0, er.lockDayOfMonth - er.deadlineDayOfMonth)
-      : Math.max(0, (er.lockWeekday - er.deadlineWeekday + 7) % 7);
+    delete DB.settings.evalLockAfterDays;
     toast('Đã lưu cài đặt nhắc đánh giá');
     save();
     render();
@@ -80982,7 +81738,7 @@ function bind() {
     render();
   }));
   // đánh dấu custom khi người dùng sửa số liệu
-  ['deadlineDayOfMonth','lockDayOfMonth','deadlineWeekday','lockWeekday','remindDaysBefore','overdueRemindEveryDays'].forEach(name => {
+  ['deadlineDayOfMonth','deadlineWeekday','remindDaysBefore','overdueRemindEveryDays'].forEach(name => {
     const el = document.querySelector(`[name="${name}"]`);
     el?.addEventListener('change', () => { getEvalReminder().preset = 'custom'; });
     el?.addEventListener('input', () => { getEvalReminder().preset = 'custom'; });
@@ -81074,7 +81830,11 @@ render();
     if (t.id === 'flt-ktvMonth') { setFilter('ktvMonth', t.value); if (typeof render === 'function') render(); }
     if (t.id === 'flt-ktvTech') { setFilter('ktvTech', t.value); if (typeof render === 'function') render(); }
     if (t.id === 'flt-tbKind') { setFilter('tbKind', t.value); if (typeof render === 'function') render(); }
-    if (t.id === 'remCheckAll') document.querySelectorAll('.rem-row').forEach((c) => { c.checked = t.checked; });
+    if (t.id === 'remCheckAll') {
+      setAllRemindLeavesChecked(t.checked);
+      const grid = window._listGrids?.remindDashboard;
+      try { grid && grid.invalidate(); grid && grid.render(); } catch (_) {}
+    }
     if (t.id === 'tbCheckAll') {
       document.querySelectorAll('.tb-row').forEach((c) => { c.checked = t.checked; });
       document.querySelectorAll('.tb-group').forEach((c) => { c.checked = t.checked; });
@@ -81088,13 +81848,14 @@ render();
     const t = e.target;
     if (!t || !t.id) return;
     if (t.id === 'btnPushRemindPlan') {
-      const rows = [...document.querySelectorAll('.rem-row:checked')];
-      if (!rows.length) { toast('Chọn ít nhất một dòng đến hạn'); return; }
+      const pack = (window._listGridPacks && window._listGridPacks.remindDashboard && window._listGridPacks.remindDashboard.rows) || [];
+      const picked = remindSelectableLeaves(pack).filter((r) => isRemindLeafChecked(r));
+      if (!picked.length) { toast('Chọn ít nhất một dòng đến hạn'); return; }
       openSchedulePlanModal({
         title: 'Đưa dòng đã chọn vào kế hoạch',
         onConfirm: ({ period, scheduleDate }) => {
-          const catRows = rows.filter((r) => (r.dataset.kind || 'CATALOG') !== 'TIRE_BATTERY');
-          const tbIds = rows.filter((r) => r.dataset.kind === 'TIRE_BATTERY').map((r) => r.dataset.tbId).filter(Boolean);
+          const catRows = picked.filter((r) => r.rowKind !== 'TIRE_BATTERY').map((r) => ({ dataset: { vid: r.vehicleId, cid: r.catalogId } }));
+          const tbIds = picked.filter((r) => r.rowKind === 'TIRE_BATTERY').map((r) => r.tbId).filter(Boolean);
           const nCat = pushReminderRowsToPlan(catRows, period, scheduleDate, 'Từ nhắc hạn (tích chọn)');
           const nTb = pushTireBatteryUnitsToPlan(tbIds, period, scheduleDate, 'Từ nhắc hạn · lốp/ắc (tích chọn)');
           const n = nCat + nTb;
@@ -81110,9 +81871,10 @@ render();
         title: 'Đưa tất cả sắp/quá hạn vào kế hoạch',
         onConfirm: ({ period, scheduleDate }) => {
           autoPushOverdueCatalogsToPlan();
-          const dueRows = [...document.querySelectorAll('.rem-row')].filter((r) => r.dataset.due === '1');
-          const catRows = dueRows.filter((r) => (r.dataset.kind || 'CATALOG') !== 'TIRE_BATTERY');
-          const tbIds = dueRows.filter((r) => r.dataset.kind === 'TIRE_BATTERY').map((r) => r.dataset.tbId).filter(Boolean);
+          const pack = (window._listGridPacks && window._listGridPacks.remindDashboard && window._listGridPacks.remindDashboard.rows) || [];
+          const dueLeaves = remindSelectableLeaves(pack).filter((r) => r.isDue);
+          const catRows = dueLeaves.filter((r) => r.rowKind !== 'TIRE_BATTERY').map((r) => ({ dataset: { vid: r.vehicleId, cid: r.catalogId } }));
+          const tbIds = dueLeaves.filter((r) => r.rowKind === 'TIRE_BATTERY').map((r) => r.tbId).filter(Boolean);
           const nCat = pushReminderRowsToPlan(catRows, period, scheduleDate, 'Từ nhắc hạn (tất cả sắp/quá hạn)');
           const nTb = pushTireBatteryUnitsToPlan(tbIds, period, scheduleDate, 'Từ nhắc hạn · lốp/ắc (tất cả)');
           const n = nCat + nTb;
