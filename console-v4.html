@@ -287,6 +287,77 @@
     .list-slick-workspace .slick-cell .chip,
     #plan-grid-container .slick-cell .btn,
     #plan-grid-container .slick-cell .chip { white-space: nowrap; }
+    #plan-grid-container .slick-row.plan-vehicle-group-row .slick-cell {
+      background: #eef2ff !important;
+      font-weight: 600;
+      color: #1e293b;
+      border-top: 1px solid #c7d2fe !important;
+    }
+    #plan-grid-container .slick-row.plan-vehicle-group-row:hover .slick-cell { background: #e0e7ff !important; }
+    #plan-grid-container .slick-row.plan-vehicle-group-row.plan-row-sel .slick-cell {
+      background: #dbeafe !important;
+    }
+    #plan-grid-container .slick-row.plan-vehicle-group-row .slick-cell .btn { font-weight: 600; }
+    /* Tree collapse — giống SlickGrid example5-collapsing */
+    #plan-grid-container .sg-tree-cell {
+      display: inline-flex;
+      align-items: center;
+      min-width: 0;
+      max-width: 100%;
+      gap: 2px;
+    }
+    #plan-grid-container .sg-tree-spacer {
+      display: inline-block;
+      height: 1px;
+      flex-shrink: 0;
+    }
+    /* Chevron thu/mở nhóm — giống lưới tham chiếu (▾ mở / ▸ thu); dùng chung kế hoạch + kết quả ĐG */
+    #plan-grid-container .slick-group-toggle,
+    .assess-fail-workspace .slick-group-toggle,
+    .list-slick-workspace .slick-group-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      margin-right: 6px;
+      flex-shrink: 0;
+      cursor: pointer;
+      user-select: none;
+      color: #2563eb;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1;
+      vertical-align: middle;
+      position: relative;
+      z-index: 5;
+      pointer-events: auto;
+      font-family: system-ui, 'Segoe UI', sans-serif;
+    }
+    #plan-grid-container .slick-group-toggle:hover,
+    .assess-fail-workspace .slick-group-toggle:hover,
+    .list-slick-workspace .slick-group-toggle:hover { color: #1d4ed8; background: #dbeafe; border-radius: 3px; }
+    #plan-grid-container .plan-group-title-cell,
+    .assess-fail-workspace .plan-group-title-cell {
+      display: inline-flex;
+      align-items: center;
+      min-width: 0;
+      max-width: 100%;
+      font-weight: 600;
+      color: #1e3a8a;
+      cursor: pointer;
+    }
+    #plan-grid-container .plan-group-title-text,
+    .assess-fail-workspace .plan-group-title-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #plan-grid-container .sg-tree-leaf-pad {
+      display: inline-block;
+      width: 1.4em;
+      flex-shrink: 0;
+    }
     .list-slick-workspace .plan-period-bar .plan-period-label { font-weight: 600; color: #0f172a; }
     /* List grid column filters (giống kế hoạch BD) */
     .list-slick-workspace .slick-headerrow,
@@ -1108,6 +1179,7 @@
   <script src="https://cdn.jsdelivr.net/npm/slickgrid@5.20.0/dist/browser/slick.core.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/slickgrid@5.20.0/dist/browser/slick.interactions.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/slickgrid@5.20.0/dist/browser/slick.grid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/slickgrid@5.20.0/dist/browser/slick.dataview.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/slickgrid@5.20.0/dist/browser/plugins/slick.cellrangedecorator.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/slickgrid@5.20.0/dist/browser/plugins/slick.cellrangeselector.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/slickgrid@5.20.0/dist/browser/plugins/slick.cellselectionmodel.min.js"></script>
@@ -1187,9 +1259,9 @@
   <div id="toast" class="pointer-events-none fixed bottom-6 right-6 z-[60] hidden rounded-md bg-slate-900 px-4 py-2.5 text-sm text-white shadow-lg"></div>
 
 <script>
-const STORAGE_KEY = 'fleet-bdsc-proto-v4-02';
-const STORAGE_KEY_LEGACY = ['fleet-bdsc-proto-v4-01','fleet-bdsc-proto-v3-02','fleet-bdsc-proto-v3-01'];
-/* v4-02: seed ĐG ↔ phiếu SC (o23/o25/o26), nháp 50E-22295, khóa 51C-41767 */
+const STORAGE_KEY = 'fleet-bdsc-proto-v4-03';
+const STORAGE_KEY_LEGACY = ['fleet-bdsc-proto-v4-02','fleet-bdsc-proto-v4-01','fleet-bdsc-proto-v3-02','fleet-bdsc-proto-v3-01'];
+/* v4-03: lưới KH group theo xe + cột KTV / ngày thực hiện + đồng bộ BASE cấp xe */
 const DRIVER_INBOX_KEY = 'fleet-bdsc-driver-inbox-v4';
 const VIEW_STATE_KEY = 'fleet-bdsc-view-v4';
 let _saveFailToastAt = 0;
@@ -64760,11 +64832,46 @@ function applyPlanCellPick(lineId, field, opt, quiet) {
     p.nhom = opt.name;
   } else if (field === 'uom') {
     p.uom = opt.name;
+  } else if (field === 'technician' || field === 'technicianName') {
+    p.technicianName = opt.name || '';
   }
   if (quiet) return;
   if (typeof save === 'function') save();
   toast('Đã cập nhật kế hoạch');
   render();
+}
+function applyPlanScheduleDate(lineId, raw) {
+  const p = planByLineId(lineId);
+  if (!p) return false;
+  p.scheduleDate = String(raw || '').trim() || null;
+  if (typeof save === 'function') save();
+  toast(p.scheduleDate ? ('Đã gắn ngày thực hiện ' + p.scheduleDate) : 'Đã xoá ngày thực hiện');
+  render();
+  return true;
+}
+function applyPlanAssignToVehicle(vehicleId, patch) {
+  const vid = String(vehicleId);
+  const visibleIds = new Set(
+    (window._planGridData || [])
+      .filter(r => r && !r.__vehGroup && String(r.vehicleId) === vid)
+      .map(r => String(r.lineId || r.id))
+      .filter(Boolean)
+  );
+  let n = 0;
+  (DB.plans || []).forEach(p => {
+    if (!visibleIds.has(String(p.id))) return;
+    if (patch && patch.technicianName !== undefined) p.technicianName = patch.technicianName || '';
+    if (patch && patch.scheduleDate !== undefined) p.scheduleDate = patch.scheduleDate || null;
+    n++;
+  });
+  if (!n) { toast('Không có hạng mục của xe này trên lưới'); return false; }
+  if (typeof save === 'function') save();
+  const bits = [];
+  if (patch && patch.technicianName !== undefined) bits.push(patch.technicianName ? ('KTV ' + patch.technicianName) : 'xoá KTV');
+  if (patch && patch.scheduleDate !== undefined) bits.push(patch.scheduleDate ? ('ngày ' + patch.scheduleDate) : 'xoá ngày');
+  toast('Đã gán ' + (bits.join(' · ') || 'assign') + ' cho ' + n + ' hạng mục');
+  render();
+  return true;
 }
 function handleCellPopClick(btn, ev) {
   if (!btn) return;
@@ -64774,6 +64881,7 @@ function handleCellPopClick(btn, ev) {
   const oid = btn.getAttribute('data-oid');
   const idx = Number(btn.getAttribute('data-idx'));
   const lineId = btn.getAttribute('data-line-id');
+  const vehicleId = btn.getAttribute('data-vehicle-id');
   const cellNode = btn._cellNode || (btn.closest && btn.closest('.slick-cell, td')) || btn;
   const wrap = btn.closest && btn.closest('.sg-cell-edit-wrap');
   const valueText = wrap
@@ -64960,6 +65068,35 @@ function handleCellPopClick(btn, ev) {
         if (typeof save === 'function') save();
         toast('Đã cập nhật ghi chú');
         render();
+      },
+    });
+    return;
+  }
+  if (kind === 'plan-technician') {
+    const cur = valueText === '—' || valueText === '— nhiều —' ? '' : valueText;
+    openCellPickPopover({
+      anchor: btn, cellNode, title: vehicleId && !lineId ? 'Gán KTV cho cả xe' : 'Gán kỹ thuật viên',
+      value: cur,
+      allowCreate: true,
+      getOptions: () => technicianLookupOptions(),
+      onCreate: (raw) => ({ id: raw, name: raw, source: 'local' }),
+      onPick: (opt) => {
+        if (lineId) applyPlanCellPick(lineId, 'technician', opt);
+        else if (vehicleId) applyPlanAssignToVehicle(vehicleId, { technicianName: opt.name || '' });
+      },
+    });
+    return;
+  }
+  if (kind === 'plan-scheduleDate') {
+    const cur = valueText === '—' || valueText === '— nhiều —' ? '' : valueText;
+    openCellValueEditor({
+      anchor: btn, cellNode,
+      title: vehicleId && !lineId ? 'Ngày thực hiện (cả xe)' : 'Ngày thực hiện',
+      value: cur,
+      inputType: 'date',
+      onCommit: (raw) => {
+        if (lineId) applyPlanScheduleDate(lineId, raw);
+        else if (vehicleId) applyPlanAssignToVehicle(vehicleId, { scheduleDate: raw || null });
       },
     });
     return;
@@ -65659,71 +65796,216 @@ function planPmhNote(g) {
   const notes = [...new Set((g.lines || []).map(p => String(p.note || '').trim()).filter(Boolean))];
   return notes.join('; ');
 }
-/** Mỗi dòng lưới = 1 hạng mục kế hoạch (định dạng cột kiểu PMH). */
+function ensurePlanAssignSeed() {
+  if (DB._planAssignSeeded) return;
+  DB._planAssignSeeded = true;
+  const techs = typeof technicianLookupOptions === 'function' ? technicianLookupOptions() : [];
+  const names = techs.length
+    ? techs.map(t => t.name).filter(Boolean)
+    : ['Nguyễn Văn An', 'Trần Minh Tuấn', 'Lê Quốc Huy', 'Phạm Thu Hà'];
+  (DB.plans || []).forEach((p, i) => {
+    if (!p.technicianName && i % 3 === 0) p.technicianName = names[i % names.length];
+    if (!p.scheduleDate && i % 4 === 0) {
+      const per = String(p.period || '2026-09');
+      const day = String(10 + (i % 18)).padStart(2, '0');
+      p.scheduleDate = (per.length >= 7 ? per.slice(0, 7) : '2026-09') + '-' + day;
+    }
+  });
+}
+function planAssignConsensus(lines, field) {
+  const vals = [...new Set((lines || []).map(p => String(p?.[field] || '').trim()).filter(Boolean))];
+  if (!vals.length) return '';
+  if (vals.length === 1) return vals[0];
+  return '— nhiều —';
+}
+function planBaseStatusRank(st) {
+  return ({ FAILED: 5, SYNCING: 4, SUBMITTED: 3, SYNCED: 2, NONE: 1 })[st || 'NONE'] || 0;
+}
+function planAggregateBaseStatus(lines) {
+  let worst = 'NONE';
+  let code = '';
+  (lines || []).forEach(p => {
+    ensurePlanBaseSync(p);
+    const st = p.baseSync?.status || 'NONE';
+    if (planBaseStatusRank(st) > planBaseStatusRank(worst)) {
+      worst = st;
+      code = p.baseSync?.code || code;
+    }
+  });
+  return { status: worst, code };
+}
+function isPlanVehGroupRow(r) {
+  return !!(r && r.__vehGroup);
+}
+function isPlanVehicleCollapsed(vehicleId) {
+  return !!(view.planCollapsedByVehicle || {})[String(vehicleId)];
+}
+function setPlanVehicleCollapsed(vehicleId, collapsed) {
+  if (!view.planCollapsedByVehicle) view.planCollapsedByVehicle = {};
+  const key = String(vehicleId);
+  if (collapsed) view.planCollapsedByVehicle[key] = true;
+  else delete view.planCollapsedByVehicle[key];
+}
+function planLineGridRow(g, p, v, parentId) {
+  ensurePlanBaseSync(p);
+  const { year, month } = planPeriodParts(g.period);
+  const soXe = planSoXe(v);
+  const c = typeof catById === 'function' ? catById(p.catalogId) : null;
+  const qty = Number(p.qty) || 0;
+  const unitPrice = Number(p.unitPrice) || 0;
+  let vat = Number(p.vat);
+  if (!Number.isFinite(vat)) vat = 0;
+  if (vat > 0 && vat <= 1) vat = vat * 100;
+  const thanhTien = Math.round(qty * unitPrice);
+  const tongTien = planLinePmhCost(p);
+  const kind = planLineWorkKind(p);
+  const soMooc = p.soMooc || v?.trailerPlate || planTrailerPlate(v) || (v?.isTrailer ? (v.plate || '') : '') || '—';
+  const bs = p.baseSync || {};
+  const scheduleDate = String(p.scheduleDate || '').trim();
+  const technicianName = String(p.technicianName || '').trim();
+  return {
+    __vehGroup: false,
+    indent: 1,
+    parent: parentId || null,
+    parentId: parentId || null,
+    _collapsed: false,
+    key: g.key,
+    vehicleId: g.vehicleId,
+    period: g.period,
+    lineId: p.id,
+    id: String(p.id),
+    year,
+    month,
+    soXe,
+    soMooc: soMooc || '—',
+    applyTo: p.applyTo || planApplyTo(v),
+    ptId: p.ptId || planPtId(v),
+    content: p.service || c?.name || '—',
+    vendor: p.vendor || '—',
+    dichVu: kind === 'MAINT' ? 'Bảo dưỡng' : 'Sửa chữa',
+    phanLoai: p.costKind || '—',
+    system: p.system || c?.system || '—',
+    nhom: p.groupName || p.nhom || '—',
+    qty,
+    qtyText: String(qty),
+    uom: p.uom || '—',
+    unitPrice,
+    unitPriceText: money(unitPrice),
+    vat,
+    vatText: String(vat),
+    thanhTien,
+    thanhTienText: money(thanhTien),
+    tongTien,
+    totalText: money(tongTien),
+    pmhNote: String(p.note || '').trim() || '—',
+    technicianName: technicianName || '—',
+    scheduleDate,
+    scheduleDateText: scheduleDate || '—',
+    plate: v?.plate || '—',
+    workKind: kind,
+    baseStatus: bs.status || 'NONE',
+    baseCode: bs.code || '',
+    baseLabel: ({
+      NONE: 'Chưa trình', SUBMITTED: 'Đã trình', SYNCING: 'Đang đồng bộ',
+      SYNCED: 'Đã đồng bộ', FAILED: 'Lỗi BASE',
+    })[bs.status || 'NONE'] || 'Chưa trình',
+    statusText: planGroupStatusText([p.status].filter(Boolean)),
+    sourceLabel: p.templateId ? 'Mẫu'
+      : (p.source === 'PERIODIC_ASSESSMENT' ? 'Từ đánh giá'
+        : (p.source === 'CUSTOMER_BUDGET' ? 'Ngân sách' : 'Nhập tay')),
+  };
+}
+/** Lưới kế hoạch: hàng group theo xe + hạng mục con (định dạng cột kiểu PMH). */
 function planGridRows(groups) {
+  ensurePlanAssignSeed();
   const out = [];
+  const byVeh = new Map();
   (groups || []).forEach(g => {
-    const v = vehicleById(g.vehicleId);
-    const { year, month } = planPeriodParts(g.period);
+    const vid = String(g.vehicleId);
+    if (!byVeh.has(vid)) byVeh.set(vid, { vehicleId: g.vehicleId, groups: [], lines: [] });
+    const bucket = byVeh.get(vid);
+    bucket.groups.push(g);
+    (g.lines || []).forEach(p => bucket.lines.push({ g, p }));
+  });
+  const seen = new Set();
+  (groups || []).forEach(g0 => {
+    const vid = String(g0.vehicleId);
+    if (seen.has(vid)) return;
+    seen.add(vid);
+    const bucket = byVeh.get(vid);
+    if (!bucket) return;
+    const v = vehicleById(bucket.vehicleId);
+    const linePlans = bucket.lines.map(x => x.p);
+    const periods = [...new Set(bucket.groups.map(g => g.period).filter(Boolean))];
+    const periodLabel = periods.length === 1 ? String(periods[0]) : (periods.length + ' kỳ');
+    const { year, month } = periods.length === 1 ? planPeriodParts(periods[0]) : { year: '—', month: '—' };
+    const total = linePlans.reduce((a, p) => a + planLinePmhCost(p), 0);
+    const tech = planAssignConsensus(linePlans, 'technicianName');
+    const sched = planAssignConsensus(linePlans, 'scheduleDate');
+    const baseAgg = planAggregateBaseStatus(linePlans);
     const soXe = planSoXe(v);
-    const lines = g.lines || [];
-    lines.forEach(p => {
-      ensurePlanBaseSync(p);
-      const c = typeof catById === 'function' ? catById(p.catalogId) : null;
-      const qty = Number(p.qty) || 0;
-      const unitPrice = Number(p.unitPrice) || 0;
-      let vat = Number(p.vat);
-      if (!Number.isFinite(vat)) vat = 0;
-      if (vat > 0 && vat <= 1) vat = vat * 100;
-      const thanhTien = Math.round(qty * unitPrice);
-      const tongTien = planLinePmhCost(p);
-      const kind = planLineWorkKind(p);
-      const soMooc = p.soMooc || v?.trailerPlate || planTrailerPlate(v) || (v?.isTrailer ? (v.plate || '') : '') || '—';
-      const bs = p.baseSync || {};
-      out.push({
-        key: g.key,
-        vehicleId: g.vehicleId,
-        period: g.period,
-        lineId: p.id,
-        id: String(p.id),
-        year,
-        month,
-        soXe,
-        soMooc: soMooc || '—',
-        applyTo: p.applyTo || planApplyTo(v),
-        ptId: p.ptId || planPtId(v),
-        content: p.service || c?.name || '—',
-        vendor: p.vendor || '—',
-        dichVu: kind === 'MAINT' ? 'Bảo dưỡng' : 'Sửa chữa',
-        phanLoai: p.costKind || '—',
-        system: p.system || c?.system || '—',
-        nhom: p.groupName || p.nhom || '—',
-        qty,
-        qtyText: String(qty),
-        uom: p.uom || '—',
-        unitPrice,
-        unitPriceText: money(unitPrice),
-        vat,
-        vatText: String(vat),
-        thanhTien,
-        thanhTienText: money(thanhTien),
-        tongTien,
-        totalText: money(tongTien),
-        pmhNote: String(p.note || '').trim() || '—',
-        plate: v?.plate || '—',
-        workKind: kind,
-        baseStatus: bs.status || 'NONE',
-        baseCode: bs.code || '',
-        baseLabel: ({
-          NONE: 'Chưa trình', SUBMITTED: 'Đã trình', SYNCING: 'Đang đồng bộ',
-          SYNCED: 'Đã đồng bộ', FAILED: 'Lỗi BASE',
-        })[bs.status || 'NONE'] || 'Chưa trình',
-        statusText: planGroupStatusText([p.status].filter(Boolean)),
-        sourceLabel: p.templateId ? 'Mẫu'
-          : (p.source === 'PERIODIC_ASSESSMENT' ? 'Từ đánh giá'
-            : (p.source === 'CUSTOMER_BUDGET' ? 'Ngân sách' : 'Nhập tay')),
-      });
+    const soMooc = planTrailerPlate(v) || (v?.isTrailer ? (v.plate || '') : '') || '—';
+    const firstKey = bucket.groups[0]?.key || (vid + '::');
+    const groupId = planVehGroupId(vid);
+    const groupTitle = (v?.plate || soXe || 'Xe') + ' · ' + linePlans.length + ' hạng mục'
+      + (periods.length === 1 ? (' · ' + periodLabel) : '');
+    out.push({
+      /* Không dùng __group — Slick.DataView coi đó là Slick.Group và gọi .equals() */
+      __vehGroup: true,
+      indent: 0,
+      parent: null,
+      parentId: null,
+      _collapsed: isPlanVehicleCollapsed(bucket.vehicleId),
+      id: groupId,
+      key: firstKey,
+      groupKeys: bucket.groups.map(g => g.key),
+      lineIds: linePlans.map(p => String(p.id)),
+      vehicleId: bucket.vehicleId,
+      period: periods.length === 1 ? periods[0] : periodLabel,
+      lineId: '',
+      year,
+      month,
+      soXe,
+      soMooc: soMooc || '—',
+      applyTo: planApplyTo(v),
+      ptId: planPtId(v),
+      content: groupTitle,
+      groupTitle,
+      /* text thô có chevron — phòng khi formatter HTML bị bỏ */
+      displayTitle: (isPlanVehicleCollapsed(bucket.vehicleId) ? '▸ ' : '▾ ') + groupTitle,
+      vendor: '—',
+      dichVu: '—',
+      phanLoai: '—',
+      system: '—',
+      nhom: '—',
+      qty: null,
+      qtyText: '',
+      uom: '',
+      unitPrice: null,
+      unitPriceText: '',
+      vat: null,
+      vatText: '',
+      thanhTien: null,
+      thanhTienText: '',
+      tongTien: total,
+      totalText: money(total),
+      pmhNote: '—',
+      technicianName: tech || '—',
+      scheduleDate: sched === '— nhiều —' ? '' : sched,
+      scheduleDateText: sched || '—',
+      plate: v?.plate || '—',
+      workKind: '',
+      lineCount: linePlans.length,
+      baseStatus: baseAgg.status,
+      baseCode: baseAgg.code || '',
+      baseLabel: ({
+        NONE: 'Chưa trình', SUBMITTED: 'Đã trình', SYNCING: 'Đang đồng bộ',
+        SYNCED: 'Đã đồng bộ', FAILED: 'Lỗi BASE',
+      })[baseAgg.status] || 'Chưa trình',
+      statusText: planGroupStatusText([...new Set(linePlans.map(p => p.status).filter(Boolean))]),
+      sourceLabel: '',
     });
+    bucket.lines.forEach(({ g, p }) => out.push(planLineGridRow(g, p, v, groupId)));
   });
   return out;
 }
@@ -66003,7 +66285,8 @@ function setPlanLineChecked(lineId, on) {
   view.checkedPlanLineIds = on ? cur.concat(id) : cur;
 }
 function planLineIdOfRow(r) {
-  return String(r?.lineId || r?.id || '');
+  if (!r || r.__vehGroup) return '';
+  return String(r.lineId || r.id || '');
 }
 function planCheckedLines() {
   const ids = new Set(planCheckedLineIds());
@@ -66052,9 +66335,9 @@ function setPlanVehicleChecked(vehicleId, on, rows) {
 function togglePlanRowChecked(item, rows) {
   if (!item) return;
   const list = rows || window._planGridData || [];
-  if (planSelectMode() === 'VEHICLE') {
+  if (item.__vehGroup || planSelectMode() === 'VEHICLE') {
     const vid = String(item.vehicleId);
-    const vehRows = list.filter(r => String(r.vehicleId) === vid);
+    const vehRows = list.filter(r => !r.__vehGroup && String(r.vehicleId) === vid);
     const allOn = vehRows.length > 0 && vehRows.every(r => isPlanLineChecked(planLineIdOfRow(r)));
     setPlanVehicleChecked(vid, !allOn, list);
   } else {
@@ -66173,13 +66456,32 @@ function showPlanCtx(ev, item) {
   ev.preventDefault();
   ev.stopPropagation();
   const g = (window._planGridGroups || []).find(x => x.key === item.key);
-  if (!g) return;
-  const unlinked = unlinkedPlanLines(g.lines);
-  const existing = ordersForPlanLines(g.lines);
+  if (!g && !item.__vehGroup) return;
+  const lines = item.__vehGroup
+    ? (item.lineIds || []).map(id => planByLineId(id)).filter(Boolean)
+    : (g?.lines || []);
+  const unlinked = unlinkedPlanLines(lines);
+  const existing = ordersForPlanLines(lines);
   const el = document.getElementById('planCtxMenu');
   if (!el) return;
   el.classList.remove('hidden');
-  const bits = [
+  const bits = item.__vehGroup ? [
+    slickMenuItem('detail', 'file', 'Xem chi tiết xe · kỳ'),
+    unlinked.length
+      ? slickMenuItem('do-now', 'calCheck', 'Làm tháng này (tạo phiếu)')
+      : `<div class="slick-menu-item disabled"><div class="slick-menu-icon">${planTbIco('calCheck')}</div><span class="slick-menu-content">Không còn hạng mục tháng này</span></div>`,
+    existing.length ? slickMenuItem('view-order', 'eye', 'Xem phiếu ' + existing.map(o => o.code).join(', ')) : '',
+    slickMenuItem('vehicle', 'truck', 'Mở xe ' + (item.plate || '')),
+    `<div class="slick-menu-item slick-menu-item-divider"></div>`,
+    slickMenuItem('collapse-one', item._collapsed ? 'chev' : 'chev', item._collapsed ? 'Mở rộng nhóm này' : 'Thu gọn nhóm này'),
+    slickMenuItem('collapse-all', 'dens', 'Thu gọn tất cả nhóm'),
+    slickMenuItem('expand-all', 'cols', 'Mở rộng tất cả nhóm'),
+    `<div class="slick-menu-item slick-menu-item-divider"></div>`,
+    slickMenuItem('toggle-veh', 'checkOn', 'Chọn / bỏ chọn theo xe'),
+    slickMenuItem('submit-base-veh', 'files', 'Trình BASE cả xe'),
+    slickMenuItem('sync-base-veh', 'refresh', 'Đồng bộ BASE cả xe'),
+    planCheckedLineIds().length > 1 ? slickMenuItem('bulk-order', 'files', 'Tạo phiếu ' + planCheckedLineIds().length + ' hạng mục đã chọn') : '',
+  ] : [
     slickMenuItem('detail', 'file', 'Xem hạng mục'),
     unlinked.length
       ? slickMenuItem('do-now', 'calCheck', 'Làm tháng này (tạo phiếu)')
@@ -66190,12 +66492,11 @@ function showPlanCtx(ev, item) {
     slickMenuItem('copy', 'copy', 'Sao chép dòng'),
     `<div class="slick-menu-item slick-menu-item-divider"></div>`,
     slickMenuItem('toggle', isPlanLineChecked(planLineIdOfRow(item)) ? 'checkOn' : 'checkOff', isPlanLineChecked(planLineIdOfRow(item)) ? 'Bỏ chọn hạng mục này' : 'Chọn hạng mục này'),
-    planSelectMode() === 'VEHICLE'
-      ? slickMenuItem('toggle-veh', isPlanLineChecked(planLineIdOfRow(item)) ? 'checkOn' : 'checkOff', 'Chọn / bỏ chọn theo xe')
-      : '',
+    slickMenuItem('toggle-veh', 'checkOn', 'Chọn / bỏ chọn theo xe'),
     planCheckedLineIds().length > 1 ? slickMenuItem('bulk-order', 'files', 'Tạo phiếu ' + planCheckedLineIds().length + ' hạng mục đã chọn') : '',
     planCheckedLineIds().length ? slickMenuItem('submit-base', 'files', 'Trình BASE hạng mục đã chọn') : '',
     planCheckedLineIds().length ? slickMenuItem('sync-base', 'refresh', 'Đồng bộ BASE hạng mục đã chọn') : '',
+    item.lineId ? slickMenuItem('sync-base-veh', 'refresh', 'Đồng bộ BASE cả xe') : '',
     planCheckedLineIds().length ? slickMenuItem('keep', 'pin', 'Giữ trên kế hoạch') : '',
     planCheckedLineIds().length ? slickMenuItem('copy-next', 'cal', 'Sao chép sang tháng sau') : '',
   ];
@@ -66209,7 +66510,7 @@ function showPlanCtx(ev, item) {
       e.stopPropagation();
       const act = b.dataset.act;
       hidePlanCtx();
-      runPlanCtx(act, g, item);
+      runPlanCtx(act, g || { key: item.key, vehicleId: item.vehicleId, lines }, item);
     };
   });
 }
@@ -66237,19 +66538,47 @@ function runPlanCtx(act, g, item) {
   if (act === 'toggle-veh') {
     const list = window._planGridData || [];
     const vid = String(item.vehicleId);
-    const vehRows = list.filter(r => String(r.vehicleId) === vid);
+    const vehRows = list.filter(r => !r.__vehGroup && String(r.vehicleId) === vid);
     const allOn = vehRows.length > 0 && vehRows.every(r => isPlanLineChecked(planLineIdOfRow(r)));
     setPlanVehicleChecked(vid, !allOn, list);
     refreshPlanGridChecks();
     return;
   }
+  if (act === 'collapse-one') {
+    if (item && item.__vehGroup) togglePlanVehicleGroupCollapse(item);
+    return;
+  }
+  if (act === 'collapse-all') {
+    document.getElementById('btnPlanCollapseAll')?.click();
+    return;
+  }
+  if (act === 'expand-all') {
+    document.getElementById('btnPlanExpandAll')?.click();
+    return;
+  }
   if (act === 'submit-base') { submitPlansToBase(); return; }
   if (act === 'sync-base') { syncPlansFromBase(); return; }
+  if (act === 'submit-base-veh') {
+    const ids = item.__vehGroup
+      ? (item.lineIds || [])
+      : (window._planGridData || []).filter(r => !r.__vehGroup && String(r.vehicleId) === String(item.vehicleId)).map(r => r.lineId);
+    submitPlansToBase(ids);
+    return;
+  }
+  if (act === 'sync-base-veh') {
+    const ids = item.__vehGroup
+      ? (item.lineIds || [])
+      : (window._planGridData || []).filter(r => !r.__vehGroup && String(r.vehicleId) === String(item.vehicleId)).map(r => r.lineId);
+    syncPlansFromBase(ids);
+    return;
+  }
   if (act === 'copy') {
+    if (item.__vehGroup) return;
     const text = [
       item.year, item.month, item.soXe, item.soMooc, item.applyTo, item.ptId,
       item.content, item.vendor, item.dichVu, item.phanLoai, item.system, item.nhom,
       item.qtyText, item.uom, item.unitPriceText, item.vatText, item.thanhTienText, item.totalText, item.pmhNote,
+      item.technicianName, item.scheduleDateText,
     ].join('\t');
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text);
     toast('Đã sao chép dòng');
@@ -66290,6 +66619,14 @@ function refreshPlanGridChecks() {
   }
   document.querySelectorAll('.pg-row').forEach(cb => {
     const lid = cb.dataset.lineId || cb.getAttribute('data-line-id');
+    const vid = cb.dataset.vehicleId || cb.getAttribute('data-vehicle-id');
+    if (cb.classList.contains('pg-veh-group') && vid) {
+      const kids = (window._planGridData || []).filter(r => !r.__vehGroup && String(r.vehicleId) === String(vid));
+      const n = kids.filter(r => isPlanLineChecked(planLineIdOfRow(r))).length;
+      cb.checked = kids.length > 0 && n === kids.length;
+      cb.indeterminate = n > 0 && n < kids.length;
+      return;
+    }
     cb.checked = lid ? isPlanLineChecked(lid) : isPlanGroupChecked(cb.dataset.gkey);
   });
   document.querySelectorAll('.plan-fallback tr[data-gkey]').forEach(tr => {
@@ -66299,7 +66636,7 @@ function refreshPlanGridChecks() {
     if (box) box.checked = lid ? isPlanLineChecked(lid) : isPlanGroupChecked(tr.dataset.gkey);
   });
   const all = document.getElementById('planGridCheckAll');
-  const rows = window._planGridData || [];
+  const rows = (window._planGridData || []).filter(r => !r.__vehGroup);
   if (all && rows.length) {
     all.checked = rows.every(r => isPlanLineChecked(planLineIdOfRow(r)));
     all.indeterminate = !all.checked && rows.some(r => isPlanLineChecked(planLineIdOfRow(r)));
@@ -66326,7 +66663,7 @@ function refreshPlanGridChecks() {
   }
   const vis = document.querySelector('[data-plan-vis-count]');
   if (vis) {
-    const shown = (window._planGridData || []).length;
+    const shown = (window._planGridData || []).filter(r => !r.__vehGroup).length;
     vis.textContent = String(shown);
   }
   const range = document.querySelector('[data-plan-period-range]');
@@ -66488,10 +66825,12 @@ function planWorkspaceHtml(groups, vehicleMode) {
           <button type="button" class="plan-tb-btn" id="btnPlanClearSel" ${nSel ? '' : 'disabled'}>
             ${planTbIco('x')} Bỏ chọn
           </button>
+          <button type="button" class="plan-tb-btn" id="btnPlanExpandAll" title="Mở rộng tất cả nhóm xe">Mở nhóm</button>
+          <button type="button" class="plan-tb-btn" id="btnPlanCollapseAll" title="Thu gọn tất cả nhóm xe">Thu nhóm</button>
           <button type="button" class="plan-tb-btn" id="btnPlanReloadGrid" title="Tải lại">
             ${planTbIco('refresh')} Tải lại
           </button>
-          <span class="plan-tb-updated hidden lg:inline">Cập nhật lần cuối lúc ${esc(updatedAt)}</span>
+          <span class="plan-tb-updated hidden lg:inline">Cập nhật lần cuối lúc ${esc(updatedAt)}</span><span class="text-[10px] text-indigo-500 ml-1" title="UI nhóm xe">· nhóm▾</span>
           <span class="text-[11px] text-slate-400 hidden xl:inline">Ctrl+C/V · kéo chọn ô · hover ô rồi bấm ✎ · F2 / double-click · tiêu đề cột để sắp xếp</span>
         </div>
         <div class="plan-grid-toolbar-right">
@@ -66507,6 +66846,7 @@ function planWorkspaceHtml(groups, vehicleMode) {
               <button type="button" data-freeze="5" role="menuitem">Ghim đến Số mooc</button>
               <button type="button" data-freeze="7" role="menuitem">Ghim đến PT ID</button>
               <button type="button" data-freeze="8" role="menuitem">Ghim đến Nội dung</button>
+              <button type="button" data-freeze="21" role="menuitem">Ghim đến Kỹ thuật viên</button>
             </div>
           </div>
           <button type="button" class="plan-tb-btn is-ghost" title="Cột hiển thị" aria-label="Cột">${planTbIco('cols')}</button>
@@ -66525,12 +66865,14 @@ function planWorkspaceHtml(groups, vehicleMode) {
 }
 
 function planFrozenColumnIndex() {
+  /* mặc định ghim đến Số xe */
   if (view.planFrozenColumn === undefined || view.planFrozenColumn === null) return 4;
   const n = Number(view.planFrozenColumn);
   return Number.isFinite(n) ? n : 4;
 }
 function planGridSortValue(row, field) {
-  const numMap = { qtyText: 'qty', unitPriceText: 'unitPrice', vatText: 'vat', thanhTienText: 'thanhTien', totalText: 'tongTien' };
+  if (row && row.__vehGroup) return field === 'soXe' || field === 'totalText' || field === 'tongTien' ? (row[field] ?? row.tongTien) : '\uffff';
+  const numMap = { qtyText: 'qty', unitPriceText: 'unitPrice', vatText: 'vat', thanhTienText: 'thanhTien', totalText: 'tongTien', scheduleDateText: 'scheduleDate' };
   const key = numMap[field] || field;
   const v = row ? row[key] : null;
   if (['year', 'month', 'qty', 'unitPrice', 'vat', 'thanhTien', 'tongTien'].includes(key)) {
@@ -66601,27 +66943,93 @@ function destroyPlanSlickGrid() {
   }
   window._planGrid = null;
   window._planGridData = null;
+  window._planDataView = null;
+  window._planItemsById = null;
   if (window._planGridResize) {
     window.removeEventListener('resize', window._planGridResize);
     window._planGridResize = null;
   }
 }
+function syncPlanGridVisibleData(dataView) {
+  const list = [];
+  if (dataView && typeof dataView.getLength === 'function') {
+    for (let i = 0, n = dataView.getLength(); i < n; i++) list.push(dataView.getItem(i));
+  }
+  window._planGridData = list;
+  return list;
+}
+function planVehGroupId(vehicleId) {
+  return 'vg-' + String(vehicleId);
+}
+function findPlanVehGroupItem(vehicleId) {
+  const id = planVehGroupId(vehicleId);
+  return (window._planItemsById && window._planItemsById[id])
+    || (window._planGridData || []).find(r => r && r.__vehGroup && String(r.vehicleId) === String(vehicleId))
+    || null;
+}
+/** Thu/mở nhóm xe trên lưới kế hoạch (filter ẩn con khi group._collapsed). */
+function togglePlanVehicleGroupCollapse(itemOrVehicleId) {
+  let item = itemOrVehicleId;
+  if (item == null) return false;
+  if (typeof item === 'string' || typeof item === 'number') {
+    item = findPlanVehGroupItem(item);
+  } else if (item && !item.__vehGroup && item.vehicleId != null) {
+    item = findPlanVehGroupItem(item.vehicleId);
+  }
+  if (!item || !item.__vehGroup) return false;
+  item._collapsed = !item._collapsed;
+  setPlanVehicleCollapsed(item.vehicleId, !!item._collapsed);
+  const mapped = window._planItemsById && window._planItemsById[String(item.id)];
+  if (mapped) mapped._collapsed = item._collapsed;
+  /* đồng bộ mọi bản ghi group cùng xe trong rows nguồn */
+  (window._planGridData || []).forEach((r) => {
+    if (r && r.__vehGroup && String(r.vehicleId) === String(item.vehicleId)) r._collapsed = item._collapsed;
+  });
+  Object.keys(window._planItemsById || {}).forEach((id) => {
+    const r = window._planItemsById[id];
+    if (r && r.__vehGroup && String(r.vehicleId) === String(item.vehicleId)) r._collapsed = item._collapsed;
+  });
+  if (typeof window._planApplyColFilters === 'function') window._planApplyColFilters();
+  else if (typeof refreshPlanGridChecks === 'function') refreshPlanGridChecks();
+  return true;
+}
+function planTreeToggleBtnHtml(item) {
+  if (!item || !item.__vehGroup) return '';
+  const collapsed = !!item._collapsed;
+  const cls = collapsed ? 'slick-group-toggle collapsed' : 'slick-group-toggle expanded';
+  const glyph = collapsed ? '▸' : '▾';
+  const title = collapsed ? 'Mở rộng nhóm' : 'Thu gọn nhóm';
+  /* Ký tự ▾/▸ giống lưới tham chiếu — không dùng <button> */
+  return `<span class="${cls}" data-plan-tree-toggle="1" data-vehicle-id="${esc(item.vehicleId)}" title="${esc(title)}" role="button" tabindex="0" aria-label="${esc(title)}">${glyph}</span>`;
+}
+function planGroupTitleCellHtml(item) {
+  if (!item || !item.__vehGroup) return '';
+  const title = item.groupTitle || item.content || '';
+  return `<span class="plan-group-title-cell" data-plan-group-toggle-row="1" data-vehicle-id="${esc(item.vehicleId)}">${planTreeToggleBtnHtml(item)}<span class="plan-group-title-text" title="${esc(title)}">${esc(title)}</span></span>`;
+}
 function mountPlanGridFallback(host, rows) {
-  const head = `<th class="w-10"><input type="checkbox" id="planGridCheckAll" class="order-grid-select-all-checkbox" /></th><th>#</th><th>Năm</th><th>Tháng</th><th>Số xe</th><th>Số mooc</th><th>Áp dụng cho</th><th>PT ID</th><th>Nội dung thực hiện</th><th>Nhà cung cấp</th><th>Dịch vụ</th><th>Phân loại</th><th>Hệ thống</th><th>Nhóm</th><th class="text-right">Số lượng</th><th>ĐVT</th><th class="text-right">Đơn giá</th><th class="text-right">% VAT</th><th class="text-right">Thành tiền</th><th class="text-right">Tổng tiền</th><th>Ghi chú cho PMH</th><th>BASE</th><th></th>`;
+  const head = `<th class="w-10"><input type="checkbox" id="planGridCheckAll" class="order-grid-select-all-checkbox" /></th><th>#</th><th>Năm</th><th>Tháng</th><th>Số xe</th><th>Số mooc</th><th>Áp dụng cho</th><th>PT ID</th><th>Nội dung thực hiện</th><th>Nhà cung cấp</th><th>Dịch vụ</th><th>Phân loại</th><th>Hệ thống</th><th>Nhóm</th><th class="text-right">Số lượng</th><th>ĐVT</th><th class="text-right">Đơn giá</th><th class="text-right">% VAT</th><th class="text-right">Thành tiền</th><th class="text-right">Tổng tiền</th><th>Ghi chú cho PMH</th><th>Kỹ thuật viên</th><th>Ngày thực hiện</th><th>BASE</th><th></th>`;
   host.innerHTML = `<table class="plan-fallback"><thead><tr>${head}</tr></thead><tbody>${rows.map((r, i) => {
-    const on = view.planPanelOpen && r.key === view.selectedPlanGroupKey ? 'is-on' : '';
+    const on = (view.planPanelOpen && r.key === view.selectedPlanGroupKey ? 'is-on' : '') + (r.__vehGroup ? ' plan-vehicle-group-row' : '');
     const lid = planLineIdOfRow(r);
-    const ck = `<td><input type="checkbox" class="pg-row order-grid-row-checkbox" data-gkey="${esc(r.key)}" data-line-id="${esc(lid)}" data-vehicle-id="${esc(r.vehicleId)}" ${isPlanLineChecked(lid) ? 'checked' : ''} /></td><td class="text-slate-400">${i + 1}</td>`;
-    const cells = `${ck}<td>${esc(r.year)}</td><td>${esc(r.month)}</td><td><button type="button" class="slick-link" data-open-vehicle="${r.vehicleId}">${esc(r.soXe)}</button></td><td>${esc(r.soMooc)}</td><td>${esc(r.applyTo)}</td><td class="font-mono text-xs">${esc(r.ptId)}</td><td>${esc(r.content)}</td><td>${esc(r.vendor)}</td><td>${esc(r.dichVu)}</td><td>${esc(r.phanLoai)}</td><td>${esc(r.system)}</td><td>${esc(r.nhom)}</td><td class="text-right tabular-nums">${esc(r.qtyText)}</td><td>${esc(r.uom)}</td><td class="text-right tabular-nums">${esc(r.unitPriceText)}</td><td class="text-right tabular-nums">${esc(r.vatText)}</td><td class="text-right tabular-nums">${esc(r.thanhTienText)}</td><td class="text-right tabular-nums fw6">${esc(r.totalText)}</td><td>${esc(r.pmhNote)}</td><td>${planBaseSyncBadge({ status: r.baseStatus, code: r.baseCode })}</td><td class="whitespace-nowrap"><button type="button" class="btn btn-primary btn-xs" data-plan-schedule="${esc(r.key)}">Lên lịch</button></td>`;
-    return `<tr class="${on}" data-gkey="${esc(r.key)}" data-line-id="${esc(lid)}">${cells}</tr>`;
-  }).join('') || `<tr><td colspan="23" class="px-4 py-10 text-center text-slate-500">Không có kế hoạch khớp bộ lọc</td></tr>`}</tbody></table>`;
+    const ck = r.__vehGroup
+      ? `<td><input type="checkbox" class="pg-row pg-veh-group order-grid-row-checkbox" data-gkey="${esc(r.key)}" data-vehicle-id="${esc(r.vehicleId)}" /></td><td></td>`
+      : `<td><input type="checkbox" class="pg-row order-grid-row-checkbox" data-gkey="${esc(r.key)}" data-line-id="${esc(lid)}" data-vehicle-id="${esc(r.vehicleId)}" ${isPlanLineChecked(lid) ? 'checked' : ''} /></td><td class="text-slate-400">${i + 1}</td>`;
+    const act = r.__vehGroup
+      ? `<button type="button" class="btn btn-outline btn-xs" data-plan-sync-base-vehicle="${esc(r.vehicleId)}">BASE</button> <button type="button" class="btn btn-primary btn-xs" data-plan-schedule="${esc(r.key)}">Lên lịch</button>`
+      : `<button type="button" class="btn btn-primary btn-xs" data-plan-schedule="${esc(r.key)}">Lên lịch</button>`;
+    const cells = `${ck}<td>${esc(r.year)}</td><td>${esc(r.month)}</td><td><button type="button" class="slick-link" data-open-vehicle="${r.vehicleId}">${esc(r.soXe)}</button></td><td>${esc(r.soMooc)}</td><td>${esc(r.applyTo)}</td><td class="font-mono text-xs">${esc(r.ptId)}</td><td>${esc(r.content)}</td><td>${r.__vehGroup ? '' : esc(r.vendor)}</td><td>${r.__vehGroup ? '' : esc(r.dichVu)}</td><td>${r.__vehGroup ? '' : esc(r.phanLoai)}</td><td>${r.__vehGroup ? '' : esc(r.system)}</td><td>${r.__vehGroup ? '' : esc(r.nhom)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.qtyText)}</td><td>${r.__vehGroup ? '' : esc(r.uom)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.unitPriceText)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.vatText)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.thanhTienText)}</td><td class="text-right tabular-nums fw6">${esc(r.totalText)}</td><td>${r.__vehGroup ? '' : esc(r.pmhNote)}</td><td>${esc(r.technicianName || '—')}</td><td>${esc(r.scheduleDateText || r.scheduleDate || '—')}</td><td>${planBaseSyncBadge({ status: r.baseStatus, code: r.baseCode })}</td><td class="whitespace-nowrap">${act}</td>`;
+    return `<tr class="${on}" data-gkey="${esc(r.key)}" data-line-id="${esc(lid)}" data-vehicle-id="${esc(r.vehicleId)}">${cells}</tr>`;
+  }).join('') || `<tr><td colspan="25" class="px-4 py-10 text-center text-slate-500">Không có kế hoạch khớp bộ lọc</td></tr>`}</tbody></table>`;
   host.querySelectorAll('.pg-row').forEach(cb => {
     cb.onclick = (e) => e.stopPropagation();
     cb.onchange = (e) => {
       e.stopPropagation();
-      const item = rows.find(r => planLineIdOfRow(r) === String(cb.dataset.lineId));
+      const item = cb.classList.contains('pg-veh-group')
+        ? rows.find(r => r.__vehGroup && String(r.vehicleId) === String(cb.dataset.vehicleId))
+        : rows.find(r => planLineIdOfRow(r) === String(cb.dataset.lineId));
       if (!item) return;
-      if (planSelectMode() === 'VEHICLE') {
+      if (item.__vehGroup || planSelectMode() === 'VEHICLE') {
         setPlanVehicleChecked(item.vehicleId, cb.checked, rows);
       } else {
         setPlanLineChecked(cb.dataset.lineId, cb.checked);
@@ -66632,11 +67040,20 @@ function mountPlanGridFallback(host, rows) {
   host.querySelectorAll('tr[data-gkey]').forEach(tr => {
     tr.oncontextmenu = (e) => {
       const lid = tr.getAttribute('data-line-id');
-      const item = rows.find(r => String(r.lineId || r.id) === String(lid)) || rows.find(r => r.key === tr.dataset.gkey);
+      const vid = tr.getAttribute('data-vehicle-id');
+      const item = (lid && rows.find(r => String(r.lineId || r.id) === String(lid)))
+        || rows.find(r => r.__vehGroup && String(r.vehicleId) === String(vid))
+        || rows.find(r => r.key === tr.dataset.gkey);
       showPlanCtx(e, item);
     };
   });
   host.querySelectorAll('[data-plan-schedule]').forEach(b => b.onclick = (e) => { e.stopPropagation(); schedulePlanGroupToDate(b.dataset.planSchedule); });
+  host.querySelectorAll('[data-plan-sync-base-vehicle]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    const vid = b.getAttribute('data-plan-sync-base-vehicle');
+    const ids = rows.filter(r => !r.__vehGroup && String(r.vehicleId) === String(vid)).map(r => r.lineId);
+    syncPlansFromBase(ids);
+  });
   const all = host.querySelector('#planGridCheckAll');
   if (all) all.onchange = () => { setAllPlanGroupsChecked(all.checked, rows); refreshPlanGridChecks(); };
 }
@@ -66766,6 +67183,11 @@ function showListCtx(ev, key, item) {
     const groupId = item.__group ? item.id : ('g-' + item.groupKey);
     const group = item.__group ? item : findAssessFailRowById(groupId);
     bits.push(slickMenuItem('assess-open', 'file', 'Xem chi tiết lần ĐG · ' + (item.plate || '')));
+    if (group) {
+      bits.push(slickMenuItem('assess-collapse-one', group._collapsed ? 'chev' : 'chev', group._collapsed ? 'Mở rộng nhóm này' : 'Thu gọn nhóm này'));
+    }
+    bits.push(slickMenuItem('assess-collapse-all', 'dens', 'Thu gọn tất cả nhóm'));
+    bits.push(slickMenuItem('assess-expand-all', 'cols', 'Mở rộng tất cả nhóm'));
     if (group && group.evalStatus === 'DRAFT' && group.vehicleId != null) {
       bits.push(slickMenuItem('eval', 'file', 'Tiếp tục nháp'));
     } else if (group && group.evalId) {
@@ -66816,6 +67238,18 @@ function showListCtx(ev, key, item) {
         if (g) openAssessFailPanel(g);
         return;
       }
+      if (act === 'assess-collapse-one' && ctx.groupKey) {
+        toggleAssessGroupCollapse(ctx.groupKey);
+        return;
+      }
+      if (act === 'assess-collapse-all') {
+        setAllAssessGroupsCollapsed(true);
+        return;
+      }
+      if (act === 'assess-expand-all') {
+        setAllAssessGroupsCollapsed(false);
+        return;
+      }
       if (act === 'view-eval' && ctx.evalId) {
         openEvalResultModal(ctx.evalId);
         return;
@@ -66864,7 +67298,7 @@ function matchLookupOption(options, text) {
     || null;
 }
 function pastePlanGridCell(item, columnDef, raw) {
-  if (!item || !columnDef) return false;
+  if (!item || item.__vehGroup || !columnDef) return false;
   const field = columnDef.field || columnDef.id;
   const lineId = item.lineId;
   const text = String(raw == null ? '' : raw).trim();
@@ -66879,6 +67313,7 @@ function pastePlanGridCell(item, columnDef, raw) {
     system: () => activeVehicleSystems().map(s => ({ id: s.id, name: s.name, sub: s.code || '' })),
     nhom: () => nhomLookupOptions(),
     uom: () => uomLookupOptions(),
+    technicianName: () => technicianLookupOptions(),
   };
   if (lookup[field]) {
     let opt = matchLookupOption(lookup[field](), text);
@@ -66891,7 +67326,7 @@ function pastePlanGridCell(item, columnDef, raw) {
       else opt = { id: text, name: text, source: 'local' };
     }
     if (!opt) return false;
-    applyPlanCellPick(lineId, field, opt, true);
+    applyPlanCellPick(lineId, field === 'technicianName' ? 'technician' : field, opt, true);
     if (field === 'content') { item.content = opt.name; if (opt.system) item.system = opt.system; }
     else if (field === 'vendor') item.vendor = opt.name;
     else if (field === 'dichVu') item.dichVu = opt.name || (opt.id === 'MAINT' ? 'Bảo dưỡng' : 'Sửa chữa');
@@ -66899,6 +67334,14 @@ function pastePlanGridCell(item, columnDef, raw) {
     else if (field === 'system') item.system = opt.name;
     else if (field === 'nhom') item.nhom = opt.name;
     else if (field === 'uom') item.uom = opt.name;
+    else if (field === 'technicianName') item.technicianName = opt.name || '—';
+    return true;
+  }
+  if (field === 'scheduleDateText' || field === 'scheduleDate') {
+    const d = text.match(/^\d{4}-\d{2}-\d{2}$/) ? text : '';
+    p.scheduleDate = d || null;
+    item.scheduleDate = d;
+    item.scheduleDateText = d || '—';
     return true;
   }
   if (field === 'qtyText') {
@@ -67068,7 +67511,7 @@ function attachExcelLikeGrid(grid, cfg) {
     const cols = typeof grid.getColumns === 'function' ? grid.getColumns() : [];
     cols.forEach((c) => {
       if (!c) return;
-      if (c.id === '_ck' || c.id === '_act' || c.id === '_idx') c.selectable = false;
+      if (c.id === '_ck' || c.id === '_tree' || c.id === '_act' || c.id === '_idx') c.selectable = false;
       else if (c.selectable == null) c.selectable = true;
     });
     if (cols.length && typeof grid.setColumns === 'function') grid.setColumns(cols);
@@ -67086,7 +67529,7 @@ function attachExcelLikeGrid(grid, cfg) {
         newRowCreator: () => undefined,
         dataItemColumnValueExtractor: (item, columnDef) => {
           if (!item || !columnDef) return '';
-          if (columnDef.id === '_ck' || columnDef.id === '_act' || columnDef.id === '_idx') return '';
+          if (columnDef.id === '_ck' || columnDef.id === '_tree' || columnDef.id === '_act' || columnDef.id === '_idx') return '';
           if (typeof cfg.copyValue === 'function') {
             const v = cfg.copyValue(item, columnDef);
             if (v != null) return String(v);
@@ -67097,7 +67540,7 @@ function attachExcelLikeGrid(grid, cfg) {
         },
         dataItemColumnValueSetter: (item, columnDef, value) => {
           if (!item || !columnDef) return null;
-          if (columnDef.denyPaste || columnDef.id === '_ck' || columnDef.id === '_act' || columnDef.id === '_idx') return null;
+          if (columnDef.denyPaste || columnDef.id === '_ck' || columnDef.id === '_tree' || columnDef.id === '_act' || columnDef.id === '_idx') return null;
           if (columnDef.selectable === false) return null;
           if (typeof cfg.pasteValue === 'function') cfg.pasteValue(item, columnDef, value);
           return null;
@@ -67121,9 +67564,11 @@ function openPlanCellAutocomplete(grid, row, cell) {
     content: 'plan-content', vendor: 'plan-vendor', dichVu: 'plan-dichVu',
     phanLoai: 'plan-phanLoai', system: 'plan-system', nhom: 'plan-nhom', uom: 'plan-uom',
     qtyText: 'plan-qty', unitPriceText: 'plan-unitPrice', vatText: 'plan-vat', pmhNote: 'plan-pmhNote',
+    technicianName: 'plan-technician', scheduleDateText: 'plan-scheduleDate', scheduleDate: 'plan-scheduleDate',
   };
   const kind = map[col.id] || map[col.field];
   if (!kind) return false;
+  if (item.__vehGroup && kind !== 'plan-technician' && kind !== 'plan-scheduleDate') return false;
   const node = grid.getCellNode(row, cell);
   if (!node) return false;
   let btn = node.querySelector('.sg-cell-edit-btn[data-cell-pop], [data-cell-pop]');
@@ -67132,7 +67577,8 @@ function openPlanCellAutocomplete(grid, row, cell) {
     btn.type = 'button';
     btn.className = 'sg-cell-edit-btn';
     btn.setAttribute('data-cell-pop', kind);
-    btn.setAttribute('data-line-id', String(item.lineId || ''));
+    if (item.__vehGroup) btn.setAttribute('data-vehicle-id', String(item.vehicleId || ''));
+    else btn.setAttribute('data-line-id', String(item.lineId || ''));
     btn.textContent = '✎';
     node.appendChild(btn);
   }
@@ -67282,7 +67728,7 @@ function mountListSlickGrid(host, rows, cols, opts) {
     const f = (view.listGridColFilters && view.listGridColFilters[key]) || {};
     const includes = (val, q) => !q || String(val ?? '').toLowerCase().includes(String(q).toLowerCase());
     const rowMatches = (r) => {
-      if (r && r.__group) return true;
+      if (r && (r.__group || r.__vehGroup)) return true;
       for (const col of safeCols) {
         if (!col || col.id === '_act' || col.id === '_ck' || col.filterable === false) continue;
         const q = f[col.id];
@@ -67307,10 +67753,17 @@ function mountListSlickGrid(host, rows, cols, opts) {
     };
     let matched = allRows.filter(rowMatches);
     if (key === 'assessResults') {
+      const groupByKey = {};
+      allRows.forEach((r) => {
+        if (r && r.__group) groupByKey[String(r.groupKey)] = r;
+      });
       const keepKeys = new Set(matched.filter(r => !r.__group).map(r => r.groupKey));
       matched = allRows.filter(r => {
         if (r.__group) return keepKeys.has(r.groupKey);
-        return keepKeys.has(r.groupKey) && rowMatches(r);
+        if (!keepKeys.has(r.groupKey) || !rowMatches(r)) return false;
+        const g = groupByKey[String(r.groupKey)];
+        if (g && g._collapsed) return false;
+        return true;
       });
     }
     visibleRows = matched;
@@ -67523,6 +67976,12 @@ function mountListSlickGrid(host, rows, cols, opts) {
           if (typeof openCreateOrderFromEval === 'function') openCreateOrderFromEval(vid, fromEv || undefined);
           return;
         }
+        const assessToggle = t.closest('[data-assess-tree-toggle], [data-assess-group-toggle-row]');
+        if (key === 'assessResults' && assessToggle) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
+          return;
+        }
         const openFail = t.closest('[data-assess-fail-open]');
         if (openFail) {
           if (native && native.stopPropagation) native.stopPropagation();
@@ -67571,6 +68030,25 @@ function mountListSlickGrid(host, rows, cols, opts) {
     }
   }
   if (key === 'assessResults') {
+    if (host._assessTreeToggleBound) {
+      host.removeEventListener('click', host._assessTreeToggleBound, true);
+    }
+    host._assessTreeToggleAt = 0;
+    host._assessTreeToggleBound = (ev) => {
+      const t = ev.target;
+      const toggleEl = t && t.closest && t.closest('[data-assess-tree-toggle], [data-assess-group-toggle-row]');
+      if (!toggleEl) return;
+      if (t.closest && (t.closest('[data-open-vehicle]') || t.closest('input') || t.closest('[data-open-order]') || t.closest('[data-create-order-from-eval]'))) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+      const now = Date.now();
+      if (now - (host._assessTreeToggleAt || 0) < 350) return;
+      host._assessTreeToggleAt = now;
+      const gk = toggleEl.getAttribute('data-assess-group-key');
+      if (gk) toggleAssessGroupCollapse(gk);
+    };
+    host.addEventListener('click', host._assessTreeToggleBound, true);
     const bindAssessHeaderCheck = () => {
       const headers = host.querySelectorAll('.slick-header:not(.slick-preheader-panel) .slick-header-column');
       const ckHeader = [...headers].find(el => String(el.id || '').includes('_ck')) || headers[0];
@@ -67685,56 +68163,114 @@ function mountPlanSlickGrid() {
   }
   destroyPlanSlickGrid();
   window._planGridData = rows;
-  const soXeFmt = (row, cell, val, col, item) =>
-    `<button type="button" class="slick-link" data-open-vehicle="${item.vehicleId}">${esc(item.soXe)}</button>`;
+  const soXeFmt = (row, cell, val, col, item) => {
+    if (item.__vehGroup) {
+      return `<span class="inline-flex items-center gap-1 min-w-0">${planTreeToggleBtnHtml(item)}<button type="button" class="slick-link font-semibold" data-open-vehicle="${item.vehicleId}">${esc(item.soXe)}</button></span>`;
+    }
+    return `<button type="button" class="slick-link" data-open-vehicle="${item.vehicleId}">${esc(item.soXe)}</button>`;
+  };
   const checkFmt = (row, cell, val, col, item) => {
+    if (item.__vehGroup) {
+      const kids = rows.filter(r => !r.__vehGroup && String(r.vehicleId) === String(item.vehicleId));
+      const n = kids.filter(r => isPlanLineChecked(planLineIdOfRow(r))).length;
+      const checked = kids.length > 0 && n === kids.length ? 'checked' : '';
+      return `<div class="flex h-full items-center justify-center"><input type="checkbox" class="pg-row pg-veh-group order-grid-row-checkbox" data-gkey="${esc(item.key)}" data-vehicle-id="${esc(item.vehicleId)}" ${checked} aria-label="Chọn cả xe" /></div>`;
+    }
     const lid = planLineIdOfRow(item);
     return `<div class="flex h-full items-center justify-center"><input type="checkbox" class="pg-row order-grid-row-checkbox" data-gkey="${esc(item.key)}" data-line-id="${esc(lid)}" data-vehicle-id="${esc(item.vehicleId)}" ${isPlanLineChecked(lid) ? 'checked' : ''} aria-label="Chọn hạng mục" /></div>`;
   };
-  const idxFmt = (row) => String(row + 1);
-  const moneyFmt = (row, cell, val) => `<span class="tabular-nums">${esc(val == null || val === '' ? '—' : val)}</span>`;
+  const idxFmt = (row, cell, val, col, item) => {
+    if (item.__vehGroup) {
+      return `<div class="flex h-full w-full items-center justify-center">${planTreeToggleBtnHtml(item)}</div>`;
+    }
+    return String(row + 1);
+  };
+  const moneyFmt = (row, cell, val, col, item) => {
+    if (item.__vehGroup && col && col.field === 'totalText') return `<span class="tabular-nums fw6">${esc(item.totalText || '—')}</span>`;
+    if (item.__vehGroup) return '';
+    return `<span class="tabular-nums">${esc(val == null || val === '' ? '—' : val)}</span>`;
+  };
   const baseFmt = (row, cell, val, col, item) => planBaseSyncBadge({ status: item.baseStatus, code: item.baseCode });
+  const leafPop = (item, text, popAttrs) => {
+    if (item.__vehGroup) return '';
+    return cellPopBtnHtml(text, popAttrs);
+  };
+  const assignTechFmt = (r, c, v, col, item) => {
+    const txt = item.technicianName || '—';
+    if (item.__vehGroup) {
+      return cellPopBtnHtml(txt, `data-cell-pop="plan-technician" data-vehicle-id="${esc(item.vehicleId)}"`);
+    }
+    return cellPopBtnHtml(txt, `data-cell-pop="plan-technician" data-line-id="${esc(item.lineId)}"`);
+  };
+  const assignDateFmt = (r, c, v, col, item) => {
+    const txt = item.scheduleDateText || item.scheduleDate || '—';
+    if (item.__vehGroup) {
+      return cellPopBtnHtml(txt, `data-cell-pop="plan-scheduleDate" data-vehicle-id="${esc(item.vehicleId)}"`);
+    }
+    return cellPopBtnHtml(txt, `data-cell-pop="plan-scheduleDate" data-line-id="${esc(item.lineId)}"`);
+  };
   const cols = [
     { id: '_ck', field: 'checked', name: '', width: 36, minWidth: 36, maxWidth: 40, cssClass: 'c', formatter: checkFmt, sortable: false, resizable: false, denyPaste: true, columnGroup: ' ' },
     { id: '_idx', field: 'idx', name: '#', width: 42, minWidth: 36, cssClass: 'c', formatter: idxFmt, sortable: false, denyPaste: true, columnGroup: ' ' },
-    { id: 'year', field: 'year', name: 'Năm', width: 58, cssClass: 'c', sortable: true, denyPaste: true, columnGroup: 'Kỳ' },
-    { id: 'month', field: 'month', name: 'Tháng', width: 58, cssClass: 'c', sortable: true, denyPaste: true, columnGroup: 'Kỳ' },
-    { id: 'soXe', field: 'soXe', name: 'Số xe', width: 110, formatter: soXeFmt, sortable: true, denyPaste: true, columnGroup: 'Phương tiện' },
-    { id: 'soMooc', field: 'soMooc', name: 'Số mooc', width: 110, sortable: true, denyPaste: true, columnGroup: 'Phương tiện' },
-    { id: 'applyTo', field: 'applyTo', name: 'Áp dụng cho', width: 110, sortable: true, denyPaste: true, columnGroup: 'Phương tiện' },
-    { id: 'ptId', field: 'ptId', name: 'PT ID', width: 110, sortable: true, denyPaste: true, columnGroup: 'Phương tiện' },
-    { id: 'content', field: 'content', name: 'Nội dung thực hiện', width: 220, sortable: true, cssClass: 'sg-col-editable', headerCssClass: 'sg-col-editable', columnGroup: 'Hạng mục',
-      formatter: (r, c, v, col, item) => cellPopBtnHtml(item.content, `data-cell-pop="plan-content" data-line-id="${esc(item.lineId)}"`) },
+    { id: 'year', field: 'year', name: 'Năm', width: 58, cssClass: 'c', sortable: true, denyPaste: true, columnGroup: 'Kỳ',
+      formatter: (r, c, v, col, item) => item.__vehGroup ? esc(item.year || '') : esc(item.year || '—') },
+    { id: 'month', field: 'month', name: 'Tháng', width: 58, cssClass: 'c', sortable: true, denyPaste: true, columnGroup: 'Kỳ',
+      formatter: (r, c, v, col, item) => item.__vehGroup ? esc(item.month || '') : esc(item.month || '—') },
+    { id: 'soXe', field: 'soXe', name: 'Số xe', width: 140, formatter: soXeFmt, sortable: true, denyPaste: true, columnGroup: 'Phương tiện' },
+    { id: 'soMooc', field: 'soMooc', name: 'Số mooc', width: 110, sortable: true, denyPaste: true, columnGroup: 'Phương tiện',
+      formatter: (r, c, v, col, item) => item.__vehGroup ? esc(item.soMooc || '') : esc(item.soMooc || '—') },
+    { id: 'applyTo', field: 'applyTo', name: 'Áp dụng cho', width: 110, sortable: true, denyPaste: true, columnGroup: 'Phương tiện',
+      formatter: (r, c, v, col, item) => item.__vehGroup ? esc(item.applyTo || '') : esc(item.applyTo || '—') },
+    { id: 'ptId', field: 'ptId', name: 'PT ID', width: 110, sortable: true, denyPaste: true, columnGroup: 'Phương tiện',
+      formatter: (r, c, v, col, item) => item.__vehGroup ? `<span class="font-mono text-xs">${esc(item.ptId || '')}</span>` : `<span class="font-mono text-xs">${esc(item.ptId || '—')}</span>` },
+    { id: 'content', field: 'content', name: 'Nội dung thực hiện', width: 280, sortable: true, cssClass: 'sg-col-editable', headerCssClass: 'sg-col-editable', columnGroup: 'Hạng mục',
+      formatter: (r, c, v, col, item) => {
+        if (item.__vehGroup) return planGroupTitleCellHtml(item);
+        const indentPx = 15 * (Number(item.indent) || 0);
+        const spacer = `<span class="sg-tree-spacer" style="width:${indentPx}px"></span>`;
+        const inner = leafPop(item, item.content, `data-cell-pop="plan-content" data-line-id="${esc(item.lineId)}"`);
+        return `<span class="sg-tree-cell">${spacer}<span class="sg-tree-leaf-pad"></span>${inner}</span>`;
+      } },
     { id: 'vendor', field: 'vendor', name: 'Nhà cung cấp', width: 140, sortable: true, cssClass: 'sg-col-editable', headerCssClass: 'sg-col-editable', columnGroup: 'Hạng mục',
-      formatter: (r, c, v, col, item) => cellPopBtnHtml(item.vendor, `data-cell-pop="plan-vendor" data-line-id="${esc(item.lineId)}"`) },
+      formatter: (r, c, v, col, item) => leafPop(item, item.vendor, `data-cell-pop="plan-vendor" data-line-id="${esc(item.lineId)}"`) },
     { id: 'dichVu', field: 'dichVu', name: 'Dịch vụ', width: 100, sortable: true, cssClass: 'sg-col-editable', headerCssClass: 'sg-col-editable', columnGroup: 'Hạng mục',
-      formatter: (r, c, v, col, item) => cellPopBtnHtml(item.dichVu, `data-cell-pop="plan-dichVu" data-line-id="${esc(item.lineId)}"`) },
+      formatter: (r, c, v, col, item) => leafPop(item, item.dichVu, `data-cell-pop="plan-dichVu" data-line-id="${esc(item.lineId)}"`) },
     { id: 'phanLoai', field: 'phanLoai', name: 'Phân loại', width: 110, sortable: true, cssClass: 'sg-col-editable', headerCssClass: 'sg-col-editable', columnGroup: 'Hạng mục',
-      formatter: (r, c, v, col, item) => cellPopBtnHtml(item.phanLoai, `data-cell-pop="plan-phanLoai" data-line-id="${esc(item.lineId)}"`) },
+      formatter: (r, c, v, col, item) => leafPop(item, item.phanLoai, `data-cell-pop="plan-phanLoai" data-line-id="${esc(item.lineId)}"`) },
     { id: 'system', field: 'system', name: 'Hệ thống', width: 120, sortable: true, cssClass: 'sg-col-editable', headerCssClass: 'sg-col-editable', columnGroup: 'Hạng mục',
-      formatter: (r, c, v, col, item) => cellPopBtnHtml(item.system, `data-cell-pop="plan-system" data-line-id="${esc(item.lineId)}"`) },
+      formatter: (r, c, v, col, item) => leafPop(item, item.system, `data-cell-pop="plan-system" data-line-id="${esc(item.lineId)}"`) },
     { id: 'nhom', field: 'nhom', name: 'Nhóm', width: 90, sortable: true, cssClass: 'sg-col-editable', headerCssClass: 'sg-col-editable', columnGroup: 'Hạng mục',
-      formatter: (r, c, v, col, item) => cellPopBtnHtml(item.nhom, `data-cell-pop="plan-nhom" data-line-id="${esc(item.lineId)}"`) },
+      formatter: (r, c, v, col, item) => leafPop(item, item.nhom, `data-cell-pop="plan-nhom" data-line-id="${esc(item.lineId)}"`) },
     { id: 'qtyText', field: 'qtyText', name: 'Số lượng', width: 88, cssClass: 'r sg-col-editable', headerCssClass: 'sg-col-editable', sortable: true, columnGroup: 'Chi phí',
-      formatter: (r, c, v, col, item) => cellPopBtnHtml(item.qtyText, `data-cell-pop="plan-qty" data-line-id="${esc(item.lineId)}"`) },
+      formatter: (r, c, v, col, item) => leafPop(item, item.qtyText, `data-cell-pop="plan-qty" data-line-id="${esc(item.lineId)}"`) },
     { id: 'uom', field: 'uom', name: 'ĐVT', width: 64, cssClass: 'c sg-col-editable', headerCssClass: 'sg-col-editable', sortable: true, columnGroup: 'Chi phí',
-      formatter: (r, c, v, col, item) => cellPopBtnHtml(item.uom, `data-cell-pop="plan-uom" data-line-id="${esc(item.lineId)}"`) },
+      formatter: (r, c, v, col, item) => leafPop(item, item.uom, `data-cell-pop="plan-uom" data-line-id="${esc(item.lineId)}"`) },
     { id: 'unitPriceText', field: 'unitPriceText', name: 'Đơn giá', width: 110, cssClass: 'r sg-col-editable', headerCssClass: 'sg-col-editable', sortable: true, columnGroup: 'Chi phí',
-      formatter: (r, c, v, col, item) => cellPopBtnHtml(item.unitPriceText, `data-cell-pop="plan-unitPrice" data-line-id="${esc(item.lineId)}"`) },
+      formatter: (r, c, v, col, item) => leafPop(item, item.unitPriceText, `data-cell-pop="plan-unitPrice" data-line-id="${esc(item.lineId)}"`) },
     { id: 'vatText', field: 'vatText', name: '% VAT', width: 72, cssClass: 'r sg-col-editable', headerCssClass: 'sg-col-editable', sortable: true, columnGroup: 'Chi phí',
-      formatter: (r, c, v, col, item) => cellPopBtnHtml(item.vatText, `data-cell-pop="plan-vat" data-line-id="${esc(item.lineId)}"`) },
+      formatter: (r, c, v, col, item) => leafPop(item, item.vatText, `data-cell-pop="plan-vat" data-line-id="${esc(item.lineId)}"`) },
     { id: 'thanhTienText', field: 'thanhTienText', name: 'Thành tiền', width: 120, cssClass: 'r', formatter: moneyFmt, sortable: true, denyPaste: true, columnGroup: 'Chi phí' },
     { id: 'totalText', field: 'totalText', name: 'Tổng tiền', width: 120, cssClass: 'r fw6', formatter: moneyFmt, sortable: true, denyPaste: true, columnGroup: 'Chi phí' },
-    { id: 'pmhNote', field: 'pmhNote', name: 'Ghi chú cho PMH', width: 180, sortable: true, cssClass: 'sg-col-editable', headerCssClass: 'sg-col-editable', columnGroup: 'Ghi chú',
-      formatter: (r, c, v, col, item) => cellPopBtnHtml(item.pmhNote, `data-cell-pop="plan-pmhNote" data-line-id="${esc(item.lineId)}"`) },
+    { id: 'pmhNote', field: 'pmhNote', name: 'Ghi chú cho PMH', width: 160, sortable: true, cssClass: 'sg-col-editable', headerCssClass: 'sg-col-editable', columnGroup: 'Ghi chú',
+      formatter: (r, c, v, col, item) => leafPop(item, item.pmhNote, `data-cell-pop="plan-pmhNote" data-line-id="${esc(item.lineId)}"`) },
+    { id: 'technicianName', field: 'technicianName', name: 'Kỹ thuật viên', width: 140, sortable: true, cssClass: 'sg-col-editable', headerCssClass: 'sg-col-editable', columnGroup: 'Thực hiện',
+      formatter: assignTechFmt },
+    { id: 'scheduleDateText', field: 'scheduleDateText', name: 'Ngày thực hiện', width: 120, sortable: true, cssClass: 'sg-col-editable c', headerCssClass: 'sg-col-editable', columnGroup: 'Thực hiện',
+      formatter: assignDateFmt },
     { id: 'baseLabel', field: 'baseLabel', name: 'BASE', width: 110, formatter: baseFmt, sortable: true, denyPaste: true, columnGroup: 'BASE' },
-    { id: '_act', field: 'act', name: '', width: 96, minWidth: 88, sortable: false, denyPaste: true, columnGroup: ' ', formatter: (row, cell, val, col, item) =>
-      `<div class="flex h-full items-center justify-center gap-1 px-1">
+    { id: '_act', field: 'act', name: '', width: 168, minWidth: 140, sortable: false, denyPaste: true, columnGroup: ' ', formatter: (row, cell, val, col, item) => {
+      if (item.__vehGroup) {
+        return `<div class="flex h-full items-center justify-center gap-1 px-1 flex-wrap">
+          <button type="button" class="btn btn-outline btn-xs whitespace-nowrap" data-plan-sync-base-vehicle="${esc(item.vehicleId)}" title="Đồng bộ BASE cho kế hoạch xe này">${planTbIco('refresh')} BASE</button>
+          <button type="button" class="btn btn-primary btn-xs whitespace-nowrap" data-plan-schedule="${esc(item.key)}">Lên lịch</button>
+        </div>`;
+      }
+      return `<div class="flex h-full items-center justify-center gap-1 px-1">
         <button type="button" class="btn btn-primary btn-xs whitespace-nowrap" data-plan-schedule="${esc(item.key)}">Lên lịch</button>
-      </div>` },
+      </div>`;
+    } },
   ];
   if (!view.planGridColFilters) view.planGridColFilters = {};
-  let filtered = rows.slice();
   const options = {
     enableCellNavigation: true,
     enableColumnReorder: true,
@@ -67754,17 +68290,68 @@ function mountPlanSlickGrid() {
     selectedCellCssClass: 'order-grid-cell-selected',
     sanitizer: (dirty) => dirty,
   };
-  const data = {
-    getLength: () => filtered.length,
-    getItem: (i) => filtered[i],
-    getItemMetadata: (i) => {
-      const item = filtered[i];
-      return (view.planPanelOpen && item && item.key === view.selectedPlanGroupKey) ? { cssClasses: 'plan-row-sel' } : null;
-    },
+  const useDataView = typeof Slick !== 'undefined' && Slick.Data && typeof Slick.Data.DataView === 'function';
+  const itemsById = {};
+  rows.forEach(r => { if (r && r.id != null) itemsById[String(r.id)] = r; });
+  window._planItemsById = itemsById;
+  let filterCtx = { keepVids: new Set(rows.filter(r => !r.__vehGroup).map(r => String(r.vehicleId))), leafMatch: () => true };
+  const planTreeFilter = (item) => {
+    if (!item) return false;
+    if (item.__vehGroup) {
+      return filterCtx.keepVids.has(String(item.vehicleId));
+    }
+    if (!filterCtx.leafMatch(item)) return false;
+    /* Ẩn hạng mục khi nhóm xe đang thu gọn */
+    const g = itemsById[planVehGroupId(item.vehicleId)]
+      || (window._planItemsById && window._planItemsById[planVehGroupId(item.vehicleId)]);
+    if (g && g._collapsed) return false;
+    return true;
   };
+  let dataView = null;
   let grid;
   try {
-    grid = new Slick.Grid(host, data, cols, options);
+    if (useDataView) {
+      dataView = new Slick.Data.DataView({ inlineFilters: true });
+      dataView.getItemMetadata = (i) => {
+        const item = dataView.getItem(i);
+        if (!item) return null;
+        let css = '';
+        if (item.__vehGroup) css += ' plan-vehicle-group-row';
+        if (view.planPanelOpen && item.key === view.selectedPlanGroupKey) css += ' plan-row-sel';
+        return css ? { cssClasses: css.trim() } : null;
+      };
+      dataView.beginUpdate();
+      dataView.setItems(rows);
+      dataView.setFilter(planTreeFilter);
+      dataView.endUpdate();
+      window._planDataView = dataView;
+      grid = new Slick.Grid(host, dataView, cols, options);
+      dataView.onRowCountChanged.subscribe(() => {
+        try { grid.updateRowCount(); grid.render(); } catch (e) {}
+      });
+      dataView.onRowsChanged.subscribe((_e, args) => {
+        try {
+          if (args && args.rows) grid.invalidateRows(args.rows);
+          grid.render();
+        } catch (e) {}
+      });
+    } else {
+      let filtered = rows.slice();
+      const data = {
+        getLength: () => filtered.length,
+        getItem: (i) => filtered[i],
+        getItemMetadata: (i) => {
+          const item = filtered[i];
+          if (!item) return null;
+          let css = '';
+          if (item.__vehGroup) css += ' plan-vehicle-group-row';
+          if (view.planPanelOpen && item.key === view.selectedPlanGroupKey) css += ' plan-row-sel';
+          return css ? { cssClasses: css.trim() } : null;
+        },
+      };
+      window._planFilteredRef = { get: () => filtered, set: (v) => { filtered = v; } };
+      grid = new Slick.Grid(host, data, cols, options);
+    }
   } catch (err) {
     console.warn('SlickGrid init failed', err);
     mountPlanGridFallback(host, rows);
@@ -67788,11 +68375,12 @@ function mountPlanSlickGrid() {
   const applyColFilters = () => {
     const f = view.planGridColFilters || {};
     const includes = (val, q) => !q || String(val || '').toLowerCase().includes(String(q).toLowerCase());
-    filtered = rows.filter(r => {
+    const leafMatch = (r) => {
+      if (r.__vehGroup) return false;
       if (f.year && String(r.year) !== String(f.year)) return false;
       if (f.month && String(r.month) !== String(f.month)) return false;
       const q = String(view.planPlateQ || '').trim().toLowerCase();
-      if (q && ![r.soXe, r.soMooc, r.ptId, r.plate, r.content].some(x => String(x || '').toLowerCase().includes(q))) return false;
+      if (q && ![r.soXe, r.soMooc, r.ptId, r.plate, r.content, r.technicianName].some(x => String(x || '').toLowerCase().includes(q))) return false;
       if (f.soXe && String(r.soXe || '') !== String(f.soXe)) return false;
       if (f.soMooc && String(r.soMooc || '') !== String(f.soMooc)) return false;
       if (f.applyTo && r.applyTo !== f.applyTo) return false;
@@ -67810,18 +68398,49 @@ function mountPlanSlickGrid() {
       if (!includes(r.thanhTienText, f.thanhTienText)) return false;
       if (!includes(r.totalText, f.totalText)) return false;
       if (!includes(r.pmhNote, f.pmhNote)) return false;
+      if (!includes(r.technicianName, f.technicianName)) return false;
+      if (!includes(r.scheduleDateText || r.scheduleDate, f.scheduleDateText)) return false;
       if (f.baseLabel && r.baseLabel !== f.baseLabel) return false;
       return true;
-    });
+    };
+    const matchedLeaves = rows.filter(leafMatch);
+    const keepVids = new Set(matchedLeaves.map(r => String(r.vehicleId)));
+    filterCtx = { keepVids, leafMatch };
     const sortState = view.planGridSort;
+    let ordered = rows;
     if (sortState && sortState.field) {
-      filtered.sort((a, b) => planGridCompareRows(a, b, sortState.field, sortState.asc !== false));
+      const headers = rows.filter(r => r.__vehGroup && keepVids.has(String(r.vehicleId)));
+      const rebuilt = [];
+      headers.forEach(h => {
+        rebuilt.push(h);
+        const kids = rows
+          .filter(r => !r.__vehGroup && String(r.vehicleId) === String(h.vehicleId) && leafMatch(r))
+          .sort((a, b) => planGridCompareRows(a, b, sortState.field, sortState.asc !== false));
+        rebuilt.push(...kids);
+        /* giữ sibling không match để tree id ổn — filter sẽ ẩn */
+        rows.filter(r => !r.__vehGroup && String(r.vehicleId) === String(h.vehicleId) && !leafMatch(r)).forEach(r => rebuilt.push(r));
+      });
+      rows.filter(r => r.__vehGroup && !keepVids.has(String(r.vehicleId))).forEach(h => {
+        rebuilt.push(h);
+        rows.filter(r => !r.__vehGroup && String(r.vehicleId) === String(h.vehicleId)).forEach(r => rebuilt.push(r));
+      });
+      ordered = rebuilt;
     }
-    window._planGridData = filtered;
-    try { grid.invalidate(); grid.render(); } catch (e) {}
+    if (dataView) {
+      dataView.beginUpdate();
+      dataView.setItems(ordered);
+      dataView.setFilter(planTreeFilter);
+      dataView.endUpdate();
+      syncPlanGridVisibleData(dataView);
+    } else {
+      const filtered = ordered.filter(planTreeFilter);
+      if (window._planFilteredRef) window._planFilteredRef.set(filtered);
+      window._planGridData = filtered;
+      try { grid.invalidate(); grid.render(); } catch (e) {}
+    }
     refreshPlanGridChecks();
     const visEl = document.querySelector('[data-plan-vis-count]');
-    if (visEl) visEl.textContent = String(filtered.length);
+    if (visEl) visEl.textContent = String((window._planGridData || []).filter(r => !r.__vehGroup).length);
   };
   window._planApplyColFilters = applyColFilters;
   applyColFilters();
@@ -67872,7 +68491,7 @@ function mountPlanSlickGrid() {
       });
     });
   }
-  const uniq = (field) => [...new Set(rows.map(r => r[field]).filter(v => v != null && String(v).trim() !== ''))].sort((a, b) => String(a).localeCompare(String(b), 'vi'));
+  const uniq = (field) => [...new Set(rows.filter(r => !r.__vehGroup).map(r => r[field]).filter(v => v != null && String(v).trim() !== '' && v !== '—'))].sort((a, b) => String(a).localeCompare(String(b), 'vi'));
   const selectFields = { year: true, month: true, soXe: true, soMooc: true, applyTo: true, ptId: true, dichVu: true, phanLoai: true, system: true, uom: true, baseLabel: true };
   const skipFilterCols = { _ck: 1, _idx: 1, _act: 1 };
   const vehicleGridMode = host.getAttribute('data-plan-grid') === 'vehicle' || !!view.planVehicleScoped;
@@ -67985,36 +68604,87 @@ function mountPlanSlickGrid() {
       all.setAttribute('aria-label', 'Chọn tất cả');
       all.addEventListener('click', (e) => {
         e.stopPropagation();
-        setAllPlanGroupsChecked(all.checked, window._planGridData || filtered);
+        setAllPlanGroupsChecked(all.checked, window._planGridData || rows);
         refreshPlanGridChecks();
       });
       ckHeader.appendChild(all);
     }
     const all = document.getElementById('planGridCheckAll');
     if (all) {
-      const vis = window._planGridData || filtered || rows;
+      const vis = (window._planGridData || rows).filter(r => !r.__vehGroup);
       all.checked = vis.length > 0 && vis.every(r => isPlanLineChecked(planLineIdOfRow(r)));
       all.indeterminate = !all.checked && vis.some(r => isPlanLineChecked(planLineIdOfRow(r)));
     }
   };
   bindHeaderCheck();
+  const planItemAt = (rowIdx) => {
+    if (dataView && typeof dataView.getItem === 'function') return dataView.getItem(rowIdx);
+    if (window._planFilteredRef) return window._planFilteredRef.get()[rowIdx];
+    return (window._planGridData || rows)[rowIdx];
+  };
+  /* Chỉ bắt 1 lần / gesture — trước đây pointerdown+click+onClick gọi toggle 2–3 lần nên mở rồi đóng ngay */
+  if (host._planTreeToggleBound) {
+    host.removeEventListener('click', host._planTreeToggleBound, true);
+    host.removeEventListener('pointerdown', host._planTreeToggleBound, true);
+  }
+  host._planTreeToggleAt = 0;
+  host._planTreeToggleBound = (ev) => {
+    const t = ev.target;
+    const toggleEl = t && t.closest && t.closest('[data-plan-tree-toggle], .slick-group-toggle, [data-plan-group-toggle-row]');
+    if (!toggleEl) return;
+    /* không chặn khi bấm link biển số / checkbox trong cùng hàng */
+    if (t.closest && (t.closest('[data-open-vehicle]') || t.closest('input.pg-row, input[type="checkbox"]'))) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    if (typeof ev.stopImmediatePropagation === 'function') ev.stopImmediatePropagation();
+    const now = Date.now();
+    if (now - (host._planTreeToggleAt || 0) < 350) return;
+    host._planTreeToggleAt = now;
+    const vid = toggleEl.getAttribute('data-vehicle-id');
+    if (vid) togglePlanVehicleGroupCollapse(vid);
+    else {
+      const cell = grid.getCellFromEvent && grid.getCellFromEvent(ev);
+      const item = cell && cell.row != null ? planItemAt(cell.row) : null;
+      if (item) togglePlanVehicleGroupCollapse(item);
+    }
+  };
+  host.addEventListener('click', host._planTreeToggleBound, true);
+
   grid.onClick.subscribe((e, args) => {
-    const item = filtered[args.row];
+    const item = planItemAt(args.row);
     if (!item) return;
     const native = (e && e.getNativeEvent && e.getNativeEvent()) || e;
     const t = native.target || e.target;
+    const toggleEl = t && t.closest && t.closest('[data-plan-tree-toggle], .slick-group-toggle, [data-plan-group-toggle-row]');
+    if (toggleEl) {
+      if (native.stopImmediatePropagation) native.stopImmediatePropagation();
+      if (native.stopPropagation) native.stopPropagation();
+      if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
+      return;
+    }
     if (t && t.closest && t.closest('.sg-cell-edit-btn, [data-cell-pop]')) {
       if (native.stopPropagation) native.stopPropagation();
       return;
     }
     if (t && t.classList && (t.classList.contains('pg-row') || t.classList.contains('order-grid-row-checkbox'))) {
       if (native.stopPropagation) native.stopPropagation();
-      if (planSelectMode() === 'VEHICLE') {
-        setPlanVehicleChecked(item.vehicleId, t.checked, filtered);
+      const visible = window._planGridData || rows;
+      if (item.__vehGroup || planSelectMode() === 'VEHICLE' || t.classList.contains('pg-veh-group')) {
+        setPlanVehicleChecked(item.vehicleId, t.checked, visible);
       } else {
         setPlanLineChecked(planLineIdOfRow(item), t.checked);
       }
       refreshPlanGridChecks();
+      return;
+    }
+    const syncVehBtn = t && t.closest && t.closest('[data-plan-sync-base-vehicle]');
+    if (syncVehBtn) {
+      if (native.stopPropagation) native.stopPropagation();
+      const vid = syncVehBtn.getAttribute('data-plan-sync-base-vehicle');
+      const ids = (item.__vehGroup && item.lineIds)
+        ? item.lineIds
+        : rows.filter(r => !r.__vehGroup && String(r.vehicleId) === String(vid)).map(r => r.lineId);
+      syncPlansFromBase(ids);
       return;
     }
     const scheduleBtn = t && t.closest && t.closest('[data-plan-schedule]');
@@ -68027,12 +68697,22 @@ function mountPlanSlickGrid() {
     if (veh) {
       view = { ...view, name: 'vehicle', vehicleId: Number(veh.dataset.openVehicle), vehicleTab: 'catalog', from: menuPlansNav(), filters: defaultFilters(), page: 1 };
       render();
+      return;
+    }
+    /* Click hàng group (ngoài checkbox/link): thu-mở — panel mở bằng double-click */
+    if (item.__vehGroup) {
+      togglePlanVehicleGroupCollapse(item);
+      return;
     }
   });
   if (grid.onDblClick) {
     grid.onDblClick.subscribe((_e, args) => {
-      const item = filtered[args.row];
+      const item = planItemAt(args.row);
       if (!item) return;
+      if (item.__vehGroup) {
+        openPlanPanel(item.key);
+        return;
+      }
       if (openPlanCellAutocomplete(grid, args.row, args.cell)) return;
       openPlanPanel(item.key);
     });
@@ -68041,7 +68721,7 @@ function mountPlanSlickGrid() {
     e.preventDefault();
     const cell = grid.getCellFromEvent && grid.getCellFromEvent(e);
     if (!cell || cell.row == null) return;
-    showPlanCtx(e, filtered[cell.row]);
+    showPlanCtx(e, planItemAt(cell.row));
   });
   const fitPlanGridWidth = () => {
     try {
@@ -68162,6 +68842,26 @@ function bindPlanGridToolbar() {
     toast('Đã tải lại lưới kế hoạch');
     render();
   });
+  const setAllPlanGroupsCollapsed = (collapsed) => {
+    const map = view.planCollapsedByVehicle || (view.planCollapsedByVehicle = {});
+    const items = window._planItemsById || {};
+    let n = 0;
+    Object.keys(items).forEach((id) => {
+      const it = items[id];
+      if (!it || !it.__vehGroup) return;
+      it._collapsed = !!collapsed;
+      if (collapsed) map[String(it.vehicleId)] = true;
+      else delete map[String(it.vehicleId)];
+      n++;
+    });
+    if (typeof window._planApplyColFilters === 'function') window._planApplyColFilters();
+    else refreshPlanGridChecks();
+    toast(collapsed
+      ? ('Đã thu gọn ' + n + ' nhóm xe')
+      : ('Đã mở rộng ' + n + ' nhóm xe'));
+  };
+  $('#btnPlanExpandAll')?.addEventListener('click', () => setAllPlanGroupsCollapsed(false));
+  $('#btnPlanCollapseAll')?.addEventListener('click', () => setAllPlanGroupsCollapsed(true));
   bindPlanFreezeMenu();
   $('#btnPlanClearColFilters')?.addEventListener('click', () => {
     view.planGridColFilters = {};
@@ -74554,6 +75254,65 @@ function findAssessFailRowById(id) {
   const rows = (window._listGridPacks && window._listGridPacks.assessResults && window._listGridPacks.assessResults.rows) || [];
   return rows.find(r => String(r.id) === String(id)) || null;
 }
+function isAssessGroupCollapsed(groupKey) {
+  return !!(view.assessCollapsedByGroupKey || {})[String(groupKey)];
+}
+function setAssessGroupCollapsed(groupKey, collapsed) {
+  if (!view.assessCollapsedByGroupKey) view.assessCollapsedByGroupKey = {};
+  const k = String(groupKey);
+  if (collapsed) view.assessCollapsedByGroupKey[k] = true;
+  else delete view.assessCollapsedByGroupKey[k];
+}
+function assessGroupToggleHtml(item) {
+  if (!item || !item.__group) return '';
+  const collapsed = !!item._collapsed;
+  const cls = collapsed ? 'slick-group-toggle collapsed' : 'slick-group-toggle expanded';
+  const glyph = collapsed ? '▸' : '▾';
+  const title = collapsed ? 'Mở rộng nhóm' : 'Thu gọn nhóm';
+  return `<span class="${cls}" data-assess-tree-toggle="1" data-assess-group-key="${esc(item.groupKey)}" title="${esc(title)}" role="button" tabindex="0" aria-label="${esc(title)}">${glyph}</span>`;
+}
+function assessGroupTitleCellHtml(item) {
+  if (!item || !item.__group) return '';
+  const title = item.groupTitle || item.itemLabel || item.plate || '';
+  return `<span class="plan-group-title-cell" data-assess-group-toggle-row="1" data-assess-group-key="${esc(item.groupKey)}">${assessGroupToggleHtml(item)}<span class="plan-group-title-text" title="${esc(title)}">${esc(title)}</span></span>`;
+}
+function toggleAssessGroupCollapse(groupKeyOrItem) {
+  let groupKey = groupKeyOrItem;
+  let item = null;
+  if (groupKeyOrItem && typeof groupKeyOrItem === 'object') {
+    item = groupKeyOrItem.__group ? groupKeyOrItem : findAssessFailRowById('g-' + groupKeyOrItem.groupKey);
+    groupKey = item?.groupKey || groupKeyOrItem.groupKey;
+  }
+  if (groupKey == null || groupKey === '') return false;
+  const next = !isAssessGroupCollapsed(groupKey);
+  setAssessGroupCollapsed(groupKey, next);
+  const packRows = window._listGridPacks?.assessResults?.rows || [];
+  const allRows = window._listGridAllRows?.assessResults || packRows;
+  [packRows, allRows].forEach((list) => {
+    (list || []).forEach((r) => {
+      if (r && r.__group && String(r.groupKey) === String(groupKey)) r._collapsed = next;
+    });
+  });
+  if (typeof window._listApplyColFilters?.assessResults === 'function') {
+    window._listApplyColFilters.assessResults();
+  } else {
+    const grid = window._listGrids?.assessResults;
+    try { grid && grid.invalidate(); grid && grid.render(); } catch (_) {}
+  }
+  return true;
+}
+function setAllAssessGroupsCollapsed(collapsed) {
+  const rows = window._listGridPacks?.assessResults?.rows || window._listGridAllRows?.assessResults || [];
+  let n = 0;
+  rows.forEach((r) => {
+    if (!r || !r.__group) return;
+    r._collapsed = !!collapsed;
+    setAssessGroupCollapsed(r.groupKey, !!collapsed);
+    n++;
+  });
+  if (typeof window._listApplyColFilters?.assessResults === 'function') window._listApplyColFilters.assessResults();
+  toast(collapsed ? ('Đã thu gọn ' + n + ' nhóm ĐG') : ('Đã mở rộng ' + n + ' nhóm ĐG'));
+}
 function assessSelectableFailRows(rows) {
   return (rows || []).filter(r => r && !r.__group && !r.isEmpty && r.itemId && r.evalStatus === 'SUBMITTED' && !r.periodExempt);
 }
@@ -74725,6 +75484,8 @@ function bindAssessFailToolbar() {
     if (grid) { try { grid.invalidate(); grid.render(); } catch (_) {} }
     refreshAssessFailChecks();
   });
+  $('#btnAssessExpandAll')?.addEventListener('click', () => setAllAssessGroupsCollapsed(false));
+  $('#btnAssessCollapseAll')?.addEventListener('click', () => setAllAssessGroupsCollapsed(true));
 }
 function assessFailDetailLinesHtml(fail) {
   const d = fail?.detail || {};
@@ -75073,6 +75834,7 @@ function buildAssessResultsGridRows(evals) {
       itemNote: '',
       assessKindLabel: '',
       act: 'group',
+      _collapsed: isAssessGroupCollapsed(groupKey),
     });
     if (!fails.length) {
       const emptyLabel = ev.periodExempt
@@ -75135,9 +75897,7 @@ function registerAssessResultsGrid(evals) {
     { id: '_ck', field: 'checked', name: '', width: 36, minWidth: 36, maxWidth: 40, cssClass: 'c', sortable: false, filterable: false, resizable: false, formatter: checkFmt },
     { id: 'itemLabel', field: 'itemLabel', name: 'Hạng mục lỗi', width: 260, minWidth: 180, sortable: true,
       formatter: (r, c, v, col, item) => {
-        if (item.__group) {
-          return `<span title="${esc(item.groupTitle || '')}">▾ ${esc(item.groupTitle || item.plate || '')}</span>`;
-        }
+        if (item.__group) return assessGroupTitleCellHtml(item);
         if (item.isEmpty) return `<span class="text-slate-500">${esc(item.itemLabel || '—')}</span>`;
         const cls = item.assessKind === 'replace' ? 'assess-fail-item-chip is-replace' : 'assess-fail-item-chip';
         const note = item.itemNote
@@ -75266,7 +76026,10 @@ function renderAssessmentResultsPanel() {
               ${planTbIco('x')} Bỏ chọn
             </button>
             <span class="plan-tb-divider"></span>
-            <span class="text-xs text-slate-500 hidden md:inline">Bấm dòng xám xem panel · chuột phải thao tác · tick hạng mục → tạo phiếu SC</span>
+            <button type="button" class="plan-tb-btn" id="btnAssessExpandAll" title="Mở rộng tất cả nhóm ĐG">Mở nhóm</button>
+            <button type="button" class="plan-tb-btn" id="btnAssessCollapseAll" title="Thu gọn tất cả nhóm ĐG">Thu nhóm</button>
+            <span class="plan-tb-divider"></span>
+            <span class="text-xs text-slate-500 hidden md:inline">▾/▸ thu nhóm · bấm dòng xám xem panel · chuột phải thao tác</span>
           </div>
           <div class="plan-grid-toolbar-right">
             <span data-assess-sel-count class="text-xs font-medium text-slate-600 tabular-nums">${nSel ? ('Đã chọn ' + nSel + ' hạng mục') : ''}</span>

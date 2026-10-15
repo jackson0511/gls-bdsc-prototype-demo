@@ -39,10 +39,32 @@
     }
     .nav-item.active .nav-ord { background: rgba(37,99,235,.45); color: #dbeafe; }
     .tab-underline.active { border-color: #2563eb; color: #2563eb; }
-    .th { white-space: nowrap; padding: .75rem .75rem; font-weight: 500; }
-    .td { white-space: nowrap; padding: .75rem .75rem; }
-    .row-h { border-top: 1px solid #f1f5f9; transition: background .15s; }
+    /* Bảng HTML: viền ô rõ để dễ đọc */
+    table.min-w-full,
+    table.grid-bordered {
+      border-collapse: collapse;
+      border: 1px solid #cbd5e1;
+    }
+    .th, .td,
+    table.min-w-full > thead > tr > th,
+    table.min-w-full > tbody > tr > td,
+    table.min-w-full > tbody > tr > th {
+      white-space: nowrap;
+      padding: .65rem .75rem;
+      border: 1px solid #e2e8f0;
+      vertical-align: middle;
+    }
+    .th,
+    table.min-w-full > thead > tr > th {
+      font-weight: 600;
+      background: #f8fafc;
+      color: #475569;
+    }
+    .td { font-weight: 400; }
+    .row-h { transition: background .15s; }
     .row-h:hover { background: #f8fafc; }
+    .row-h:hover > .td,
+    .row-h:hover > td { background: #f8fafc; }
     :root {
       --slick-font-family: Inter, system-ui, sans-serif;
       --slick-header-input-height: 28px;
@@ -428,6 +450,16 @@
     .slick-cell.r { text-align: right; }
     .slick-cell.fw6 { font-weight: 600; }
     .slick-cell.c { text-align: center; }
+    #plan-grid-container .slick-header-column,
+    #plan-grid-container .slick-headerrow-column,
+    #plan-grid-container .slick-cell {
+      border-right: 1px solid #e2e8f0 !important;
+      border-bottom: 1px solid #e2e8f0 !important;
+    }
+    #plan-grid-container .slick-header-columns,
+    #plan-grid-container .slick-headerrow-columns {
+      border-bottom: 1px solid #cbd5e1;
+    }
     .slick-row.plan-row-sel .slick-cell { background: #eff6ff !important; }
     .slick-link { color: #2563eb; font-weight: 500; background: none; border: 0; padding: 0; cursor: pointer; font-family: inherit; }
     .slick-link:hover { text-decoration: underline; }
@@ -489,9 +521,9 @@
     .plan-freeze-menu .plan-freeze-hint {
       padding: 6px 10px 4px; font-size: 11px; color: #94a3b8; line-height: 1.35;
     }
-    .plan-fallback { width: 100%; height: 100%; overflow: auto; border-collapse: collapse; font-size: 13px; }
-    .plan-fallback th { position: sticky; top: 0; background: #f8fafc; color: #475569; font-size: 12px; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
-    .plan-fallback td { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
+    .plan-fallback { width: 100%; height: 100%; overflow: auto; border-collapse: collapse; font-size: 13px; border: 1px solid #cbd5e1; }
+    .plan-fallback th { position: sticky; top: 0; background: #f8fafc; color: #475569; font-size: 12px; font-weight: 600; padding: 8px 10px; border: 1px solid #e2e8f0; text-align: left; z-index: 1; }
+    .plan-fallback td { padding: 6px 10px; border: 1px solid #e2e8f0; white-space: nowrap; }
     .plan-fallback tr:hover td { background: #f8fafc; }
     .plan-fallback tr.is-on td { background: #eff6ff; }
     @media (max-width: 1023px) {
@@ -818,7 +850,7 @@
         <div class="nav-section mb-1 mt-4 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Khác</div>
         <span class="nav-item disabled mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" title="Kế hoạch xe - tài xế hàng ngày"><span class="nav-ico">KX</span><span class="nav-label">Kế hoạch xe - tài xế hàng ngày</span></span>
         <span class="nav-item disabled mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" title="Đánh giá phương tiện trước chuyến"><span class="nav-ico">TC</span><span class="nav-label">Đánh giá phương tiện trước chuyến</span></span>
-        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="tireBattery" title="Vỏ lốp / ắc quy"><span class="nav-ico">VL</span><span class="nav-label">Vỏ lốp / ắc quy</span><span class="nav-badge ml-auto text-[9px] text-sky-400">v2</span></a>
+        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="tireBattery" title="Vỏ lốp / ắc quy"><span class="nav-ico">VL</span><span class="nav-label">Vỏ lốp / ắc quy</span></a>
       </nav>
       <div class="sidebar-foot border-t border-slate-800 px-4 py-3 text-[11px] text-slate-500">
         Mẫu từ Excel khách: GLSPWMS + Dự toán SC HCM<br/>Bấm «Làm mới dữ liệu mẫu» để tải lại seed v25
@@ -64423,11 +64455,124 @@ function orderHasWorkKind(o, kind) {
   return true;
 }
 function orderWorkKindBadges(o) {
+  const pk = orderPrimaryKind(o);
+  if (pk === 'MAINT') return '<span class="chip bg-blue-100 text-blue-800">Bảo dưỡng</span>';
+  if (pk === 'REPAIR') return '<span class="chip bg-orange-100 text-orange-800">Sửa chữa</span>';
   const { nM, nR } = orderWorkKindCounts(o);
   const bits = [];
   if (nM) bits.push(`<span class="chip bg-blue-100 text-blue-800">${nM} BD</span>`);
   if (nR) bits.push(`<span class="chip bg-orange-100 text-orange-800">${nR} SC</span>`);
   return bits.join(' ') || '<span class="text-slate-400">—</span>';
+}
+/** Phiếu BD hoặc SC — không trộn hai loại trên cùng phiếu. */
+function orderPrimaryKind(o) {
+  if (!o) return 'REPAIR';
+  if (o.primaryKind === 'MAINT' || o.primaryKind === 'REPAIR') return o.primaryKind;
+  if (o.type === 'PERIODIC') return 'MAINT';
+  if (o.type === 'INCIDENTAL') return 'REPAIR';
+  if (o.source === 'DRIVER_REQUEST' || o.source === 'FROM_MAINT') return 'REPAIR';
+  if (o.source === 'PLAN' || o.catalogId) return 'MAINT';
+  const c = orderWorkKindCounts(o);
+  if (c.nM && !c.nR) return 'MAINT';
+  if (c.nR && !c.nM) return 'REPAIR';
+  return 'REPAIR';
+}
+function linkedRepairOrdersOf(maintOrder) {
+  if (!maintOrder) return [];
+  const ids = new Set((maintOrder.linkedRepairOrderIds || []).map(String));
+  if (maintOrder.linkedRepairOrderId) ids.add(String(maintOrder.linkedRepairOrderId));
+  return (DB.orders || []).filter(o =>
+    ids.has(String(o.id)) || String(o.linkedFromOrderId) === String(maintOrder.id)
+  );
+}
+function linkedMaintOrderOf(repairOrder) {
+  if (!repairOrder?.linkedFromOrderId) return null;
+  return (DB.orders || []).find(o => String(o.id) === String(repairOrder.linkedFromOrderId)) || null;
+}
+/** Tạo phiếu SC nháp liên kết từ phiếu BD (chuyển hạng mục SC lẫn trên phiếu BD sang phiếu mới nếu có). */
+function createLinkedRepairOrderFromMaint(maintOrderId) {
+  const src = DB.orders.find(x => String(x.id) === String(maintOrderId));
+  if (!src) { toast('Không tìm thấy phiếu'); return null; }
+  ensureOrderApproval(src);
+  if (orderPrimaryKind(src) !== 'MAINT') {
+    toast('Chỉ tạo phiếu sửa chữa liên kết từ phiếu bảo dưỡng');
+    return null;
+  }
+  const existing = linkedRepairOrdersOf(src)[0];
+  if (existing) {
+    toast('Đã có phiếu SC liên kết ' + existing.code);
+    view = { ...view, name: 'order', orderId: existing.id, from: view.from || 'order' };
+    render();
+    return existing;
+  }
+  const v = vehicleById(src.vehicleId);
+  const today = typeof todayDateKey === 'function' ? todayDateKey() : new Date().toISOString().slice(0, 10);
+  const moved = [];
+  const kept = [];
+  (src.workItems || []).forEach(w => {
+    ensureWorkItemKind(w, src);
+    if (w.kind === 'REPAIR') moved.push({ ...w, kind: 'REPAIR', id: w.id || uid('wi') });
+    else {
+      w.kind = 'MAINT';
+      kept.push(w);
+    }
+  });
+  src.workItems = kept;
+  src.primaryKind = 'MAINT';
+  if (src.type === 'WORK' || !src.type) src.type = 'PERIODIC';
+  const id = uid('o');
+  const code = 'RO-2026-' + (1000 + Math.floor(Math.random() * 900));
+  const neu = {
+    id,
+    code,
+    vehicleId: Number(src.vehicleId),
+    trailerId: src.trailerId != null ? Number(src.trailerId) : null,
+    trailerPlate: src.trailerPlate || '',
+    type: 'INCIDENTAL',
+    primaryKind: 'REPAIR',
+    linkedFromOrderId: src.id,
+    linkedFromOrderCode: src.code,
+    occurrence: ordersOf(src.vehicleId).length + 1,
+    date: src.date || today,
+    km: src.km != null ? src.km : (v?.km || 0),
+    garage: src.garage || v?.garage || '',
+    source: 'FROM_MAINT',
+    system: src.system || '—',
+    status: 'NOT_STARTED',
+    approvalStatus: 'DRAFT',
+    revision: 0,
+    cost: 0,
+    catalogId: null,
+    content: 'Sửa chữa liên kết từ phiếu BD ' + src.code,
+    technicianName: src.technicianName || '',
+    createdAt: today,
+    materials: [],
+    purchaseMaterials: [],
+    images: [],
+    workItems: moved,
+    approvalLog: [{
+      at: nowStamp(),
+      action: 'CREATE',
+      by: 'Nguyễn Văn Kỹ thuật',
+      note: 'Tạo từ phiếu BD ' + src.code + (moved.length ? ' · chuyển ' + moved.length + ' hạng mục SC' : ''),
+    }],
+  };
+  ensureOrderApproval(neu);
+  src.linkedRepairOrderIds = [...new Set([...(src.linkedRepairOrderIds || []).map(String), String(id)])];
+  src.linkedRepairOrderId = id;
+  if (!Array.isArray(src.approvalLog)) src.approvalLog = [];
+  src.approvalLog.push({
+    at: nowStamp(),
+    action: 'LINK_REPAIR',
+    by: 'Nguyễn Văn Kỹ thuật',
+    note: 'Tạo phiếu SC liên kết ' + code,
+  });
+  DB.orders.unshift(neu);
+  if (typeof save === 'function') save();
+  toast('Đã tạo phiếu SC ' + code + ' · liên kết ' + src.code);
+  view = { ...view, name: 'order', orderId: id, from: view.from || 'order' };
+  render();
+  return neu;
 }
 function parsePlanGroupKey(key) {
   const s = String(key || '');
@@ -69397,74 +69542,247 @@ function pageVehicleHistory() {
 }
 
 /* ----- ORDER DETAIL ----- */
-function orderWorkItemsKindTable(o, kind, showWiActionCol, canCompleteWi) {
-  const isMaint = kind === 'MAINT';
+function orderWorkItemRowHtml(o, w, idx, showWiActionCol, canCompleteWi) {
+  ensureWorkItemFields(w, o);
+  const pk = orderPrimaryKind(o);
+  const kindCell = planWorkKindChip(pk);
+  const wiDone = !!w.completedAt;
+  const wiStarted = !!w.startedAt && !wiDone;
+  const wiStatus = wiDone
+    ? '<span class="badge bg-emerald-50 text-emerald-800">Đã HT</span>'
+    : wiStarted
+      ? '<span class="badge bg-sky-50 text-sky-800">Đang làm</span>'
+      : '<span class="badge bg-slate-100 text-slate-600">Chưa bắt đầu</span>';
+  const hoursCell = wiDone && w.hours != null
+    ? `<span class="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800">TT ${Number(w.hours).toFixed(1)} / barem ${w.standardHours != null ? Number(w.standardHours).toFixed(1) : '—'}</span>`
+    : wiStarted
+      ? `<span class="text-[11px] text-sky-700">Từ ${fmtStampVi(w.startedAt)}</span>`
+      : (w.hours != null ? Number(w.hours).toFixed(1) : '—');
+  let wiActions = '';
+  if (canEditOrderDetail(o)) {
+    wiActions = `<button type="button" data-edit-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs mr-1">Sửa</button>
+    <button type="button" data-del-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs text-rose-700 !border-rose-300">Xóa</button>`;
+  } else if (canCompleteWi) {
+    if (wiDone) wiActions = `<span class="text-emerald-600 font-semibold">✓</span> <span class="text-[10px] text-slate-500">${fmtStampVi(w.completedAt)}</span>`;
+    else if (!w.startedAt) wiActions = `<button type="button" data-start-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs !border-sky-400 !bg-sky-50 text-sky-900">Bắt đầu</button>`;
+    else wiActions = `<button type="button" data-complete-work-item="${o.id}:${idx}" class="btn btn-emerald btn-xs">Hoàn thành</button>`;
+  }
+  return `<tr class="row-h border-b border-slate-100">
+    <td class="td">${esc(w.system)}</td>
+    <td class="td whitespace-nowrap">${kindCell}</td>
+    <td class="td">${esc(w.service || '—')}</td>
+    <td class="td">${esc(w.content)}</td>
+    <td class="td">${esc(w.performer)}</td>
+    <td class="td text-center">${wiStatus}</td>
+    <td class="td text-right tabular-nums text-slate-500">${w.standardHours != null ? Number(w.standardHours).toFixed(1) : '—'}</td>
+    <td class="td text-right tabular-nums font-medium">${hoursCell}</td>
+    ${showWiActionCol ? `<td class="td text-center whitespace-nowrap">${wiActions}</td>` : ''}
+  </tr>`;
+}
+/** Bảng hạng mục theo loại phiếu (BD hoặc SC — không trộn). */
+function orderPlannedWorkItemsTable(o, showWiActionCol, canCompleteWi) {
+  const colN = showWiActionCol ? 9 : 8;
+  const editable = canEditOrderDetail(o);
+  const pk = orderPrimaryKind(o);
+  const isMaint = pk === 'MAINT';
+  // Chỉ hiện hạng mục đúng loại phiếu; hạng mục SC lẫn trên phiếu BD sẽ chuyển khi bấm «Tạo phiếu SC liên kết»
   const rows = (o.workItems || []).map((w, idx) => {
     ensureWorkItemFields(w, o);
     return { w, idx };
-  }).filter(({ w }) => isMaint ? w.kind === 'MAINT' : w.kind !== 'MAINT');
-  const title = isMaint ? 'Khu vực 1 · Bảo dưỡng định kỳ' : 'Khu vực 2 · Sửa chữa phát sinh';
-  const empty = isMaint ? 'Chưa có hạng mục bảo dưỡng — bấm «+ Hạng mục» và chọn Bảo dưỡng' : 'Chưa có hạng mục sửa chữa phát sinh — bấm «+ Hạng mục» và chọn Sửa chữa';
+  }).filter(({ w }) => (w.kind === 'MAINT') === isMaint);
+  const label = isMaint ? 'Hạng mục bảo dưỡng' : 'Hạng mục sửa chữa';
   const tone = isMaint ? 'text-blue-900' : 'text-orange-900';
-  const colN = showWiActionCol ? 9 : 8;
-  const body = rows.map(({ w, idx }) => {
-    const wiKind = w.kind === 'MAINT' ? 'MAINT' : 'REPAIR';
-    const kindCell = canEditOrderDetail(o)
-      ? `<label class="mr-2 inline-flex items-center gap-1 text-xs"><input type="radio" name="wi-kind-${esc(o.id)}-${idx}" class="!w-auto" data-set-wi-kind="${o.id}:${idx}:MAINT" ${wiKind==='MAINT'?'checked':''} /> BD</label>
-         <label class="inline-flex items-center gap-1 text-xs"><input type="radio" name="wi-kind-${esc(o.id)}-${idx}" class="!w-auto" data-set-wi-kind="${o.id}:${idx}:REPAIR" ${wiKind==='REPAIR'?'checked':''} /> SC</label>`
-      : planWorkKindChip(wiKind);
-    const wiDone = !!w.completedAt;
-    const wiStarted = !!w.startedAt && !wiDone;
-    const wiStatus = wiDone
-      ? '<span class="badge bg-emerald-50 text-emerald-800">Đã HT</span>'
-      : wiStarted
-        ? '<span class="badge bg-sky-50 text-sky-800">Đang làm</span>'
-        : '<span class="badge bg-slate-100 text-slate-600">Chưa bắt đầu</span>';
-    const hoursCell = wiDone && w.hours != null
-      ? `<span class="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-800">TT ${Number(w.hours).toFixed(1)} / barem ${w.standardHours != null ? Number(w.standardHours).toFixed(1) : '—'}</span>`
-      : wiStarted
-        ? `<span class="text-[11px] text-sky-700">Từ ${fmtStampVi(w.startedAt)}</span>`
-        : (w.hours != null ? Number(w.hours).toFixed(1) : '—');
-    let wiActions = '';
-    if (canEditOrderDetail(o)) {
-      wiActions = `<button type="button" data-edit-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs mr-1">Sửa</button>
-      <button type="button" data-del-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs text-rose-700 !border-rose-300">Xóa</button>`;
-    } else if (canCompleteWi) {
-      if (wiDone) wiActions = `<span class="text-emerald-600 font-semibold">✓</span> <span class="text-[10px] text-slate-500">${fmtStampVi(w.completedAt)}</span>`;
-      else if (!w.startedAt) wiActions = `<button type="button" data-start-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs !border-sky-400 !bg-sky-50 text-sky-900">Bắt đầu</button>`;
-      else wiActions = `<button type="button" data-complete-work-item="${o.id}:${idx}" class="btn btn-emerald btn-xs">Hoàn thành</button>`;
-    }
-    return `<tr class="row-h">
-      <td class="td">${esc(w.system)}</td>
-      <td class="td whitespace-nowrap">${kindCell}</td>
-      <td class="td">${esc(w.service || '—')}</td>
-      <td class="td">${esc(w.content)}</td>
-      <td class="td">${esc(w.performer)}</td>
-      <td class="td text-center">${wiStatus}</td>
-      <td class="td text-right tabular-nums text-slate-500">${w.standardHours != null ? Number(w.standardHours).toFixed(1) : '—'}</td>
-      <td class="td text-right tabular-nums font-medium">${hoursCell}</td>
-      ${showWiActionCol ? `<td class="td text-center whitespace-nowrap">${wiActions}</td>` : ''}
-    </tr>`;
-  }).join('') || `<tr><td colspan="${colN}" class="px-5 py-6 text-center text-slate-400">${empty}</td></tr>`;
-  return `<div>
-    <div class="mb-2 text-xs font-semibold uppercase tracking-wide ${tone}">${title} · ${rows.length}</div>
-    <div class="overflow-x-auto rounded-md border border-amber-100">
-      <table class="min-w-full text-sm">
-        <thead class="bg-amber-50/50 text-slate-600"><tr>
-          <th class="th text-left">Hệ thống</th>
-          <th class="th text-left">Phân loại</th>
-          <th class="th text-left">Loại DV</th>
-          <th class="th text-left">Nội dung</th>
-          <th class="th text-left">Người thực hiện</th>
-          <th class="th text-center">Trạng thái</th>
-          <th class="th text-right">Giờ barem</th>
-          <th class="th text-right">Giờ TT</th>
-          ${showWiActionCol ? '<th class="th text-center">Thao tác</th>' : ''}
-        </tr></thead>
-        <tbody>${body}</tbody>
-      </table>
-    </div>
+  const emptyMsg = isMaint
+    ? 'Chưa có hạng mục bảo dưỡng — bấm «+ Thêm dòng»'
+    : 'Chưa có hạng mục sửa chữa — bấm «+ Thêm dòng»';
+  const body = rows.length
+    ? rows.map(({ w, idx }) => orderWorkItemRowHtml(o, w, idx, showWiActionCol, canCompleteWi)).join('')
+    : `<tr><td colspan="${colN}" class="td px-5 py-5 text-center text-slate-400 text-sm">${emptyMsg}</td></tr>`;
+  const addFooter = editable
+    ? `<tr class="bg-amber-50/40">
+        <td colspan="${colN}" class="td py-2 text-center">
+          <button type="button" data-add-work-item-kind="${o.id}:${pk}" class="text-sm font-medium text-blue-700 hover:underline">+ Thêm dòng hạng mục ${isMaint ? 'bảo dưỡng' : 'sửa chữa'}</button>
+        </td>
+      </tr>`
+    : '';
+  return `<div class="overflow-x-auto rounded-md border border-slate-200 bg-white">
+    <table class="min-w-full border-collapse text-sm">
+      <thead class="bg-slate-100 text-slate-600">
+        <tr>
+          <th class="th text-left border-b border-slate-200">Hệ thống</th>
+          <th class="th text-left border-b border-slate-200">Phân loại</th>
+          <th class="th text-left border-b border-slate-200">Loại DV</th>
+          <th class="th text-left border-b border-slate-200">Nội dung</th>
+          <th class="th text-left border-b border-slate-200">Người thực hiện</th>
+          <th class="th text-center border-b border-slate-200">Trạng thái</th>
+          <th class="th text-right border-b border-slate-200">Giờ barem</th>
+          <th class="th text-right border-b border-slate-200">Giờ TT</th>
+          ${showWiActionCol ? '<th class="th text-center border-b border-slate-200">Thao tác</th>' : ''}
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="bg-slate-50/90 border-y border-slate-200">
+          <td colspan="${colN}" class="td py-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-xs font-semibold uppercase tracking-wide ${tone}">${label} · ${rows.length}</span>
+              ${editable ? `<button type="button" data-add-work-item-kind="${o.id}:${pk}" class="btn btn-outline btn-xs">+ Thêm dòng</button>` : ''}
+            </div>
+          </td>
+        </tr>
+        ${body}
+        ${addFooter}
+      </tbody>
+    </table>
   </div>`;
+}
+/** Bảng vật tư dự kiến + thêm dòng (inline draft hoặc mở form). */
+function orderPlannedMaterialsTable(o) {
+  const editable = canEditOrderDetail(o);
+  const mats = plannedMaterials(o);
+  const colN = editable ? 9 : 8;
+  const rows = mats.map((m, idx) => {
+    if (m._draft && editable) {
+      return `<tr class="row-h bg-amber-50/50 border-b border-amber-100" data-mat-draft-row="${o.id}:${idx}">
+        <td class="td"><span class="chip bg-amber-100 text-amber-900">Nháp</span></td>
+        <td class="td"><input type="text" class="form-control !py-1 !text-xs font-mono w-24" data-mat-draft-field="code" data-oid="${o.id}" data-idx="${idx}" placeholder="Mã" value="${esc(m.code || '')}" /></td>
+        <td class="td"><input type="text" class="form-control !py-1 !text-sm w-full min-w-[10rem]" data-mat-draft-field="name" data-oid="${o.id}" data-idx="${idx}" placeholder="Tên vật tư *" value="${esc(m.name || '')}" /></td>
+        <td class="td text-right"><input type="number" min="0" step="0.01" class="form-control !py-1 !text-sm w-20 text-right ml-auto" data-mat-draft-field="qty" data-oid="${o.id}" data-idx="${idx}" value="${m.qty ?? 1}" /></td>
+        <td class="td"><input type="text" class="form-control !py-1 !text-sm w-16" data-mat-draft-field="uom" data-oid="${o.id}" data-idx="${idx}" value="${esc(m.uom || 'Cái')}" /></td>
+        <td class="td text-right"><input type="number" min="0" class="form-control !py-1 !text-sm w-28 text-right ml-auto" data-mat-draft-field="price" data-oid="${o.id}" data-idx="${idx}" value="${m.price ?? 0}" /></td>
+        <td class="td text-right"><input type="number" min="0" step="0.1" class="form-control !py-1 !text-sm w-16 text-right ml-auto" data-mat-draft-field="vat" data-oid="${o.id}" data-idx="${idx}" value="${m.vat ?? 8}" /></td>
+        <td class="td"><input type="text" class="form-control !py-1 !text-xs w-full min-w-[8rem]" data-mat-draft-field="supplier" data-oid="${o.id}" data-idx="${idx}" placeholder="NCC / kho" value="${esc([m.supplier, m.warehouse].filter(Boolean).join(' · ') || '')}" /></td>
+        <td class="td text-center whitespace-nowrap">
+          <button type="button" data-save-mat-draft="${o.id}:${idx}" class="btn btn-primary btn-xs mr-1">Lưu dòng</button>
+          <button type="button" data-cancel-mat-draft="${o.id}:${idx}" class="btn btn-outline btn-xs text-rose-700 !border-rose-300">Hủy</button>
+        </td>
+      </tr>`;
+    }
+    return `<tr class="row-h border-b border-slate-100">
+      <td class="td">${materialSourceChip(m)}</td>
+      <td class="td font-mono text-xs">${m.code || '—'}</td>
+      <td class="td">${esc(m.name)}</td>
+      <td class="td text-right">${m.qty}</td>
+      <td class="td">${m.uom || '—'}</td>
+      <td class="td text-right tabular-nums font-medium">${money(m.price)}</td>
+      <td class="td text-right tabular-nums">${m.vat != null ? m.vat + '%' : '—'}</td>
+      <td class="td text-xs">${esc([m.supplier, m.warehouse].filter(Boolean).join(' · ') || '—')}${m.fulfillmentNote ? `<div class="text-[10px] text-slate-500">${esc(m.fulfillmentNote)}</div>` : ''}</td>
+      ${editable ? `<td class="td text-center whitespace-nowrap">
+        <button type="button" data-edit-material="${o.id}:${idx}" class="btn btn-outline btn-xs mr-1">Sửa</button>
+        <button type="button" data-del-material="${o.id}:${idx}" class="btn btn-outline btn-xs text-rose-700 !border-rose-300">Xóa</button>
+      </td>` : ''}
+    </tr>`;
+  }).join('');
+  const emptyOrBody = rows || `<tr><td colspan="${colN}" class="td px-5 py-5 text-center text-slate-400 text-sm">Chưa có vật tư dự kiến</td></tr>`;
+  const addFooter = editable
+    ? `<tr class="bg-amber-50/40">
+        <td colspan="${colN}" class="td py-2 text-center">
+          <button type="button" data-add-mat-row="${o.id}" class="text-sm font-medium text-blue-700 hover:underline">+ Thêm dòng vật tư</button>
+          <span class="mx-2 text-slate-300">·</span>
+          <button type="button" data-add-material="${o.id}" class="text-sm text-slate-600 hover:underline">Mở form đầy đủ (kho / autocomplete)</button>
+        </td>
+      </tr>`
+    : '';
+  return `<div class="overflow-x-auto rounded-md border border-slate-200 bg-white">
+    <table class="min-w-full border-collapse text-sm">
+      <thead class="bg-slate-100 text-slate-600">
+        <tr>
+          <th class="th text-left border-b border-slate-200">Hình thức</th>
+          <th class="th text-left border-b border-slate-200">Mã</th>
+          <th class="th text-left border-b border-slate-200">Tên</th>
+          <th class="th text-right border-b border-slate-200">Số lượng</th>
+          <th class="th text-left border-b border-slate-200">Đơn vị tính</th>
+          <th class="th text-right border-b border-slate-200">Đơn giá dự kiến</th>
+          <th class="th text-right border-b border-slate-200">VAT</th>
+          <th class="th text-left border-b border-slate-200">Nhà cung cấp / kho (tạm)</th>
+          ${editable ? '<th class="th text-center border-b border-slate-200">Thao tác</th>' : ''}
+        </tr>
+      </thead>
+      <tbody>${emptyOrBody}${addFooter}</tbody>
+    </table>
+  </div>`;
+}
+function appendDraftMaterialRow(orderId) {
+  const o = DB.orders.find(x => x.id === orderId);
+  if (!o || !canEditOrderDetail(o)) return;
+  if (!Array.isArray(o.materials)) o.materials = [];
+  if (o.materials.some(m => m && m._draft)) {
+    toast('Hoàn tất dòng vật tư đang nhập trước');
+    return;
+  }
+  o.materials.push({
+    id: uid('mt'),
+    _draft: true,
+    source: 'TECHNICIAN',
+    fulfillment: 'TECHNICIAN',
+    fulfillmentNote: 'Nhập tay trên bảng',
+    code: null,
+    name: '',
+    qty: 1,
+    uom: 'Cái',
+    price: 0,
+    vat: 8,
+    supplier: null,
+    warehouse: null,
+    priceKind: 'MANUAL',
+    localOnly: true,
+  });
+  if (typeof save === 'function') save({ quiet: true });
+  render();
+}
+function saveDraftMaterialRow(orderId, idx) {
+  const o = DB.orders.find(x => x.id === orderId);
+  if (!o || !canEditOrderDetail(o)) return;
+  const m = o.materials?.[idx];
+  if (!m || !m._draft) return;
+  const root = document.querySelector(`[data-mat-draft-row="${orderId}:${idx}"]`);
+  const val = (field) => {
+    const el = root?.querySelector(`[data-mat-draft-field="${field}"]`);
+    return el ? String(el.value || '').trim() : '';
+  };
+  const name = val('name');
+  if (!name) { toast('Nhập tên vật tư'); return; }
+  const qty = Number(val('qty') || 0);
+  const price = Number(val('price') || 0);
+  const vat = Number(val('vat') ?? 8);
+  const supplierRaw = val('supplier');
+  const before = orderSnapshot(o);
+  Object.assign(m, {
+    _draft: false,
+    code: val('code') || null,
+    name,
+    qty: qty > 0 ? qty : 1,
+    uom: val('uom') || 'Cái',
+    price,
+    vat: Number.isFinite(vat) ? vat : 8,
+    supplier: supplierRaw || null,
+    warehouse: null,
+    source: 'TECHNICIAN',
+    fulfillment: 'TECHNICIAN',
+    fulfillmentNote: 'Nhập tay trên bảng',
+    priceKind: 'MANUAL',
+    localOnly: true,
+  });
+  delete m._draft;
+  if (!materialLocalOptions().some(x => (x.name || '').toLowerCase() === name.toLowerCase())
+    && !materialMasterOptions().some(x => (x.name || '').toLowerCase() === name.toLowerCase())) {
+    persistLocalMaterial(name);
+  }
+  logOrderEdit(o, before, 'Thêm vật tư (dòng bảng)');
+  toast('Đã lưu dòng vật tư');
+  render();
+}
+function cancelDraftMaterialRow(orderId, idx) {
+  const o = DB.orders.find(x => x.id === orderId);
+  if (!o || !canEditOrderDetail(o)) return;
+  const m = o.materials?.[idx];
+  if (!m || !m._draft) return;
+  o.materials.splice(idx, 1);
+  if (typeof save === 'function') save({ quiet: true });
+  render();
+}
+/** @deprecated dùng orderPlannedWorkItemsTable — giữ alias cho chỗ gọi cũ */
+function orderWorkItemsKindTable(o, kind, showWiActionCol, canCompleteWi) {
+  return orderPlannedWorkItemsTable(o, showWiActionCol, canCompleteWi);
 }
 function pageOrder() {
   const o = DB.orders.find(x => x.id === view.orderId);
@@ -69503,6 +69821,15 @@ function pageOrder() {
   const showWiActionCol = canEditOrderDetail(o) || canCompleteWi;
 
   const actionBtns = [];
+  const primaryKind = orderPrimaryKind(o);
+  if (primaryKind === 'MAINT') {
+    const linkedSc = linkedRepairOrdersOf(o);
+    if (linkedSc.length) {
+      actionBtns.push(`<button type="button" data-open-order="${linkedSc[0].id}" class="btn btn-outline !border-orange-400 !bg-orange-50 text-orange-900">Mở phiếu SC liên kết</button>`);
+    } else {
+      actionBtns.push(`<button type="button" data-create-linked-repair="${o.id}" class="btn btn-outline !border-orange-400 !bg-orange-50 text-orange-900">+ Tạo phiếu sửa chữa liên kết</button>`);
+    }
+  }
   if (ap === 'DRAFT') {
     actionBtns.push(`<button data-edit-order="${o.id}" class="btn btn-outline">Sửa thông tin chung</button>`);
     actionBtns.push(`<button data-submit-order="${o.id}" class="btn btn-primary">Nộp duyệt</button>`);
@@ -69649,6 +69976,37 @@ function pageOrder() {
             </div>
             <div class="flex flex-wrap gap-2">${actionBtns.join('')}</div>
           </div>
+          ${(() => {
+            const pk = orderPrimaryKind(o);
+            if (pk === 'MAINT') {
+              const linked = linkedRepairOrdersOf(o);
+              const orphanSc = (o.workItems || []).filter(w => ensureWorkItemKind(w, o) === 'REPAIR').length;
+              if (!linked.length) {
+                return `<div class="mt-3 rounded-md border border-orange-200 bg-orange-50/80 px-3 py-2 text-xs text-orange-950 leading-relaxed">
+                  Phiếu <strong>bảo dưỡng</strong> chỉ chứa hạng mục BD. Cần sửa chữa phát sinh → bấm <strong>«Tạo phiếu sửa chữa liên kết»</strong> (phiếu SC riêng, gắn mã phiếu này).
+                  ${orphanSc ? `<div class="mt-1 font-medium">Có ${orphanSc} hạng mục SC đang ẩn — sẽ chuyển sang phiếu SC khi tạo liên kết.</div>` : ''}
+                </div>`;
+              }
+              return `<div class="mt-3 rounded-md border border-orange-200 bg-orange-50/80 px-3 py-2 text-xs text-orange-950 leading-relaxed">
+                Phiếu SC liên kết:
+                ${linked.map(r => `<button type="button" data-open-order="${r.id}" class="font-semibold text-orange-800 underline mx-1">${esc(r.code)}</button>`).join('')}
+              </div>`;
+            }
+            const parent = linkedMaintOrderOf(o);
+            if (parent) {
+              return `<div class="mt-3 rounded-md border border-blue-200 bg-blue-50/80 px-3 py-2 text-xs text-blue-950 leading-relaxed">
+                Liên kết từ phiếu bảo dưỡng
+                <button type="button" data-open-order="${parent.id}" class="font-semibold text-blue-800 underline mx-1">${esc(parent.code)}</button>
+                — phiếu này chỉ chứa hạng mục sửa chữa.
+              </div>`;
+            }
+            if (pk === 'REPAIR') {
+              return `<div class="mt-3 rounded-md border border-orange-200 bg-orange-50/60 px-3 py-2 text-xs text-orange-950 leading-relaxed">
+                Phiếu <strong>sửa chữa</strong> — chỉ hạng mục SC (không trộn bảo dưỡng trên cùng phiếu).
+              </div>`;
+            }
+            return '';
+          })()}
           ${lastReject && ap === 'REJECTED' ? `
           <div class="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-900">
             <span class="font-semibold">Lý do từ chối</span> · ${esc(lastReject.by)} · ${esc(lastReject.at)}<br/>
@@ -69755,54 +70113,29 @@ function pageOrder() {
           <div class="border-b border-amber-200 bg-amber-50/70 px-5 py-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <div class="font-semibold text-sm text-amber-950">Cụm dự kiến · kỹ thuật nhập</div>
-              <p class="text-[11px] text-amber-900/80">Hạng mục + vật tư KTV điền (giá / hình thức tạm). Không bị ghi đè khi đồng bộ mua hàng.</p>
+              <p class="text-[11px] text-amber-900/80">Chỉ hạng mục ${orderPrimaryKind(o) === 'MAINT' ? 'bảo dưỡng' : 'sửa chữa'} + vật tư KTV (giá / hình thức tạm). Không bị ghi đè khi đồng bộ mua hàng.</p>
             </div>
             <div class="flex flex-wrap gap-2">
-              ${canEditOrderDetail(o) ? `<button type="button" data-add-work-item="${o.id}" class="btn btn-outline btn-sm">+ Hạng mục</button>` : ''}
+              ${canEditOrderDetail(o) ? `<button type="button" data-add-work-item-kind="${o.id}:${orderPrimaryKind(o)}" class="btn btn-outline btn-sm">+ Hạng mục</button>` : ''}
               ${canEditOrderDetail(o) ? `<button type="button" data-add-material="${o.id}" class="btn btn-primary btn-sm">+ Vật tư dự kiến</button>` : ''}
               ${hasPwms && canEditOrderDetail(o)
                 ? `<button type="button" data-refresh-pwms-lines="${o.id}" class="btn btn-outline btn-sm !border-sky-400 !bg-sky-50 text-sky-900">Làm mới tồn / giá tạm</button>`
                 : ''}
             </div>
           </div>
-          <div class="px-5 py-3 border-b border-amber-100 space-y-5">
-            ${orderWorkItemsKindTable(o, 'MAINT', showWiActionCol, canCompleteWi)}
-            ${orderWorkItemsKindTable(o, 'REPAIR', showWiActionCol, canCompleteWi)}
+          <div class="px-5 py-3 border-b border-amber-100 space-y-3">
+            <div class="text-xs font-semibold uppercase tracking-wide text-amber-900">Hạng mục công việc</div>
+            ${orderPlannedWorkItemsTable(o, showWiActionCol, canCompleteWi)}
           </div>
-          <div class="px-5 py-3">
-            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div class="px-5 py-3 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <div class="text-xs font-semibold uppercase tracking-wide text-amber-900">Vật tư dự kiến</div>
-              <div class="text-[11px] text-slate-500">Tạm tính: <strong class="tabular-nums text-slate-800">${money(sumMaterialLines(plannedMaterials(o)))}</strong></div>
+              <div class="text-[11px] text-slate-500">Tạm tính: <strong class="tabular-nums text-slate-800">${money(sumMaterialLines(plannedMaterials(o).filter(m => !m._draft)))}</strong></div>
             </div>
-            <div class="mb-3 rounded-md border border-amber-200 bg-white/70 px-3 py-2 text-xs text-slate-700 leading-relaxed">
-              Chọn kho đủ tồn → <strong>Xuất kho</strong>; thiếu/không có → <strong>Sửa ngoài</strong>; nhập tay → <strong>Kỹ thuật viên ghi</strong>. Đây là đề nghị gửi sang mua hàng / BASE.
+            <div class="rounded-md border border-amber-200 bg-white/70 px-3 py-2 text-xs text-slate-700 leading-relaxed">
+              Chọn kho đủ tồn → <strong>Xuất kho</strong>; thiếu/không có → <strong>Sửa ngoài</strong>; nhập tay → <strong>Kỹ thuật viên ghi</strong> (thêm dòng trên bảng hoặc form đầy đủ).
             </div>
-            <div class="overflow-x-auto rounded-md border border-amber-100">
-              <table class="min-w-full text-sm">
-                <thead class="bg-amber-50/50 text-slate-600"><tr>
-                  <th class="th text-left">Hình thức</th><th class="th text-left">Mã</th><th class="th text-left">Tên</th>
-                  <th class="th text-right">Số lượng</th><th class="th text-left">Đơn vị tính</th>
-                  <th class="th text-right">Đơn giá dự kiến</th>
-                  <th class="th text-right">VAT</th>
-                  <th class="th text-left">Nhà cung cấp / kho (tạm)</th>
-                  ${canEditOrderDetail(o) ? '<th class="th text-center">Thao tác</th>' : ''}
-                </tr></thead>
-                <tbody>${plannedMaterials(o).map((m, idx) => `<tr class="row-h">
-                  <td class="td">${materialSourceChip(m)}</td>
-                  <td class="td font-mono text-xs">${m.code || '—'}</td>
-                  <td class="td">${esc(m.name)}</td>
-                  <td class="td text-right">${m.qty}</td>
-                  <td class="td">${m.uom || '—'}</td>
-                  <td class="td text-right tabular-nums font-medium">${money(m.price)}</td>
-                  <td class="td text-right tabular-nums">${m.vat != null ? m.vat + '%' : '—'}</td>
-                  <td class="td text-xs">${esc([m.supplier, m.warehouse].filter(Boolean).join(' · ') || '—')}${m.fulfillmentNote ? `<div class="text-[10px] text-slate-500">${esc(m.fulfillmentNote)}</div>` : ''}</td>
-                  ${canEditOrderDetail(o) ? `<td class="td text-center whitespace-nowrap">
-                    <button type="button" data-edit-material="${o.id}:${idx}" class="btn btn-outline btn-xs mr-1">Sửa</button>
-                    <button type="button" data-del-material="${o.id}:${idx}" class="btn btn-outline btn-xs text-rose-700 !border-rose-300">Xóa</button>
-                  </td>` : ''}
-                </tr>`).join('') || `<tr><td colspan="${canEditOrderDetail(o) ? 9 : 8}" class="px-5 py-6 text-center text-slate-400">${canEditOrderDetail(o) ? 'Chưa có vật tư dự kiến' : 'Chưa có vật tư dự kiến'}</td></tr>`}</tbody>
-              </table>
-            </div>
+            ${orderPlannedMaterialsTable(o)}
           </div>
         </div>
 
@@ -70912,7 +71245,7 @@ function pageTechnicianWorkHours() {
 }
 
 
-/* ----- VỎ LỐP / ẮC QUY v2 (đơn vị gắn trên xe) ----- */
+/* ----- VỎ LỐP / ẮC QUY (đơn vị gắn trên xe) ----- */
 function pageTireBattery() {
   ensureTireBatteryUnits(false);
   const f = F();
@@ -71519,13 +71852,16 @@ function createQuickDraftOrder(vehicleId, source, opts) {
   if (typeof ensureLocalGarageIfNew === 'function') ensureLocalGarageIfNew(garage);
   const pair = relatedPairForVehicle(v);
   const trailer = pair.trailer;
+  const scope = opts?.primaryKind || menuWorkScope();
+  const primaryKind = scope === 'MAINT' ? 'MAINT' : 'REPAIR';
   const o = {
     id: uid('o'),
     code: 'RO-2026-' + (1000 + Math.floor(Math.random() * 900)),
     vehicleId: Number(vehicleId),
     trailerId: trailer?.id ? Number(trailer.id) : null,
     trailerPlate: trailer?.plate || '',
-    type: 'WORK',
+    type: primaryKind === 'MAINT' ? 'PERIODIC' : 'INCIDENTAL',
+    primaryKind,
     occurrence: ordersOf(vehicleId).length + 1,
     date,
     km: v.km || 0,
@@ -71537,7 +71873,9 @@ function createQuickDraftOrder(vehicleId, source, opts) {
     revision: 0,
     cost: 0,
     catalogId: null,
-    content: 'Phiếu nháp — bổ sung hạng mục / vật tư sau',
+    content: primaryKind === 'MAINT'
+      ? 'Phiếu bảo dưỡng nháp — bổ sung hạng mục / vật tư sau'
+      : 'Phiếu sửa chữa nháp — bổ sung hạng mục / vật tư sau',
     createdAt: date,
     materials: [],
     images: [],
@@ -71546,7 +71884,7 @@ function createQuickDraftOrder(vehicleId, source, opts) {
       at: nowStamp(),
       action: 'CREATE',
       by: 'Nguyễn Văn Kỹ thuật',
-      note: 'Tạo nhanh · ' + v.plate + (trailer?.plate ? ' · mooc ' + trailer.plate : '') + ' · ' + garage,
+      note: 'Tạo nhanh · ' + (primaryKind === 'MAINT' ? 'BD' : 'SC') + ' · ' + v.plate + (trailer?.plate ? ' · mooc ' + trailer.plate : '') + ' · ' + garage,
     }],
   };
   DB.orders.unshift(o);
@@ -75201,7 +75539,7 @@ function openEditOrderModal(id) {
   };
 }
 
-function openWorkItemModal(orderId, idx) {
+function openWorkItemModal(orderId, idx, preferredKind) {
   const o = DB.orders.find(x => x.id === orderId);
   if (!o || !canEditOrderDetail(o)) return;
   ensureOrderApproval(o);
@@ -75213,20 +75551,23 @@ function openWorkItemModal(orderId, idx) {
   const initContent = w?.content || '';
   const initBarem = resolveBaremHours(initSysId, initContent);
   const initStd = w?.standardHours != null ? w.standardHours : initBarem;
+  const initKind = orderPrimaryKind(o); // khóa theo loại phiếu
+  if (preferredKind && preferredKind !== initKind) {
+    /* ignore — không cho đổi BD↔SC trên cùng phiếu */
+  }
 
   const renderForm = (sysId, serviceTypeId, content, standardHours, performer, kind) => {
     const barems = baremRowsForSystem(sysId);
     const svcOpts = serviceTypesForSystem(sysId);
     const std = content ? (resolveBaremHours(sysId, content) ?? standardHours) : null;
-    const k = kind || w?.kind || inferWorkItemKind(w, o);
+    const k = initKind;
     return `
     <form id="workItemForm" class="space-y-3 px-5 py-4">
-      <label class="block text-sm font-medium text-slate-700">Phân loại hạng mục
-        <div class="mt-1 flex gap-4 text-sm font-normal">
-          <label class="inline-flex items-center gap-1.5"><input type="radio" name="kind" value="MAINT" class="!w-auto" ${k==='MAINT'?'checked':''} /> Bảo dưỡng</label>
-          <label class="inline-flex items-center gap-1.5"><input type="radio" name="kind" value="REPAIR" class="!w-auto" ${k!=='MAINT'?'checked':''} /> Sửa chữa</label>
-        </div>
-      </label>
+      <input type="hidden" name="kind" value="${k}" />
+      <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+        Phân loại phiếu: ${k === 'MAINT' ? planWorkKindChip('MAINT') + ' — chỉ thêm hạng mục bảo dưỡng' : planWorkKindChip('REPAIR') + ' — chỉ thêm hạng mục sửa chữa'}
+        ${k === 'MAINT' ? '<div class="mt-1 text-[11px] text-slate-500">Cần SC → dùng nút «Tạo phiếu sửa chữa liên kết» trên phiếu BD.</div>' : ''}
+      </div>
       <label class="block text-sm font-medium text-slate-700">Hệ thống / hạng mục xe
         <select name="systemId" id="wiSystem" required>
           <option value="">— Chọn hệ thống —</option>
@@ -75267,7 +75608,7 @@ function openWorkItemModal(orderId, idx) {
       <h2 class="text-lg font-bold">${isNew ? 'Thêm hạng mục công việc' : 'Sửa hạng mục công việc'}</h2>
       <p class="text-sm text-slate-500">${esc(o.code)} · chọn hệ thống để xem lịch sử cùng hạng mục trên xe · rồi chọn loại DV / nội dung</p>
     </div>
-    <div id="wiFormWrap" class="max-h-[75vh] overflow-y-auto">${renderForm(initSysId, w?.serviceTypeId || '', initContent, initStd, w?.performer)}</div>
+    <div id="wiFormWrap" class="max-h-[75vh] overflow-y-auto">${renderForm(initSysId, w?.serviceTypeId || '', initContent, initStd, w?.performer, initKind)}</div>
   `, 'max-w-2xl');
 
   const bindWi = () => {
@@ -75283,7 +75624,7 @@ function openWorkItemModal(orderId, idx) {
       const sid = $('#wiSystem')?.value || '';
       const wrap = $('#wiFormWrap');
       if (!wrap) return;
-      const kind = document.querySelector('#workItemForm [name=kind]:checked')?.value;
+      const kind = document.querySelector('#workItemForm [name=kind]:checked')?.value || initKind;
       wrap.innerHTML = renderForm(sid, '', '', null, $('[name=performer]')?.value || 'Nguyễn Văn Kỹ thuật', kind);
       bindWi();
     };
@@ -75318,7 +75659,7 @@ function openWorkItemModal(orderId, idx) {
       if (standardHours == null) { toast('Nội dung chưa có giờ barem — cấu hình tại Barem giờ công'); return; }
       const item = {
         id: w?.id || uid('wi'),
-        kind: fd.get('kind') === 'MAINT' ? 'MAINT' : 'REPAIR',
+        kind: orderPrimaryKind(o),
         systemId,
         system: sys.name,
         serviceTypeId,
@@ -76186,24 +76527,38 @@ function bind() {
     e.stopPropagation();
     schedulePlanGroupToDate(b.dataset.planSchedule);
   });
-  $$('[data-add-work-item]').forEach(b => b.onclick = () => openWorkItemModal(b.dataset.addWorkItem, -1));
-  $$('[data-set-wi-kind]').forEach(el => el.onchange = () => {
-    const [oid, idx, kind] = String(el.dataset.setWiKind || '').split(':');
-    const o = DB.orders.find(x => x.id === oid);
-    if (!o || !canEditOrderDetail(o) || !o.workItems[Number(idx)]) return;
-    o.workItems[Number(idx)].kind = kind === 'MAINT' ? 'MAINT' : 'REPAIR';
-    if (typeof save === 'function') save();
-    render();
+  $$('[data-add-work-item]').forEach(b => {
+    b.onclick = () => {
+      const o = DB.orders.find(x => String(x.id) === String(b.dataset.addWorkItem));
+      openWorkItemModal(b.dataset.addWorkItem, -1, o ? orderPrimaryKind(o) : 'MAINT');
+    };
   });
+  $$('[data-add-work-item-kind]').forEach(b => b.onclick = () => {
+    const [oid, kind] = String(b.dataset.addWorkItemKind || '').split(':');
+    const o = DB.orders.find(x => String(x.id) === String(oid));
+    const forced = o ? orderPrimaryKind(o) : (kind === 'REPAIR' ? 'REPAIR' : 'MAINT');
+    openWorkItemModal(oid, -1, forced);
+  });
+  $$('[data-create-linked-repair]').forEach(b => b.onclick = () => createLinkedRepairOrderFromMaint(b.dataset.createLinkedRepair));
   $$('[data-edit-work-item]').forEach(b => b.onclick = () => {
     const [oid, idx] = b.dataset.editWorkItem.split(':');
-    openWorkItemModal(oid, Number(idx));
+    const o = DB.orders.find(x => String(x.id) === String(oid));
+    openWorkItemModal(oid, Number(idx), o ? orderPrimaryKind(o) : undefined);
   });
   $$('[data-del-work-item]').forEach(b => b.onclick = () => {
     const [oid, idx] = b.dataset.delWorkItem.split(':');
     deleteWorkItem(oid, Number(idx));
   });
   $$('[data-add-material]').forEach(b => b.onclick = () => openMaterialModal(b.dataset.addMaterial, -1));
+  $$('[data-add-mat-row]').forEach(b => b.onclick = () => appendDraftMaterialRow(b.dataset.addMatRow));
+  $$('[data-save-mat-draft]').forEach(b => b.onclick = () => {
+    const [oid, idx] = String(b.dataset.saveMatDraft || '').split(':');
+    saveDraftMaterialRow(oid, Number(idx));
+  });
+  $$('[data-cancel-mat-draft]').forEach(b => b.onclick = () => {
+    const [oid, idx] = String(b.dataset.cancelMatDraft || '').split(':');
+    cancelDraftMaterialRow(oid, Number(idx));
+  });
   $$('[data-edit-material]').forEach(b => b.onclick = () => {
     const [oid, idx] = b.dataset.editMaterial.split(':');
     openMaterialModal(oid, Number(idx));
