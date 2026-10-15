@@ -69418,36 +69418,42 @@ async function idbGetImage(key) {
 function imageStorageKey(orderId, img) {
   return String(img?.id || ('ord-' + orderId + '-' + (img?.name || Math.random())));
 }
+function detachImageListForPersist(orderId, list, pending) {
+  if (!Array.isArray(list)) return [];
+  return list.map((img, idx) => {
+    const dataUrl = img?.dataUrl || (String(img?.url || '').startsWith('data:') ? img.url : null);
+    const key = imageStorageKey(orderId, img || { id: 'img-' + idx });
+    if (dataUrl && String(dataUrl).startsWith('data:')) {
+      pending.push({ key, dataUrl });
+      return {
+        id: img.id || key,
+        name: img.name || ('anh-' + (idx + 1) + '.jpg'),
+        source: img.source || '',
+        at: img.at || '',
+        storageKey: key,
+        url: '',
+        dataUrl: '',
+      };
+    }
+    return {
+      id: img.id || key,
+      name: img.name || '',
+      source: img.source || '',
+      at: img.at || '',
+      storageKey: img.storageKey || key,
+      url: (img.url && !String(img.url).startsWith('data:')) ? img.url : '',
+      dataUrl: '',
+    };
+  });
+}
 /** Move base64 out of orders into IndexedDB; keep lightweight refs in DB. */
 function detachOrderImagesForPersist(db) {
   const pending = [];
   (db.orders || []).forEach((o) => {
-    if (!Array.isArray(o.images)) return;
-    o.images = o.images.map((img, idx) => {
-      const dataUrl = img?.dataUrl || (String(img?.url || '').startsWith('data:') ? img.url : null);
-      const key = imageStorageKey(o.id, img || { id: 'img-' + idx });
-      if (dataUrl && String(dataUrl).startsWith('data:')) {
-        pending.push({ key, dataUrl });
-        return {
-          id: img.id || key,
-          name: img.name || ('anh-' + (idx + 1) + '.jpg'),
-          source: img.source || '',
-          at: img.at || '',
-          storageKey: key,
-          url: '',
-          dataUrl: '',
-        };
-      }
-      return {
-        id: img.id || key,
-        name: img.name || '',
-        source: img.source || '',
-        at: img.at || '',
-        storageKey: img.storageKey || key,
-        url: (img.url && !String(img.url).startsWith('data:')) ? img.url : '',
-        dataUrl: '',
-      };
-    });
+    ensureOrderImageClusters(o);
+    o.conditionImages = detachImageListForPersist(o.id, o.conditionImages, pending);
+    o.acceptanceImages = detachImageListForPersist(o.id, o.acceptanceImages, pending);
+    o.images = o.acceptanceImages;
   });
   return pending;
 }
@@ -69472,11 +69478,14 @@ function compactDbForQuota(db, level) {
   if (!db) return db;
   const lv = level || 1;
   (db.orders || []).forEach((o) => {
-    if (!Array.isArray(o.images)) return;
-    o.images = o.images.slice(0, lv >= 2 ? 0 : 1).map((img) => ({
+    ensureOrderImageClusters(o);
+    const slim = (arr) => (arr || []).slice(0, lv >= 2 ? 0 : 1).map((img) => ({
       id: img.id, name: img.name || '', source: img.source || '', at: img.at || '',
       storageKey: img.storageKey || '', url: '', dataUrl: '',
     }));
+    o.conditionImages = slim(o.conditionImages);
+    o.acceptanceImages = slim(o.acceptanceImages);
+    o.images = o.acceptanceImages;
     if (Array.isArray(o.approvalLog) && o.approvalLog.length > 4) o.approvalLog = o.approvalLog.slice(-4);
     if (Array.isArray(o.log) && o.log.length > 4) o.log = o.log.slice(-4);
   });
@@ -69505,8 +69514,8 @@ function compactDbForQuota(db, level) {
 }
 function stripInMemoryOrderImages() {
   (DB.orders || []).forEach((o) => {
-    if (!Array.isArray(o.images)) return;
-    o.images.forEach((img) => {
+    ensureOrderImageClusters(o);
+    [...(o.conditionImages || []), ...(o.acceptanceImages || [])].forEach((img) => {
       img.dataUrl = '';
       if (String(img.url || '').startsWith('data:')) img.url = '';
     });
@@ -69551,8 +69560,11 @@ function save(opts) {
   }
 }
 async function hydrateOrderImages(o) {
-  if (!o || !Array.isArray(o.images) || !o.images.length) return o;
-  await Promise.all(o.images.map(async (img) => {
+  if (!o) return o;
+  ensureOrderImageClusters(o);
+  const all = [...(o.conditionImages || []), ...(o.acceptanceImages || [])];
+  if (!all.length) return o;
+  await Promise.all(all.map(async (img) => {
     if (img.dataUrl || (img.url && String(img.url).startsWith('data:'))) return;
     const key = img.storageKey || imageStorageKey(o.id, img);
     const dataUrl = await idbGetImage(key);
@@ -70676,14 +70688,156 @@ function ensureOrderApproval(o) {
   if (!Array.isArray(o.approvalLog)) o.approvalLog = [];
   if (!Array.isArray(o.workItems)) o.workItems = [];
   if (!Array.isArray(o.materials)) o.materials = [];
-  if (!Array.isArray(o.images)) o.images = [];
+  ensureOrderImageClusters(o);
   o.workItems.forEach((w, i) => { if (!w.id) w.id = 'wi-' + (o.id || 'o') + '-' + i; ensureWorkItemFields(w, o); });
   o.materials.forEach((m, i) => { if (!m.id) m.id = 'mt-' + (o.id || 'o') + '-' + i; });
-  o.images.forEach((img, i) => { if (!img.id) img.id = 'img-' + (o.id || 'o') + '-' + i; });
   if (!Array.isArray(o.purchaseMaterials)) o.purchaseMaterials = [];
   ensureOrderTimeline(o);
   ensurePurchaseMaterialsCluster(o);
   return o;
+}
+/** Hai cụm ảnh phiếu: hiện trạng + nghiệm thu (mỗi cụm tối đa 8). Legacy `images` → nghiệm thu. */
+function ensureOrderImageClusters(o) {
+  if (!o) return o;
+  if (!Array.isArray(o.conditionImages)) o.conditionImages = [];
+  if (!Array.isArray(o.acceptanceImages)) o.acceptanceImages = [];
+  if (!o.acceptanceImages.length && Array.isArray(o.images) && o.images.length && o.images !== o.acceptanceImages) {
+    o.acceptanceImages = o.images.slice();
+  }
+  if (!Array.isArray(o.images)) o.images = [];
+  // đồng bộ alias cũ
+  o.images = o.acceptanceImages;
+  const stamp = (arr, prefix) => (arr || []).forEach((img, i) => {
+    if (!img.id) img.id = prefix + '-' + (o.id || 'o') + '-' + i;
+  });
+  stamp(o.conditionImages, 'cimg');
+  stamp(o.acceptanceImages, 'aimg');
+  return o;
+}
+function orderImageList(o, kind) {
+  ensureOrderImageClusters(o);
+  return kind === 'condition' ? o.conditionImages : o.acceptanceImages;
+}
+function canUploadOrderImages(o) {
+  ensureOrderApproval(o);
+  // Cho phép thêm / xóa ảnh đến khi phiếu hoàn thành
+  return o.status !== 'COMPLETED';
+}
+function orderImageClusterCardHtml(o, kind) {
+  ensureOrderImageClusters(o);
+  const isCond = kind === 'condition';
+  const list = orderImageList(o, kind);
+  const title = isCond ? 'Ảnh hiện trạng' : 'Ảnh nghiệm thu';
+  const hint = isCond
+    ? 'Ảnh tình trạng trước / trong khi làm · tối đa 8 ảnh'
+    : 'Ảnh sau khi hoàn thành / nghiệm thu · tối đa 8 ảnh';
+  const empty = isCond ? 'Chưa có ảnh hiện trạng' : 'Chưa có ảnh nghiệm thu';
+  const canUp = canUploadOrderImages(o);
+  const addBtn = canUp && list.length < 8
+    ? `<label class="btn btn-outline btn-sm cursor-pointer">+ Thêm ảnh
+        <input type="file" accept="image/*" multiple class="hidden" data-order-images="${esc(o.id)}" data-order-image-kind="${kind}" />
+      </label>`
+    : '';
+  const body = list.length
+    ? `<div class="flex flex-wrap gap-3">${list.map((img, idx) => `
+        <div class="w-28 shrink-0">
+          <div class="relative size-28 rounded-md border border-slate-200 bg-slate-50">
+            <button type="button" class="absolute inset-0 z-0 overflow-hidden rounded-md p-0 border-0 bg-transparent cursor-zoom-in"
+              data-preview-order-image="${esc(o.id)}" data-order-image-kind="${kind}" data-order-image-idx="${idx}"
+              title="Xem ảnh lớn" aria-label="Xem ảnh lớn">
+              <img src="${esc(img.dataUrl || img.url || '')}" alt="${esc(img.name || 'Ảnh')}" class="pointer-events-none size-full object-cover" />
+            </button>
+            ${canUp ? `<button type="button" data-del-order-image="${esc(o.id)}:${idx}" data-order-image-kind="${kind}" class="absolute -right-1 -top-1 z-20 rounded-full border border-rose-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold leading-none text-rose-700 shadow-sm hover:bg-rose-50" title="Xóa ảnh">×</button>` : ''}
+          </div>
+          <div class="mt-1 flex items-start gap-1">
+            <button type="button" class="min-w-0 flex-1 truncate text-left text-[11px] text-slate-600 hover:text-blue-700 hover:underline"
+              data-preview-order-image="${esc(o.id)}" data-order-image-kind="${kind}" data-order-image-idx="${idx}"
+              title="${esc(img.name || '')} · bấm để xem">${esc(img.name || 'Ảnh')}</button>
+            ${canUp ? `<button type="button" data-del-order-image="${esc(o.id)}:${idx}" data-order-image-kind="${kind}" class="shrink-0 text-[10px] font-medium text-rose-600 hover:underline" title="Xóa ảnh">Xóa</button>` : ''}
+          </div>
+        </div>`).join('')}</div>`
+    : `<p class="text-sm text-slate-400 text-center py-6">${canUp ? empty + ' — bấm «+ Thêm ảnh»' : empty}</p>`;
+  return `<div class="card overflow-hidden">
+    <div class="border-b border-slate-200 px-5 py-3 flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <div class="font-semibold text-sm">${title}</div>
+        <p class="text-[11px] text-slate-500">${hint} · ${list.length}/8 · bấm ảnh để xem · ${canUp ? 'có thể xóa trước khi HT phiếu' : 'phiếu đã HT — không xóa'}</p>
+      </div>
+      ${addBtn}
+    </div>
+    <div class="px-5 py-4">${body}</div>
+  </div>`;
+}
+function openOrderImagePreview(orderId, kind, idx) {
+  const o = DB.orders.find((x) => String(x.id) === String(orderId));
+  if (!o) return;
+  ensureOrderImageClusters(o);
+  const k = kind === 'condition' ? 'condition' : 'acceptance';
+  const list = orderImageList(o, k);
+  let i = Number(idx) || 0;
+  if (!list.length || i < 0 || i >= list.length) return;
+  const title = k === 'condition' ? 'Ảnh hiện trạng' : 'Ảnh nghiệm thu';
+  const renderPreview = () => {
+    const img = list[i];
+    const src = img?.dataUrl || img?.url || '';
+    const name = img?.name || ('Ảnh ' + (i + 1));
+    const root = document.getElementById('orderImgPreviewBody');
+    if (!root) return;
+    root.innerHTML = `
+      <div class="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
+        <div class="min-w-0">
+          <div class="text-sm font-semibold text-slate-900">${title}</div>
+          <div class="truncate text-xs text-slate-500">${esc(name)} · ${i + 1}/${list.length}</div>
+        </div>
+        <div class="flex shrink-0 items-center gap-2">
+          ${canUploadOrderImages(o) ? `<button type="button" id="imgDelPreview" class="btn btn-sm border border-rose-300 bg-white text-rose-700 hover:bg-rose-50">Xóa ảnh</button>` : ''}
+          <button type="button" data-close class="btn btn-ghost btn-sm" title="Đóng">✕</button>
+        </div>
+      </div>
+      <div class="relative flex min-h-[50vh] items-center justify-center bg-slate-950 px-10 py-4">
+        ${list.length > 1 ? `<button type="button" id="imgPrev" class="absolute left-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/30 bg-black/50 px-3 py-2 text-white hover:bg-black/70" aria-label="Ảnh trước">‹</button>` : ''}
+        <img src="${esc(src)}" alt="${esc(name)}" class="max-h-[70vh] max-w-full object-contain" />
+        ${list.length > 1 ? `<button type="button" id="imgNext" class="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-full border border-white/30 bg-black/50 px-3 py-2 text-white hover:bg-black/70" aria-label="Ảnh sau">›</button>` : ''}
+      </div>
+      <div class="flex flex-wrap justify-center gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3">
+        ${list.map((thumb, ti) => `
+          <button type="button" data-jump-img="${ti}" class="size-12 overflow-hidden rounded border ${ti === i ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200'} bg-white p-0">
+            <img src="${esc(thumb.dataUrl || thumb.url || '')}" alt="" class="size-full object-cover" />
+          </button>`).join('')}
+      </div>`;
+    root.querySelector('[data-close]')?.addEventListener('click', closeModal);
+    root.querySelector('#imgDelPreview')?.addEventListener('click', () => {
+      if (!canUploadOrderImages(o)) return;
+      if (!confirm('Xóa ảnh này?')) return;
+      list.splice(i, 1);
+      saveDB();
+      if (!list.length) {
+        closeModal();
+        renderOrderDetail(String(o.id));
+        return;
+      }
+      if (i >= list.length) i = list.length - 1;
+      renderPreview();
+      renderOrderDetail(String(o.id));
+    });
+    root.querySelector('#imgPrev')?.addEventListener('click', () => {
+      i = (i - 1 + list.length) % list.length;
+      renderPreview();
+    });
+    root.querySelector('#imgNext')?.addEventListener('click', () => {
+      i = (i + 1) % list.length;
+      renderPreview();
+    });
+    root.querySelectorAll('[data-jump-img]').forEach((b) => {
+      b.addEventListener('click', () => {
+        i = Number(b.getAttribute('data-jump-img')) || 0;
+        renderPreview();
+      });
+    });
+  };
+  openModal(`<div id="orderImgPreviewBody" class="overflow-hidden rounded-md bg-white"></div>`, 'max-w-4xl');
+  renderPreview();
+  $('[data-close]')?.addEventListener('click', closeModal);
 }
 function canEditOrderDetail(o) {
   ensureOrderApproval(o);
@@ -70693,6 +70847,7 @@ function ensureWorkItemFields(w, order) {
   if (!w) return w;
   ensureWorkItemKind(w, order);
   if (w.startedAt === undefined) w.startedAt = null;
+  if (w.completionNote === undefined) w.completionNote = '';
   if (w.completedAt) w.status = 'DONE';
   else if (w.startedAt) w.status = 'IN_PROGRESS';
   else {
@@ -70860,7 +71015,9 @@ function orderSnapshot(o) {
     date: o.date || '',
     materials: structuredClone(o.materials || []),
     workItems: structuredClone(o.workItems || []),
-    images: structuredClone(o.images || []),
+    images: structuredClone(o.acceptanceImages || o.images || []),
+    conditionImages: structuredClone(o.conditionImages || []),
+    acceptanceImages: structuredClone(o.acceptanceImages || o.images || []),
   };
 }
 function diffOrderFields(before, after) {
@@ -70875,7 +71032,8 @@ function diffOrderFields(before, after) {
   push('Ngày BD', before.date, after.date);
   push('Vật tư', materialsSummary(before.materials), materialsSummary(after.materials));
   push('Công việc', workSummary(before.workItems), workSummary(after.workItems));
-  push('Hình ảnh', String((before.images || []).length), String((after.images || []).length));
+  push('Ảnh hiện trạng', String((before.conditionImages || []).length), String((after.conditionImages || []).length));
+  push('Ảnh nghiệm thu', String((before.acceptanceImages || before.images || []).length), String((after.acceptanceImages || after.images || []).length));
   return changes;
 }
 function nowStamp() {
@@ -71180,6 +71338,7 @@ function sourceLabel(s) {
     INCIDENT: 'Sự cố',
     PERIODIC_ASSESSMENT: 'Đánh giá định kỳ',
     DRIVER_REQUEST: 'Tài xế yêu cầu',
+    FROM_MAINT: 'Từ phiếu bảo dưỡng',
     // Legacy (không còn trong combobox tạo / lọc)
     PRE_TRIP: 'Trước chuyến',
     REMINDER: 'Nhắc bảo dưỡng',
@@ -71194,6 +71353,7 @@ function orderSourceFilterOptions(scope) {
       ['INCIDENT', 'Sự cố'],
       ['DRIVER_REQUEST', 'Tài xế yêu cầu'],
       ['PERIODIC_ASSESSMENT', 'Đánh giá định kỳ'],
+      ['FROM_MAINT', 'Từ phiếu bảo dưỡng'],
     ];
   }
   if (s === 'MAINT') {
@@ -71210,6 +71370,7 @@ function orderSourceFilterOptions(scope) {
     ['INCIDENT', 'Sự cố'],
     ['DRIVER_REQUEST', 'Tài xế yêu cầu'],
     ['PERIODIC_ASSESSMENT', 'Đánh giá định kỳ'],
+    ['FROM_MAINT', 'Từ phiếu bảo dưỡng'],
   ];
 }
 /** Option form tạo phiếu — không PRE_TRIP / REMINDER */
@@ -72886,10 +73047,20 @@ function orderWorkItemRowHtml(o, w, idx, showWiActionCol, canCompleteWi) {
     wiActions = `<button type="button" data-edit-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs mr-1">Sửa</button>
     <button type="button" data-del-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs text-rose-700 !border-rose-300">Xóa</button>`;
   } else if (canCompleteWi) {
-    if (wiDone) wiActions = `<span class="text-emerald-600 font-semibold">✓</span> <span class="text-[10px] text-slate-500">${fmtStampVi(w.completedAt)}</span>`;
-    else if (!w.startedAt) wiActions = `<button type="button" data-start-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs !border-sky-400 !bg-sky-50 text-sky-900">Bắt đầu</button>`;
-    else wiActions = `<button type="button" data-complete-work-item="${o.id}:${idx}" class="btn btn-emerald btn-xs">Hoàn thành</button>`;
+    if (wiDone) {
+      wiActions = `<span class="text-emerald-600 font-semibold">✓</span> <span class="text-[10px] text-slate-500">${fmtStampVi(w.completedAt)}</span>`;
+    } else if (!w.startedAt) {
+      wiActions = `<button type="button" data-start-work-item="${o.id}:${idx}" class="btn btn-outline btn-xs !border-sky-400 !bg-sky-50 text-sky-900">Bắt đầu</button>`;
+    } else {
+      wiActions = `<button type="button" data-complete-work-item="${o.id}:${idx}" class="btn btn-emerald btn-xs">Hoàn thành</button>`;
+    }
   }
+  const noteText = String(w.completionNote || '').trim();
+  const noteCell = noteText
+    ? `<span class="text-xs text-slate-700 leading-snug" title="${esc(noteText)}">${esc(noteText)}</span>`
+    : (wiDone
+      ? '<span class="text-slate-300">—</span>'
+      : '<span class="text-[11px] text-slate-400">Nhập khi hoàn thành</span>');
   const canPop = canEditOrderDetail(o);
   const sysCell = canPop
     ? cellPopBtnHtml(w.system, `data-cell-pop="wi-system" data-oid="${o.id}" data-idx="${idx}"`)
@@ -72912,12 +73083,13 @@ function orderWorkItemRowHtml(o, w, idx, showWiActionCol, canCompleteWi) {
     <td class="td text-center">${wiStatus}</td>
     <td class="td text-right tabular-nums text-slate-500">${w.standardHours != null ? Number(w.standardHours).toFixed(1) : '—'}</td>
     <td class="td text-right tabular-nums font-medium">${hoursCell}</td>
+    <td class="td max-w-[14rem]">${noteCell}</td>
     ${showWiActionCol ? `<td class="td text-center whitespace-nowrap">${wiActions}</td>` : ''}
   </tr>`;
 }
 /** Bảng hạng mục theo loại phiếu (BD hoặc SC — không trộn). */
 function orderPlannedWorkItemsTable(o, showWiActionCol, canCompleteWi) {
-  const colN = showWiActionCol ? 9 : 8;
+  const colN = showWiActionCol ? 10 : 9;
   const editable = canEditOrderDetail(o);
   const pk = orderPrimaryKind(o);
   const isMaint = pk === 'MAINT';
@@ -72953,6 +73125,7 @@ function orderPlannedWorkItemsTable(o, showWiActionCol, canCompleteWi) {
           <th class="th text-center border-b border-slate-200">Trạng thái</th>
           <th class="th text-right border-b border-slate-200">Giờ barem</th>
           <th class="th text-right border-b border-slate-200">Giờ TT</th>
+          <th class="th text-left border-b border-slate-200">Ghi chú</th>
           ${showWiActionCol ? '<th class="th text-center border-b border-slate-200">Thao tác</th>' : ''}
         </tr>
       </thead>
@@ -73123,7 +73296,8 @@ function orderWorkItemsKindTable(o, kind, showWiActionCol, canCompleteWi) {
 function pageOrder() {
   const o = DB.orders.find(x => x.id === view.orderId);
   if (!o) return pageShell('Không tìm thấy phiếu', '', '', '');
-  const needsImgHydrate = (o.images || []).some((img) =>
+  ensureOrderImageClusters(o);
+  const needsImgHydrate = [...(o.conditionImages || []), ...(o.acceptanceImages || [])].some((img) =>
     !img.dataUrl && !String(img.url || '').startsWith('http') && (img.storageKey || img.id)
   );
   if (needsImgHydrate && !o._imagesHydrating) {
@@ -73189,6 +73363,9 @@ function pageOrder() {
         actionBtns.push(`<button data-sync-purchase="${o.id}" class="btn btn-outline !border-sky-400 !bg-sky-50 text-sky-900">${ps.status === 'SYNCED' ? 'Đồng bộ lại từ PWMS' : 'Đồng bộ từ PWMS'}</button>`);
       }
     }
+    if (allWorkItemsDone(o)) {
+      actionBtns.push(`<button type="button" data-complete-order-odo="${o.id}" class="btn btn-emerald">Hoàn thành phiếu · nhập Odo</button>`);
+    }
   } else if (ap === 'APPROVED' && o.status === 'COMPLETED') {
     if (hasPwms && ps.status !== 'SYNCED') {
       actionBtns.push(`<button data-sync-purchase="${o.id}" class="btn btn-outline !border-sky-400 !bg-sky-50 text-sky-900">Đồng bộ từ PWMS</button>`);
@@ -73209,8 +73386,10 @@ function pageOrder() {
     REJECTED: 'Đã từ chối · sửa cũ→mới → Nộp lại → Duyệt → …',
     APPROVED: o.status === 'COMPLETED'
       ? (ps.status === 'SYNCED' ? 'Đã khép chu kỳ (có đồng bộ mua hàng)' : 'Đã hoàn thành · kiểm tra đồng bộ mua hàng')
-      : (ps.status === 'SYNCED' ? 'Đã duyệt · đang làm · đã đồng bộ mua hàng'
-        : 'Đã duyệt · đang làm · cần đồng bộ mua hàng trước khi khóa chi phí chuẩn'),
+      : (allWorkItemsDone(o)
+        ? 'Đủ hạng mục HT · nhập Odo thực tế để hoàn thành phiếu'
+        : (ps.status === 'SYNCED' ? 'Đã duyệt · đang làm · đã đồng bộ mua hàng'
+          : 'Đã duyệt · đang làm · cần đồng bộ mua hàng trước khi khóa chi phí chuẩn')),
   }[ap] || '';
 
   const syncBanner = (() => {
@@ -73356,7 +73535,7 @@ function pageOrder() {
             <div><dt class="text-xs text-slate-500">Ngày BD</dt><dd class="font-medium">${o.date}</dd></div>
             <div><dt class="text-xs text-slate-500">Odo</dt><dd class="font-medium tabular-nums">${kmFmt(o.km)} km</dd></div>
             <div><dt class="text-xs text-slate-500">Nơi bảo dưỡng / sửa chữa</dt><dd class="font-medium">${esc(o.garage)}</dd></div>
-            <div><dt class="text-xs text-slate-500">Nguồn tạo</dt><dd class="font-medium">${sourceLabel(o.source)}${o.source === 'DRIVER_REQUEST' ? ' <span class="chip bg-orange-100 text-orange-800">TX</span>' : ''}</dd></div>
+            <div><dt class="text-xs text-slate-500">Nguồn tạo</dt><dd class="font-medium">${esc(sourceLabel(o.source))}${o.source === 'DRIVER_REQUEST' ? ' <span class="chip bg-orange-100 text-orange-800">TX</span>' : ''}${o.source === 'FROM_MAINT' ? ' <span class="chip bg-sky-100 text-sky-800">BD</span>' : ''}</dd></div>
             <div><dt class="text-xs text-slate-500">Hệ thống</dt><dd class="font-medium">${esc(o.system || '—')}</dd></div>
             <div>
               <dt class="text-xs text-slate-500">Kỹ thuật viên</dt>
@@ -73425,31 +73604,9 @@ function pageOrder() {
           </div>
         </div>` : ''}
 
-        <div class="card overflow-hidden">
-          <div class="border-b border-slate-200 px-5 py-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div class="font-semibold text-sm">Hình ảnh</div>
-              <p class="text-[11px] text-slate-500">Tối đa 8 ảnh · giống phiếu BD/SC trên Fleet</p>
-            </div>
-            ${canEditOrderDetail(o) && (o.images || []).length < 8
-              ? `<label class="btn btn-outline btn-sm cursor-pointer">+ Thêm ảnh
-                  <input id="orderImageInput" type="file" accept="image/*" multiple class="hidden" data-order-images="${o.id}" />
-                </label>`
-              : ''}
-          </div>
-          <div class="px-5 py-4">
-            ${(o.images || []).length ? `
-            <div class="flex flex-wrap gap-3">
-              ${(o.images || []).map((img, idx) => `
-                <div class="w-28 shrink-0">
-                  <div class="relative size-28 overflow-hidden rounded-md border border-slate-200 bg-slate-50">
-                    <img src="${esc(img.dataUrl || img.url || '')}" alt="${esc(img.name || 'Ảnh')}" class="size-full object-cover" />
-                    ${canEditOrderDetail(o) ? `<button type="button" data-del-order-image="${o.id}:${idx}" class="absolute right-1 top-1 rounded bg-white/90 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 border border-rose-200">Xóa</button>` : ''}
-                  </div>
-                  <div class="mt-1 truncate text-[11px] text-slate-600" title="${esc(img.name || '')}">${esc(img.name || 'Ảnh')}</div>
-                </div>`).join('')}
-            </div>` : `<p class="text-sm text-slate-400 text-center py-6">${canEditOrderDetail(o) ? 'Chưa có ảnh — bấm «Thêm ảnh» để đính kèm' : 'Chưa có ảnh'}</p>`}
-          </div>
+        <div class="grid gap-4 lg:grid-cols-2">
+          ${orderImageClusterCardHtml(o, 'condition')}
+          ${orderImageClusterCardHtml(o, 'acceptance')}
         </div>
 
         <div class="card overflow-hidden border-amber-200/80">
@@ -74971,6 +75128,31 @@ function shiftDateKey(iso, days) {
   d.setDate(d.getDate() + Number(days || 0));
   return d.toISOString().slice(0, 10);
 }
+/** Km chạy trung bình 1 tháng của xe (ưu tiên trường lưu; không có thì ước lượng demo ổn định theo xe). */
+function vehicleAvgKmPerMonth(v) {
+  if (!v) return null;
+  const saved = Number(v.avgKmPerMonth);
+  if (Number.isFinite(saved) && saved > 0) return Math.round(saved);
+  const id = Number(v.id) || 0;
+  if (v.isTrailer) return 1800 + (id % 9) * 200;
+  const areaBoost = v.area === 'HN' ? 500 : v.area === 'DN' ? -400 : 0;
+  const typeBoost = /đầu kéo|tractor|casca|freight/i.test(String(v.type || '') + ' ' + String(v.brand || '')) ? 800 : 0;
+  return Math.max(1500, 7200 + areaBoost + typeBoost + (id % 13) * 280);
+}
+/** Phân loại bảo dưỡng trên nhắc BD: theo mốc chu kỳ danh mục, hoặc Vỏ lốp / Ắc quy. */
+function remindMaintClassLabel(rowKind, catalogOrAlert) {
+  if (rowKind === 'TIRE_BATTERY') {
+    return catalogOrAlert?.kind === 'BATTERY' || catalogOrAlert?.tbKind === 'BATTERY' ? 'Ắc quy' : 'Vỏ lốp';
+  }
+  const c = catalogOrAlert;
+  const types = [...new Set((c?.rules || []).map((r) => r.type).filter(Boolean))];
+  if (!types.length) return 'Bảo dưỡng định kỳ';
+  const order = { KM: 1, HOUR: 2, MONTH: 3, YEAR: 4 };
+  types.sort((a, b) => (order[a] || 9) - (order[b] || 9));
+  const short = { KM: 'km', HOUR: 'giờ', MONTH: 'tháng', YEAR: 'năm' };
+  if (types.length === 1) return 'BD theo ' + (short[types[0]] || types[0]);
+  return 'BD theo ' + types.map((t) => short[t] || t).join(' + ');
+}
 /**
  * Mốc danh mục BD:
  * - remindPlan = mốc đến hạn (đưa KH khi quá hạn) = nextKm / nextDate
@@ -75021,7 +75203,9 @@ function collectRemindDueLeaves(filters) {
       const isDue = status === 'overdue' || status === 'dueSoon';
       const marks = catalogRemindMilestoneFields(next);
       const itemLabel = c.name || c.code || '—';
-      const searchBlob = [v.plate, v.type, c.name, c.code, v.area, marks.remindMaintText, marks.remindPlanText].join(' ');
+      const avgKm = vehicleAvgKmPerMonth(v);
+      const maintClass = remindMaintClassLabel('CATALOG', c);
+      const searchBlob = [v.plate, v.type, c.name, c.code, v.area, marks.remindMaintText, marks.remindPlanText, maintClass, avgKm].join(' ');
       if (!matchSearch(searchBlob, f.search)) return;
       if (f.remindStatus !== 'ALL' && status !== f.remindStatus) return;
       if (f.catalogId === '__TIRE__' || f.catalogId === '__BATTERY__') return;
@@ -75035,6 +75219,9 @@ function collectRemindDueLeaves(filters) {
         areaLabel: formatAreaLabel(v.area),
         odoText: kmFmt(v.km),
         odoNum: Number(v.km) || 0,
+        avgKmPerMonthNum: avgKm,
+        avgKmPerMonthText: avgKm != null ? (kmFmt(avgKm) + ' km') : '—',
+        maintClassLabel: maintClass,
         itemLabel,
         itemSub: c.code || '',
         vehicleKindLabel: v.isTrailer ? 'Mooc' : 'Xe',
@@ -75069,7 +75256,9 @@ function collectRemindDueLeaves(filters) {
       const kindLabel = a.kind === 'BATTERY' ? 'Ắc quy' : 'Vỏ lốp';
       const itemLabel = (a.serial || a.name || kindLabel);
       const milestoneText = `${kmFmt(usedKm)}/${kmFmt(maxKm)} km · ${usedMonth}/${maxMonth} th`;
-      const searchBlob = [v.plate, v.type, kindLabel, a.name, a.code, a.serial, 'gắn xe'].join(' ');
+      const avgKm = vehicleAvgKmPerMonth(v);
+      const maintClass = remindMaintClassLabel('TIRE_BATTERY', a);
+      const searchBlob = [v.plate, v.type, kindLabel, a.name, a.code, a.serial, 'gắn xe', maintClass, avgKm].join(' ');
       if (!matchSearch(searchBlob, f.search)) return;
       if (f.remindStatus !== 'ALL' && status !== f.remindStatus) return;
       if (f.catalogId === '__TIRE__' && a.kind !== 'TIRE') return;
@@ -75085,6 +75274,9 @@ function collectRemindDueLeaves(filters) {
         areaLabel: formatAreaLabel(v.area),
         odoText: kmFmt(v.km),
         odoNum: Number(v.km) || 0,
+        avgKmPerMonthNum: avgKm,
+        avgKmPerMonthText: avgKm != null ? (kmFmt(avgKm) + ' km') : '—',
+        maintClassLabel: maintClass,
         itemLabel,
         itemSub: a.code || '',
         vehicleKindLabel: v.isTrailer ? 'Mooc' : 'Xe',
@@ -75138,6 +75330,7 @@ function buildRemindDashboardGridRows(leaves) {
       kids.length + ' hạng mục',
       nOver ? (nOver + ' quá hạn') : (nSoon ? (nSoon + ' sắp hạn') : 'ổn'),
     ].join(' · ');
+    const classSet = [...new Set(kids.map((k) => k.maintClassLabel).filter(Boolean))];
     rows.push({
       id: 'g-' + groupKey,
       __group: true,
@@ -75148,6 +75341,9 @@ function buildRemindDashboardGridRows(leaves) {
       areaLabel: first.areaLabel,
       odoText: first.odoText,
       odoNum: first.odoNum,
+      avgKmPerMonthNum: first.avgKmPerMonthNum,
+      avgKmPerMonthText: first.avgKmPerMonthText,
+      maintClassLabel: classSet.length === 1 ? classSet[0] : (classSet.length ? (classSet.length + ' loại') : '—'),
       itemLabel: groupTitle,
       vehicleKindLabel: first.isTrailer ? 'Mooc' : 'Xe',
       kindLabel: '—',
@@ -75227,6 +75423,19 @@ function registerRemindDashboardGrid(leaves) {
       } },
     { id: 'odoText', field: 'odoNum', name: 'Số km xe', width: 100, minWidth: 88, sortable: true, cssClass: 'r', toolTip: 'Số km trên đồng hồ xe / mooc',
       formatter: (r, c, v, col, item) => `<span class="tabular-nums">${esc(item.odoText || '—')}</span>` },
+    { id: 'avgKmPerMonthText', field: 'avgKmPerMonthNum', name: 'Km TB / tháng', width: 120, minWidth: 100, sortable: true, cssClass: 'r', toolTip: 'Xe chạy trung bình 1 tháng (km)',
+      formatter: (r, c, v, col, item) => `<span class="tabular-nums text-slate-800" title="Trung bình km chạy / tháng">${esc(item.avgKmPerMonthText || '—')}</span>` },
+    { id: 'maintClassLabel', field: 'maintClassLabel', name: 'Phân loại bảo dưỡng', width: 150, minWidth: 120, sortable: true, filterType: 'select',
+      formatter: (r, c, v, col, item) => {
+        if (item.__group) {
+          return `<span class="text-xs text-slate-500">${esc(item.maintClassLabel || '—')}</span>`;
+        }
+        const lab = item.maintClassLabel || '—';
+        const cls = item.rowKind === 'TIRE_BATTERY'
+          ? (item.tbKind === 'BATTERY' ? 'bg-amber-50 text-amber-900 border-amber-200' : 'bg-violet-50 text-violet-900 border-violet-200')
+          : 'bg-sky-50 text-sky-900 border-sky-200';
+        return `<span class="inline-flex rounded border px-1.5 py-0.5 text-[11px] font-medium ${cls}" title="${esc(lab)}">${esc(lab)}</span>`;
+      } },
     { id: 'areaLabel', field: 'areaLabel', name: 'Khu vực', width: 110, minWidth: 80, sortable: true,
       formatter: (r, c, v, col, item) => esc(item.areaLabel || '—') },
     { id: 'usedKmText', field: 'usedKmNum', name: 'Đã dùng (km)', width: 120, minWidth: 100, sortable: true, cssClass: 'r', toolTip: 'Lốp/ắc — km đã dùng',
@@ -79861,12 +80070,78 @@ function openCriteriaItemModal(gid, itemId) {
 }
 
 function finalizeOrderIfAllWorkItemsDone(id) {
-  const o = DB.orders.find(x => x.id === id);
-  if (!o || !allWorkItemsDone(o)) return false;
-  return completeOrder(id);
+  const o = DB.orders.find(x => String(x.id) === String(id));
+  if (!o || !allWorkItemsDone(o) || o.status === 'COMPLETED') return false;
+  openCompleteOrderOdoModal(id);
+  return true;
 }
-function completeOrder(id) {
-  const o = DB.orders.find(x => x.id === id);
+/** Popup nhập Odo thực tế khi đủ hạng mục HT → mới khóa phiếu. */
+function openCompleteOrderOdoModal(orderId) {
+  const o = DB.orders.find(x => String(x.id) === String(orderId));
+  if (!o || !allWorkItemsDone(o) || o.status === 'COMPLETED') return;
+  ensureOrderApproval(o);
+  if (o.approvalStatus !== 'APPROVED') {
+    toast('Chỉ hoàn thành khi phiếu đã được duyệt');
+    return;
+  }
+  const v = vehicleById(o.vehicleId);
+  const prevOrderKm = o.km != null && o.km !== '' ? Number(o.km) : null;
+  const prevVehKm = v?.km != null && v.km !== '' ? Number(v.km) : null;
+  const minKm = Math.max(
+    Number.isFinite(prevOrderKm) ? prevOrderKm : 0,
+    Number.isFinite(prevVehKm) ? prevVehKm : 0
+  );
+  const defaultKm = Number.isFinite(prevOrderKm) ? prevOrderKm
+    : (Number.isFinite(prevVehKm) ? prevVehKm : '');
+  openModal(`
+    <div class="border-b border-slate-200 px-5 py-4">
+      <h2 class="text-lg font-bold">Nhập Odo thực tế · hoàn thành phiếu</h2>
+      <p class="text-sm text-slate-500">${esc(o.code)} · ${esc(v?.plate || '—')} · đủ ${(o.workItems || []).length} hạng mục đã HT</p>
+    </div>
+    <form id="completeOrderOdoForm" class="space-y-3 px-5 py-4">
+      <div class="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-950">
+        Tất cả hạng mục đã hoàn thành. Nhập số km trên đồng hồ (Odo thực tế) để khóa phiếu.
+      </div>
+      <dl class="grid gap-2 text-sm sm:grid-cols-2">
+        <div><dt class="text-xs text-slate-500">Odo trên phiếu (khi tạo)</dt><dd class="font-medium tabular-nums">${prevOrderKm != null && Number.isFinite(prevOrderKm) ? kmFmt(prevOrderKm) + ' km' : '—'}</dd></div>
+        <div><dt class="text-xs text-slate-500">Odo hiện tại trên xe</dt><dd class="font-medium tabular-nums">${prevVehKm != null && Number.isFinite(prevVehKm) ? kmFmt(prevVehKm) + ' km' : '—'}</dd></div>
+      </dl>
+      <label class="block text-sm font-medium text-slate-700">Odo thực tế (km) <span class="text-rose-600">*</span>
+        <input id="completeOrderActualKm" name="actualKm" type="number" min="${minKm}" step="1" required
+          value="${defaultKm === '' ? '' : defaultKm}"
+          class="mt-1 w-full tabular-nums" placeholder="Nhập số km đồng hồ" />
+      </label>
+      <p class="text-[11px] text-slate-500 m-0">Tối thiểu ${kmFmt(minKm)} km (không nhỏ hơn Odo phiếu / xe đang ghi). Sau khi xác nhận, phiếu chuyển Hoàn thành và cập nhật kỳ BD theo Odo này.</p>
+      <div class="flex justify-end gap-2 pt-1">
+        <button type="button" data-close class="btn btn-outline">Để sau</button>
+        <button type="submit" class="btn btn-emerald">Xác nhận · hoàn thành phiếu</button>
+      </div>
+    </form>`, 'max-w-md');
+  $('[data-close]').onclick = closeModal;
+  const kmInput = $('#completeOrderActualKm');
+  if (kmInput) {
+    setTimeout(() => { kmInput.focus(); kmInput.select?.(); }, 50);
+  }
+  $('#completeOrderOdoForm').onsubmit = (e) => {
+    e.preventDefault();
+    const raw = $('#completeOrderActualKm')?.value;
+    const km = Number(raw);
+    if (!Number.isFinite(km) || km < 0) {
+      toast('Odo không hợp lệ');
+      return;
+    }
+    if (km < minKm) {
+      toast(`Odo thực tế phải ≥ ${kmFmt(minKm)} km`);
+      kmInput?.focus();
+      return;
+    }
+    closeModal();
+    completeOrder(orderId, { actualKm: km });
+  };
+}
+function completeOrder(id, opts) {
+  opts = opts || {};
+  const o = DB.orders.find(x => String(x.id) === String(id));
   if (!o) return false;
   ensureOrderApproval(o);
   if (o.status === 'COMPLETED') return false;
@@ -79875,6 +80150,22 @@ function completeOrder(id) {
     return false;
   }
   if (!allWorkItemsDone(o)) return false;
+  if (opts.actualKm == null || opts.actualKm === '') {
+    openCompleteOrderOdoModal(id);
+    return false;
+  }
+  const km = Number(opts.actualKm);
+  if (!Number.isFinite(km) || km < 0) {
+    toast('Odo không hợp lệ');
+    return false;
+  }
+  const prevKm = o.km;
+  o.km = km;
+  o.actualKm = km;
+  const v = vehicleById(o.vehicleId);
+  if (v && (v.km == null || km >= Number(v.km) || Number.isNaN(Number(v.km)))) {
+    v.km = km;
+  }
   if (o.status === 'NOT_STARTED') {
     o.status = 'IN_PROGRESS';
     if (!o.startedAt) o.startedAt = nowStamp();
@@ -79887,7 +80178,10 @@ function completeOrder(id) {
   }
   if (!o.approvalLog) o.approvalLog = [];
   freezeOrderMaterialSnapshots(o, 'COMPLETE');
-  o.approvalLog.push({ at, action: 'COMPLETE', by: 'Nguyễn Văn Kỹ thuật', note: 'Hoàn thành thực tế · ' + fmtStampVi(at) + ' · chi phí ' + money(o.cost) + ' · khóa snapshot VT · đủ ' + (o.workItems || []).length + ' hạng mục' });
+  const kmNote = prevKm != null && Number(prevKm) !== km
+    ? ` · Odo ${kmFmt(prevKm)} → ${kmFmt(km)} km`
+    : ` · Odo thực tế ${kmFmt(km)} km`;
+  o.approvalLog.push({ at, action: 'COMPLETE', by: 'Nguyễn Văn Kỹ thuật', note: 'Hoàn thành thực tế · ' + fmtStampVi(at) + kmNote + ' · chi phí ' + money(o.cost) + ' · khóa snapshot VT · đủ ' + (o.workItems || []).length + ' hạng mục' });
   const maintItems = (o.workItems || []).filter(w => ensureWorkItemKind(w, o) === 'MAINT' && w.catalogId);
   if (o.catalogId && !maintItems.some(w => String(w.catalogId) === String(o.catalogId))) {
     maintItems.push({ catalogId: o.catalogId, kind: 'MAINT' });
@@ -79902,7 +80196,8 @@ function completeOrder(id) {
     st.nextKm = next.nextKm; st.nextDate = next.nextDate;
     nCat++;
   });
-  toast(nCat ? `Đã hoàn thành phiếu · cập nhật ${nCat} kỳ danh mục BD` : 'Đã hoàn thành phiếu');
+  save();
+  toast(nCat ? `Đã hoàn thành phiếu · Odo ${kmFmt(km)} km · cập nhật ${nCat} kỳ danh mục BD` : `Đã hoàn thành phiếu · Odo ${kmFmt(km)} km`);
   render();
   return true;
 }
@@ -79964,18 +80259,21 @@ function openStartWorkItemModal(orderId, idx) {
   $('#wiStartConfirm').onclick = () => startWorkItem(orderId, idx);
 }
 
-function completeWorkItem(orderId, idx) {
+function completeWorkItem(orderId, idx, opts) {
+  opts = opts || {};
   const o = DB.orders.find(x => x.id === orderId);
   if (!o || !canCompleteWorkItems(o)) return;
   ensureOrderApproval(o);
   const w = o.workItems[idx];
   if (!w || w.completedAt) return;
   if (!w.startedAt) { toast('Cần bấm «Bắt đầu» hạng mục trước'); return; }
+  ensureWorkItemFields(w, o);
   const barem = w.standardHours != null ? w.standardHours
     : (w.systemId && w.content ? resolveBaremHours(w.systemId, w.content) : null);
   const at = nowStamp();
   const act = actualHoursFromRange(w.startedAt, at);
   if (act == null || Number.isNaN(act)) { toast('Không tính được giờ thực tế'); return; }
+  if (opts.completionNote != null) w.completionNote = String(opts.completionNote || '').trim();
   w.standardHours = barem;
   w.hours = act;
   w.completedAt = at;
@@ -79990,12 +80288,15 @@ function completeWorkItem(orderId, idx) {
   }
   o.approvalLog.push({
     at, action: 'WI_COMPLETE', by: 'Nguyễn Văn Kỹ thuật',
-    note: `HT hạng mục: ${w.content} · từ ${fmtStampVi(w.startedAt)} → ${fmtStampVi(at)} · TT ${act.toFixed(1)}h · barem ${barem != null ? barem.toFixed(1) : '—'}h · ${delta}`,
+    note: `HT hạng mục: ${w.content} · từ ${fmtStampVi(w.startedAt)} → ${fmtStampVi(at)} · TT ${act.toFixed(1)}h · barem ${barem != null ? barem.toFixed(1) : '—'}h · ${delta}`
+      + (w.completionNote ? ` · ghi chú: ${w.completionNote}` : ''),
   });
   closeModal();
-  if (!finalizeOrderIfAllWorkItemsDone(orderId)) {
-    toast(`Đã hoàn thành hạng mục · TT ${act.toFixed(1)}h · ${delta}`);
-    render();
+  save();
+  toast(`Đã hoàn thành hạng mục · TT ${act.toFixed(1)}h · ${delta}`);
+  render();
+  if (allWorkItemsDone(o) && o.status !== 'COMPLETED') {
+    openCompleteOrderOdoModal(orderId);
   }
 }
 
@@ -80006,6 +80307,7 @@ function openCompleteWorkItemModal(orderId, idx) {
   const w = o.workItems[idx];
   if (!w || w.completedAt) return;
   if (!w.startedAt) { toast('Cần bấm «Bắt đầu» hạng mục trước'); return; }
+  ensureWorkItemFields(w, o);
   const barem = w.standardHours != null ? w.standardHours
     : (w.systemId && w.content ? resolveBaremHours(w.systemId, w.content) : null);
   const endAt = nowStamp();
@@ -80027,13 +80329,19 @@ function openCompleteWorkItemModal(orderId, idx) {
         <strong class="ml-1 text-slate-900">${baremDeltaText(act, barem)}</strong>
         <p class="mt-1 text-[11px] text-slate-500 m-0">Giờ TT = thời điểm bắt đầu → hoàn thành hạng mục. KTV không nhập tay.</p>
       </div>
+      <label class="block text-sm font-medium text-slate-700">Ghi chú
+        <span class="font-normal text-slate-400">(không bắt buộc · nhập lúc hoàn thành)</span>
+        <textarea id="wiCompleteNote" rows="2" class="mt-1 w-full" placeholder="Ghi chú khi hoàn thành…">${esc(w.completionNote || '')}</textarea>
+      </label>
       <div class="flex justify-end gap-2 pt-1">
         <button type="button" data-close class="btn btn-outline">Hủy</button>
         <button type="button" id="wiCompleteConfirm" class="btn btn-emerald">Xác nhận hoàn thành</button>
       </div>
     </div>`, 'max-w-md');
   $('[data-close]').onclick = closeModal;
-  $('#wiCompleteConfirm').onclick = () => completeWorkItem(orderId, idx);
+  $('#wiCompleteConfirm').onclick = () => completeWorkItem(orderId, idx, {
+    completionNote: $('#wiCompleteNote')?.value || '',
+  });
 }
 
 function submitOrderForApproval(id, isResubmit) {
@@ -80736,47 +81044,55 @@ function openMaterialModal(orderId, idx) {
   };
 }
 
-function handleOrderImageFiles(orderId, fileList) {
+function handleOrderImageFiles(orderId, fileList, kind) {
   const o = DB.orders.find(x => x.id === orderId);
-  if (!o || !canEditOrderDetail(o)) return;
+  if (!o || !canUploadOrderImages(o)) return;
   ensureOrderApproval(o);
+  const k = kind === 'condition' ? 'condition' : 'acceptance';
+  const list = orderImageList(o, k);
+  const label = k === 'condition' ? 'hiện trạng' : 'nghiệm thu';
   const before = orderSnapshot(o);
   const files = [...(fileList || [])].filter(f => f.type.startsWith('image/'));
   if (!files.length) { toast('Chọn file ảnh'); return; }
-  const room = Math.max(0, 8 - (o.images || []).length);
-  if (!room) { toast('Đã đủ 8 ảnh'); return; }
+  const room = Math.max(0, 8 - (list || []).length);
+  if (!room) { toast('Đã đủ 8 ảnh «' + label + '»'); return; }
   const take = files.slice(0, room);
   let done = 0;
   take.forEach(file => {
     const reader = new FileReader();
     reader.onload = () => {
-      o.images.push({
-        id: uid('img'),
+      list.push({
+        id: uid(k === 'condition' ? 'cimg' : 'aimg'),
         name: file.name,
         dataUrl: reader.result,
         createdAt: nowStamp(),
       });
       done += 1;
       if (done === take.length) {
-        logOrderEdit(o, before, `Thêm ${take.length} ảnh`);
-        toast(`Đã thêm ${take.length} ảnh`);
+        o.images = o.acceptanceImages;
+        logOrderEdit(o, before, `Thêm ${take.length} ảnh ${label}`);
+        toast(`Đã thêm ${take.length} ảnh ${label}`);
         render();
       }
     };
     reader.readAsDataURL(file);
   });
-  if (files.length > room) toast(`Chỉ thêm được ${room} ảnh nữa (tối đa 8)`);
+  if (files.length > room) toast(`Chỉ thêm được ${room} ảnh nữa (tối đa 8 / cụm)`);
 }
 
-function deleteOrderImage(orderId, idx) {
-  const o = DB.orders.find(x => x.id === orderId);
-  if (!o || !canEditOrderDetail(o)) return;
+function deleteOrderImage(orderId, idx, kind) {
+  const o = DB.orders.find(x => String(x.id) === String(orderId));
+  if (!o || !canUploadOrderImages(o)) return;
   ensureOrderApproval(o);
+  const k = kind === 'condition' ? 'condition' : 'acceptance';
+  const list = orderImageList(o, k);
+  const label = k === 'condition' ? 'hiện trạng' : 'nghiệm thu';
   const before = orderSnapshot(o);
-  if (!o.images[idx]) return;
-  o.images.splice(idx, 1);
-  logOrderEdit(o, before, 'Xóa ảnh');
-  toast('Đã xóa ảnh');
+  if (!list[idx]) return;
+  list.splice(idx, 1);
+  o.images = o.acceptanceImages;
+  logOrderEdit(o, before, 'Xóa ảnh ' + label);
+  toast('Đã xóa ảnh ' + label);
   render();
 }
 
@@ -81348,17 +81664,34 @@ function bind() {
     const [oid, idx] = b.dataset.delMaterial.split(':');
     deleteMaterial(oid, Number(idx));
   });
-  $$('[data-del-order-image]').forEach(b => b.onclick = () => {
+  $$('[data-del-order-image]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
     const [oid, idx] = b.dataset.delOrderImage.split(':');
-    deleteOrderImage(oid, Number(idx));
+    const kind = b.getAttribute('data-order-image-kind') || 'acceptance';
+    deleteOrderImage(oid, Number(idx), kind);
+  });
+  $$('[data-preview-order-image]').forEach((b) => {
+    b.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const oid = b.getAttribute('data-preview-order-image');
+      const kind = b.getAttribute('data-order-image-kind') || 'acceptance';
+      const idx = Number(b.getAttribute('data-order-image-idx'));
+      openOrderImagePreview(oid, kind, idx);
+    };
   });
   $$('[data-order-images]').forEach(inp => {
     inp.onchange = () => {
-      handleOrderImageFiles(inp.dataset.orderImages, inp.files);
+      const kind = inp.getAttribute('data-order-image-kind') || 'acceptance';
+      handleOrderImageFiles(inp.dataset.orderImages, inp.files, kind);
       inp.value = '';
     };
   });
   $$('[data-start-order]').forEach(b => b.onclick = () => startOrder(b.dataset.startOrder));
+  $$('[data-complete-order-odo]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    openCompleteOrderOdoModal(b.dataset.completeOrderOdo);
+  });
   $$('[data-sync-purchase]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();
     syncPurchaseOrder(b.dataset.syncPurchase);
