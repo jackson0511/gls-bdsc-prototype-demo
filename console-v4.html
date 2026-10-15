@@ -74832,7 +74832,6 @@ function pageTireBattery() {
   const unitRow = (u) => {
     const level = tireBatteryWarnLevel(u);
     const warn = !!level;
-    const kmP = tbUsagePct(u.usedKm, u.maxKm);
     const moP = tbUsagePct(u.usedMonth, u.maxMonth);
     const kindChip = u.kind === 'BATTERY'
       ? '<span class="chip bg-violet-100 text-violet-800">Ắc quy</span>'
@@ -74861,7 +74860,6 @@ function pageTireBattery() {
       </td>
       <td class="td">${esc(u.name || '—')}</td>
       <td class="td text-xs">${esc(u.supplier || '—')}</td>
-      <td class="td text-right text-xs tabular-nums">${kmFmt(u.usedKm)} / ${kmFmt(u.maxKm)}<div class="text-[10px] text-slate-400">${kmP}%</div>${usageBar(kmP)}</td>
       <td class="td text-right text-xs tabular-nums">${u.usedMonth} / ${u.maxMonth} th<div class="text-[10px] text-slate-400">${moP}%</div>${usageBar(moP)}</td>
       <td class="td text-center">${ttCell}</td>
     </tr>`;
@@ -74876,7 +74874,6 @@ function pageTireBattery() {
             <th class="th text-left">Seri / Mã</th>
             <th class="th text-left">Tên</th>
             <th class="th text-left">Nhà cung cấp</th>
-            <th class="th text-right">Km đã dùng</th>
             <th class="th text-right">Tháng đã dùng</th>
             <th class="th text-center">TT</th>
           </tr></thead>
