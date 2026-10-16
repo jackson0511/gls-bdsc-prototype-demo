@@ -74949,14 +74949,14 @@ function pageTireBattery() {
       : `<button type="button" data-tb-warn-chip="${level === 'overdue' ? 'OVERDUE' : (warn ? 'SOON' : 'OK')}" class="bg-transparent p-0 border-0 cursor-pointer">${level === 'overdue' ? evalBadge('overdue') : (warn ? evalBadge('soon') : evalBadge('ok'))}</button>`;
     return `<tr class="row-h ${warn ? 'bg-amber-50/50' : ''}">
       <td class="td text-center"><input type="checkbox" class="tb-row" data-id="${esc(u.id)}" data-group-key="${esc(sel)}" ${warn ? 'checked' : ''} ${attach !== 'MOUNTED' ? 'disabled' : ''} /></td>
-      <td class="td">${side}${attachChip}</td>
-      <td class="td font-mono text-sm font-bold tracking-wide text-slate-900 whitespace-nowrap">${esc(u.serial || '—')}</td>
       <td class="td font-mono text-xs text-slate-700 whitespace-nowrap">${esc(u.code || '—')}</td>
-      <td class="td text-xs font-medium text-slate-800">${esc(u.brand || '—')}</td>
+      <td class="td font-mono text-sm font-bold tracking-wide text-slate-900 whitespace-nowrap">${esc(u.serial || '—')}</td>
       <td class="td">${esc(u.name || '—')}</td>
-      <td class="td text-center">${conditionChip(u)}</td>
+      <td class="td text-xs font-medium text-slate-800">${esc(u.brand || '—')}</td>
       <td class="td text-xs">${esc(u.supplier || '—')}</td>
+      <td class="td">${side}${attachChip}</td>
       <td class="td text-right text-xs tabular-nums">${u.usedMonth} / ${u.maxMonth} th<div class="text-[10px] text-slate-400">${moP}%</div>${usageBar(moP)}</td>
+      <td class="td text-center">${conditionChip(u)}</td>
       <td class="td text-center">${ttCell}</td>
     </tr>`;
   };
@@ -74965,14 +74965,14 @@ function pageTireBattery() {
         <table class="min-w-full text-sm">
           <thead class="sticky top-0 bg-slate-50 text-slate-600"><tr>
             <th class="th"><input type="checkbox" id="tbCheckAll" /></th>
-            <th class="th text-left">Vị trí</th>
-            <th class="th text-left">Seri</th>
             <th class="th text-left">Mã</th>
-            <th class="th text-left">Nhãn hiệu</th>
+            <th class="th text-left">Seri</th>
             <th class="th text-left">Tên</th>
-            <th class="th text-center">Tình trạng</th>
+            <th class="th text-left">Nhãn hiệu</th>
             <th class="th text-left">Nhà cung cấp</th>
+            <th class="th text-left">Vị trí</th>
             <th class="th text-right">Tháng đã dùng</th>
+            <th class="th text-center">Tình trạng</th>
             <th class="th text-center">TT hạn</th>
           </tr></thead>
           <tbody>${detailUnits.map(unitRow).join('')}</tbody>
