@@ -75063,7 +75063,7 @@ function pageTireBattery() {
             <span class="sr-only">Tìm biển số hoặc tiêu đề</span>
             <input id="flt-search" type="search" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Tìm biển số xe / tiêu đề…" value="${esc(f.search || '')}" autocomplete="off" />
           </label>
-          ${filterSelect('flt-tbWarn', 'Cảnh báo (gắn xe)', warnF, [['ALL', 'Tất cả'], ['WARN', 'Sắp / đến hạn'], ['SOON', 'Sắp hạn'], ['OVERDUE', 'Quá hạn'], ['OK', 'Đúng hạn']])}
+          ${filterSelect('flt-tbWarn', 'Cảnh báo (gắn xe)', warnF, [['ALL', 'Tất cả'], ['WARN', 'Sắp / đến hạn'], ['SOON', 'Sắp hạn'], ['OVERDUE', 'Quá hạn'], ['OK', 'Còn hạn']])}
         </div>
         <div class="max-h-[70vh] overflow-y-auto">${leftList}</div>
       </div>
