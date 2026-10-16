@@ -278,11 +278,20 @@
     .assess-fail-workspace .list-slick-host {
       width: 100% !important;
     }
-    .list-slick-workspace .slick-pane,
-    .list-slick-workspace .slick-viewport,
-    .list-slick-workspace .slick-header,
-    .list-slick-workspace .slick-headerrow {
+    /* Không freeze: kéo pane full width. Có freeze: chỉ pane phải — pane trái giữ width SlickGrid (tránh đè click/contextmenu) */
+    .list-slick-workspace .list-slick-host:not(:has(.slick-pane-left)) .slick-pane,
+    .list-slick-workspace .list-slick-host:not(:has(.slick-pane-left)) .slick-viewport,
+    .list-slick-workspace .list-slick-host:not(:has(.slick-pane-left)) .slick-header,
+    .list-slick-workspace .list-slick-host:not(:has(.slick-pane-left)) .slick-headerrow,
+    .list-slick-workspace .slick-pane-right,
+    .list-slick-workspace .slick-pane-right .slick-viewport,
+    .list-slick-workspace .slick-pane-right .slick-header,
+    .list-slick-workspace .slick-pane-right .slick-headerrow {
       width: 100% !important;
+    }
+    .list-slick-workspace .slick-pane-left {
+      pointer-events: auto;
+      z-index: 3;
     }
     /* Không ép header-columns = 100% — khi nhiều cột / tắt forceFit cần width = tổng cột để scroll + hiện tên header */
     .list-slick-workspace .slick-header-columns,
@@ -801,7 +810,8 @@
     .slick-context-menu .slick-menu-item.danger .slick-menu-content,
     .slick-context-menu .slick-menu-item.danger .slick-menu-icon { color: #ef4444; }
     .slick-context-menu .slick-menu-item.disabled { opacity: .45; pointer-events: none; }
-    #plan-grid-container .slick-pane-left {
+    #plan-grid-container .slick-pane-left,
+    .list-slick-workspace .slick-pane-left {
       box-shadow: 2px 0 6px rgba(15, 23, 42, 0.08);
       z-index: 3;
     }
@@ -64154,6 +64164,7 @@ function defaultFilters() {
     executionStatus: 'ALL',
     source: 'ALL',
     system: 'ALL',
+    serviceType: 'ALL',
     area: 'ALL',
     kind: 'ALL',
     evalStatus: 'ALL',
@@ -65261,8 +65272,13 @@ document.addEventListener('mousedown', (e) => {
 }, true);
 document.addEventListener('click', (e) => {
   const root = document.getElementById('cellPopRoot');
+  /* Giữ popover khi bấm ✎ (cell-pop hoặc catalog v2) — mở ở pointerdown, click sau đó không được đóng ngay */
   const btn = e.target && e.target.closest
-    ? e.target.closest('.sg-cell-edit-btn[data-cell-pop], button[data-cell-pop]')
+    ? e.target.closest(
+      '.sg-cell-edit-btn[data-cell-pop], button[data-cell-pop],'
+      + ' .sg-cell-edit-btn[data-catalog-v2-edit], button[data-catalog-v2-edit],'
+      + ' .sg-cell-edit-btn[data-catalog-v2-edit-rule], button[data-catalog-v2-edit-rule]'
+    )
     : null;
   if (btn) {
     e.preventDefault();
@@ -67371,6 +67387,26 @@ function showListCtx(ev, key, item) {
       plate: item.plate,
       code: item.plate || '',
     };
+  } else if (key === 'catalogV2') {
+    const cid = item.catalogId != null ? item.catalogId : item.id;
+    const label = item.name || item.code || ('#' + cid);
+    bits.push(slickMenuItem('cat-open-panel', 'file', 'Mở panel · Chu kỳ'));
+    bits.push(slickMenuItem('cat-open-vehicles', 'truck', 'Mở panel · Xe đang dùng'));
+    bits.push(slickMenuItem('cat-open-detail', 'eye', 'Mở trang chi tiết đầy đủ'));
+    bits.push(`<div class="slick-menu-item slick-menu-item-divider"></div>`);
+    bits.push(slickMenuItem('cat-edit-meta', 'file', 'Sửa thông tin danh mục'));
+    bits.push(slickMenuItem('cat-add-rule', 'plus', 'Thêm mốc chu kỳ'));
+    bits.push(slickMenuItem('cat-bulk-assign', 'plus', 'Gắn hàng loạt vào xe'));
+    bits.push(`<div class="slick-menu-item slick-menu-item-divider"></div>`);
+    bits.push(slickMenuItem('copy-code', 'copy', 'Sao chép mã' + (item.code ? ' ' + item.code : '')));
+    bits.push(slickMenuItem('copy-name', 'copy', 'Sao chép tên'));
+    bits.push(slickMenuItem('cat-delete', 'x', 'Xóa danh mục', 'danger'));
+    el._listCtx = {
+      key, item,
+      catalogId: cid,
+      code: item.code || '',
+      name: item.name || label,
+    };
   } else {
     bits.push(slickMenuItem('copy-code', 'copy', 'Sao chép'));
     el._listCtx = { key, item, code: item.code || item.plate || item.name || '' };
@@ -67469,6 +67505,61 @@ function showListCtx(ev, key, item) {
         if (!kids.length) { toast('Không có hạng mục lỗi để tạo phiếu SC'); return; }
         view.checkedAssessFailIds = kids.map(r => String(r.id));
         createRepairOrdersFromAssessFailSelection();
+        return;
+      }
+      if (act === 'cat-open-panel' && ctx.catalogId != null) {
+        view.catalogV2PanelTab = 'rules';
+        openCatalogV2Panel(ctx.catalogId);
+        return;
+      }
+      if (act === 'cat-open-vehicles' && ctx.catalogId != null) {
+        view.catalogV2PanelTab = 'vehicles';
+        openCatalogV2Panel(ctx.catalogId);
+        return;
+      }
+      if (act === 'cat-open-detail' && ctx.catalogId != null) {
+        view = { ...view, name: 'catalogDetail', catalogId: Number(ctx.catalogId), page: 1, filters: defaultFilters() };
+        render();
+        return;
+      }
+      if (act === 'cat-edit-meta' && ctx.catalogId != null) {
+        openCatalogMetaModal(Number(ctx.catalogId));
+        return;
+      }
+      if (act === 'cat-add-rule' && ctx.catalogId != null) {
+        view.catalogV2PanelTab = 'rules';
+        view.selectedCatalogId = Number(ctx.catalogId);
+        view.catalogV2PanelOpen = true;
+        openEditCatRules(Number(ctx.catalogId), -1);
+        return;
+      }
+      if (act === 'cat-bulk-assign') {
+        openBulkAssignCatalogModal();
+        return;
+      }
+      if (act === 'cat-delete' && ctx.catalogId != null) {
+        const c = catById(Number(ctx.catalogId));
+        if (!c) return;
+        if (!confirm('Xóa danh mục «' + (c.name || c.code || ctx.catalogId) + '»?\nXe đã gắn sẽ mất liên kết danh mục này.')) return;
+        const cid = Number(ctx.catalogId);
+        DB.catalog = (DB.catalog || []).filter(x => Number(x.id) !== cid);
+        ensureVehicleCatalogAssign();
+        Object.keys(DB.vehicleCatalogIds || {}).forEach(k => {
+          DB.vehicleCatalogIds[k] = (DB.vehicleCatalogIds[k] || []).filter(id => Number(id) !== cid);
+        });
+        if (view.selectedCatalogId != null && Number(view.selectedCatalogId) === cid) {
+          view.catalogV2PanelOpen = false;
+          view.selectedCatalogId = null;
+        }
+        if (typeof save === 'function') save();
+        toast('Đã xóa danh mục');
+        render();
+        return;
+      }
+      if (act === 'copy-name') {
+        const text = ctx.name || '';
+        if (navigator.clipboard && text) navigator.clipboard.writeText(text).then(() => toast('Đã sao chép tên')).catch(() => toast(text));
+        else toast(text || '—');
         return;
       }
       if (act === 'copy-code') {
@@ -67913,7 +68004,8 @@ function mountListSlickGrid(host, rows, cols, opts) {
       const item = visibleRows[i];
       if (!item) return null;
       const sel = (view._listSelKey === key && String(item.id) === String(view._listSelId))
-        || (key === 'assessResults' && view.assessFailPanelOpen && String(item.id) === String(view.selectedAssessFailId));
+        || (key === 'assessResults' && view.assessFailPanelOpen && String(item.id) === String(view.selectedAssessFailId))
+        || (key === 'catalogV2' && view.catalogV2PanelOpen && String(item.id) === String(view.selectedCatalogId));
       if (key === 'assessResults' && item.__group) {
         /* Dòng xe: gộp title+ghi chú; giữ các cột meta / SC */
         return {
@@ -68356,6 +68448,12 @@ function mountListSlickGrid(host, rows, cols, opts) {
           openOrdersByPlate(viewOrders.getAttribute('data-view-orders-plate') || '', view.name === 'fleet' ? 'fleet' : (view.from || null));
           return;
         }
+        const catV2Edit = t.closest('[data-catalog-v2-edit], [data-catalog-v2-edit-rule]');
+        if (key === 'catalogV2' && catV2Edit) {
+          if (native && native.stopPropagation) native.stopPropagation();
+          if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
+          return;
+        }
       }
       const item = visibleRows[args.row];
       if (!item) return;
@@ -68366,6 +68464,9 @@ function mountListSlickGrid(host, rows, cols, opts) {
         try { if (typeof refreshAssessFailChecks === 'function') refreshAssessFailChecks(); } catch (_) {}
         /* Chỉ mở panel khi bấm dòng nhóm xe / phiếu ĐG — giống dblclick mở panel kế hoạch */
         if (item.__group && typeof openAssessFailPanel === 'function') openAssessFailPanel(item);
+      }
+      if (key === 'catalogV2' && item.catalogId != null && typeof openCatalogV2Panel === 'function') {
+        openCatalogV2Panel(item.catalogId);
       }
     });
     if (key === 'assessResults' && grid.onDblClick) {
@@ -69706,6 +69807,7 @@ function defaultView(overrides = {}) {
     selectedAssessFailId: null,
     checkedAssessFailIds: [],
     orderId: null, catalogId: null, criteriaGroupId: null, from: null,
+    catalogV2PanelOpen: false, selectedCatalogId: null, catalogV2PanelTab: 'rules',
     menuScope: FLEET_MENU_HIDDEN ? 'MAINT' : null,
     page: 1, pageSize: 10,
     filters: FLEET_MENU_HIDDEN
@@ -69978,6 +70080,7 @@ function sanitizeRestoredView(raw) {
   if (v.name === 'order' && !(DB.orders || []).some((o) => String(o.id) === String(v.orderId))) return home(scope);
   if (v.name === 'vehicle' && !(DB.vehicles || []).some((x) => Number(x.id) === Number(v.vehicleId))) return home(scope);
   if ((v.name === 'catHistory' || v.name === 'vehicleHistory') && !(DB.vehicles || []).some((x) => Number(x.id) === Number(v.vehicleId))) return home(scope);
+  if (v.name === 'catalogV2') v.name = 'catalog';
   if (v.name === 'catalogDetail' && !(DB.catalog || []).some((c) => Number(c.id) === Number(v.catalogId))) {
     return defaultView({ name: 'catalog', filters: defaultFilters() });
   }
@@ -70059,6 +70162,28 @@ function toast(msg) {
 function vehicleById(id) { return DB.vehicles.find(v => v.id === Number(id)); }
 function catById(id) { return DB.catalog.find(c => c.id === Number(id)); }
 
+/** Gợi ý loại BD (master Loại dịch vụ) theo hệ thống danh mục. */
+function inferCatalogServiceTypeId(c) {
+  const blob = `${c?.system || ''} ${c?.name || ''} ${c?.code || ''}`.toLowerCase();
+  if (/ắc quy|ac quy|acquy/.test(blob)) return 'svc-acq';
+  if (/vỏ lốp|vo lop|lốp/.test(blob)) return 'svc-lop';
+  if (serviceTypeById('svc-bd')) return 'svc-bd';
+  return activeServiceTypes()[0]?.id || '';
+}
+function catalogServiceTypeLabel(c) {
+  if (!c) return '—';
+  const st = serviceTypeById(c.serviceTypeId);
+  if (st) return st.name;
+  return c.serviceType || '—';
+}
+function serviceTypeOptionsHtml(selectedId, systemId) {
+  const list = systemId ? serviceTypesForSystem(systemId) : activeServiceTypes();
+  const opts = list.length ? list : activeServiceTypes();
+  const sel = selectedId || '';
+  return `<option value="">— Chọn loại bảo dưỡng —</option>` + opts.map(st =>
+    `<option value="${esc(st.id)}" ${String(st.id) === String(sel) ? 'selected' : ''}>${esc(st.name)}${st.code ? ' (' + esc(st.code) + ')' : ''}</option>`
+  ).join('');
+}
 function normalizeCatalog(c) {
   if (!c) return c;
   const raw = c.rules || [];
@@ -70089,6 +70214,10 @@ function normalizeCatalog(c) {
     const sys = (DB.vehicleSystems || []).find(s => s.name === c.system);
     if (sys) c.systemId = sys.id;
   }
+  if (!c.serviceTypeId) c.serviceTypeId = inferCatalogServiceTypeId(c);
+  const st = serviceTypeById(c.serviceTypeId);
+  if (st) c.serviceType = st.name;
+  else if (!c.serviceType) c.serviceType = catalogServiceTypeLabel(c);
   return c;
 }
 function allEvalItemsFlat() {
@@ -71526,24 +71655,25 @@ function catalogPrimaryRule(c) {
   const rules = (c?.rules || []).slice().sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
   return rules.find(r => r.repeat) || rules[0] || null;
 }
-/** { key, label: '10.000 km' | '180 ngày', sort } */
+/** { key, label: 'cứ mỗi 10.000 km' | 'cứ mỗi 6 tháng', sort } — giữ đơn vị gốc, không đổi sang ngày */
 function catalogCycleMeta(c) {
   const r = catalogPrimaryRule(c);
   if (!r) return { key: 'NONE', label: '—', sort: 9e9, type: null, value: null };
   const t = String(r.type || '').toUpperCase();
   const v = Number(r.value) || 0;
-  if (t === 'KM') return { key: 'KM:' + v, label: kmFmt(v) + ' km', sort: v, type: t, value: v };
-  if (t === 'HOUR') return { key: 'HOUR:' + v, label: kmFmt(v) + ' giờ', sort: 1e7 + v, type: t, value: v };
+  const prefix = r.repeat ? 'cứ mỗi ' : '';
+  if (t === 'KM') return { key: 'KM:' + v, label: prefix + kmFmt(v) + ' km', sort: v, type: t, value: v };
+  if (t === 'HOUR') return { key: 'HOUR:' + v, label: prefix + kmFmt(v) + ' giờ', sort: 1e7 + v, type: t, value: v };
   if (t === 'MONTH') {
     const days = Math.round(v * 30);
-    return { key: 'MONTH:' + v, label: kmFmt(days) + ' ngày', sort: 2e7 + days, type: t, value: v };
+    return { key: 'MONTH:' + v, label: prefix + v + ' tháng', sort: 2e7 + days, type: t, value: v };
   }
   if (t === 'YEAR') {
     const days = Math.round(v * 365);
-    return { key: 'YEAR:' + v, label: kmFmt(days) + ' ngày', sort: 3e7 + days, type: t, value: v };
+    return { key: 'YEAR:' + v, label: prefix + v + ' năm', sort: 3e7 + days, type: t, value: v };
   }
-  if (t === 'DAY') return { key: 'DAY:' + v, label: kmFmt(v) + ' ngày', sort: 2e7 + v, type: t, value: v };
-  return { key: t + ':' + v, label: String(v), sort: 8e7 + v, type: t, value: v };
+  if (t === 'DAY') return { key: 'DAY:' + v, label: prefix + kmFmt(v) + ' ngày', sort: 2e7 + v, type: t, value: v };
+  return { key: t + ':' + v, label: prefix + String(v), sort: 8e7 + v, type: t, value: v };
 }
 /** Tạo phiếu nháp BD từ danh mục đã gắn (đăng ký BD/SC hàng loạt) */
 function createDraftOrdersFromVehicleCatalogs(vid, catalogIds) {
@@ -71903,7 +72033,7 @@ function render() {
     else if (view.name === 'repairItems') main.innerHTML = pageRepairItemsMaster();
     else if (view.name === 'serviceTypes') main.innerHTML = pageServiceTypesMaster();
     else if (view.name === 'baremHours') main.innerHTML = pageBaremHoursMaster();
-    else if (view.name === 'catalog') main.innerHTML = pageCatalogMaster();
+    else if (view.name === 'catalog' || view.name === 'catalogV2') main.innerHTML = pageCatalogMasterV2();
     else if (view.name === 'catalogDetail') main.innerHTML = pageCatalogDetail();
     else if (view.name === 'criteria') main.innerHTML = pageCriteriaMaster();
     else if (view.name === 'criteriaDetail') main.innerHTML = pageCriteriaDetail();
@@ -71924,6 +72054,7 @@ function render() {
       if (view.name === 'reminder' && view.remindTab !== 'history') {
         bindRemindDashboardToolbar();
       }
+      if (view.name === 'catalog' || view.name === 'catalogV2') bindCatalogV2Panel();
     } catch (_) {}
     saveViewState();
     if (focusId) {
@@ -71966,7 +72097,7 @@ function updateNav() {
     planTemplate: 'Mẫu kế hoạch', reminder: 'Nhắc bảo dưỡng',
     assessment: 'Đánh giá phương tiện định kỳ', vehicleSystems: 'Hệ thống xe',
     materials: 'Vật tư (PWMS)', vehicleMaps: 'Ánh xạ xe TMS ↔ PWMS', pwmsHistory: 'Lịch sử giá / nhà cung cấp (PWMS)', repairItems: 'Nội dung sửa chữa (PWMS)',
-    catalog: 'Danh mục bảo dưỡng', catalogDetail: 'Chi tiết danh mục bảo dưỡng',
+    catalog: 'Danh mục bảo dưỡng', catalogV2: 'Danh mục bảo dưỡng', catalogDetail: 'Chi tiết danh mục bảo dưỡng',
     criteria: 'Tiêu chí đánh giá', criteriaDetail: 'Chi tiết nhóm tiêu chí',
     settings: 'Cài đặt nhắc đánh giá phương tiện',
     serviceTypes: 'Loại dịch vụ', baremHours: 'Cài đặt giờ sửa chữa kỹ thuật viên',
@@ -71983,6 +72114,7 @@ function updateNav() {
       || (['vehicle', 'order', 'catHistory', 'vehicleHistory'].includes(view.name) && n === entityNav)
       || (view.name === 'planTemplate' && n === plansHome)
       || (view.name === 'catalogDetail' && n === 'catalog')
+      || (view.name === 'catalogV2' && n === 'catalog')
       || (view.name === 'criteriaDetail' && n === 'criteria');
     a.classList.toggle('active', active);
   });
@@ -77335,107 +77467,584 @@ function catalogKmCycle(c) {
   if (v <= 60000) return { key: 60000, label: '60.000 km' };
   return { key: 99999, label: '> 60.000 km' };
 }
-/** Chuỗi mốc dễ đọc: 15.000 km → 30.000 km (thay) */
+/** Nhãn 1 mốc: "cứ mỗi 10.000 km" | "6 tháng · thay" */
+function catalogRuleAmountLabel(r) {
+  if (!r) return '—';
+  const t = String(r.type || '').toUpperCase();
+  const v = Number(r.value) || 0;
+  if (t === 'KM') return kmFmt(v) + ' km';
+  if (t === 'HOUR') return kmFmt(v) + ' giờ';
+  if (t === 'MONTH') return v + ' tháng';
+  if (t === 'YEAR') return v + ' năm';
+  if (t === 'DAY') return kmFmt(v) + ' ngày';
+  return String(v);
+}
+function catalogRuleBriefLabel(r) {
+  if (!r) return '—';
+  const amount = catalogRuleAmountLabel(r);
+  let label = r.repeat ? ('cứ mỗi ' + amount) : amount;
+  if (!r.repeat) label += ' · một lần';
+  if (r.forceReplace) label += ' · thay';
+  return label;
+}
+/** Chuỗi mốc plain-text (tooltip / chỗ không HTML) */
 function catalogRulesBrief(c) {
   normalizeCatalog(c);
   const rules = (c.rules || []).slice().sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
   if (!rules.length) return 'Chưa có mốc';
-  return rules.map((r) => {
-    const t = String(r.type || '').toUpperCase();
-    const v = Number(r.value) || 0;
-    let label = String(v);
-    if (t === 'KM') label = kmFmt(v) + ' km';
-    else if (t === 'HOUR') label = kmFmt(v) + ' giờ';
-    else if (t === 'MONTH') label = v + ' tháng';
-    else if (t === 'YEAR') label = v + ' năm';
-    else if (t === 'DAY') label = v + ' ngày';
-    const tags = [];
-    if (r.forceReplace) tags.push('thay');
-    if (r.repeat) tags.push('lặp');
-    return label + (tags.length ? ' · ' + tags.join(', ') : '');
-  }).join(' → ');
+  return rules.map((r, i) => `#${r.seq || i + 1} ${catalogRuleBriefLabel(r)}`).join(' → ');
+}
+/** HTML list (dùng chỗ khác nếu cần) — master list dùng cột grid Excel */
+function catalogRulesListHtml(c) {
+  normalizeCatalog(c);
+  const rules = (c.rules || []).slice().sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
+  if (!rules.length) return '<span class="text-slate-400">—</span>';
+  return rules.map((r, i) => esc(`#${r.seq || i + 1} ${catalogRuleBriefLabel(r)}`)).join('<br/>');
 }
 function catalogEvalBadShort(c) {
   normalizeCatalog(c);
-  if (c.defaultOnEvalBad === 'REPLACE') {
-    return '<span class="chip bg-rose-50 text-rose-800">Thay</span>';
+  return c.defaultOnEvalBad === 'REPLACE' ? 'Thay thế' : 'Sửa chữa';
+}
+function catalogRuleGridCells(r) {
+  if (!r) {
+    return { value: '—', kind: '—', action: '—' };
   }
-  return '<span class="chip bg-slate-100 text-slate-700">Sửa</span>';
+  return {
+    value: catalogRuleAmountLabel(r),
+    kind: r.repeat ? 'Cứ mỗi kỳ' : 'Một lần',
+    action: r.forceReplace ? 'Phải thay mới' : 'Kiểm tra / bảo dưỡng',
+  };
 }
 function pageCatalogMaster() {
   const f = F();
-  const filtered = DB.catalog.filter(c => {
-    if (!matchSearch([c.code, c.name, c.system].join(' '), f.search)) return false;
-    if (f.system !== 'ALL' && c.system !== f.system) return false;
+  const all = (DB.catalog || []).map(c => { normalizeCatalog(c); return c; });
+  const filtered = all.filter(c => {
+    if (!matchSearch([c.code, c.name, c.system, c.serviceType, catalogServiceTypeLabel(c)].join(' '), f.search)) return false;
+    if (f.system && f.system !== 'ALL' && c.system !== f.system) return false;
+    if (f.serviceType && f.serviceType !== 'ALL' && String(c.serviceTypeId) !== String(f.serviceType) && c.serviceType !== f.serviceType) return false;
     return true;
-  });
-  // Quét nhanh: hiện đủ danh sách đã lọc (không chia trang dày)
-  const prevPageSize = view.pageSize;
-  view.pageSize = Math.max(filtered.length, 1);
+  }).slice().sort((a, b) =>
+    String(a.system || '').localeCompare(String(b.system || ''), 'vi')
+    || String(a.name || '').localeCompare(String(b.name || ''), 'vi')
+  );
   const pg = paginate(filtered);
-  view.pageSize = prevPageSize;
+  const systemNames = [...new Set(all.map(c => c.system || '').filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+  const svcOpts = activeServiceTypes().map(st =>
+    `<option value="${esc(st.id)}" ${String(f.serviceType) === String(st.id) ? 'selected' : ''}>${esc(st.name)}</option>`
+  ).join('');
+
+  const rows = pg.items.map(c => {
+    const rules = (c.rules || []).slice().sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
+    const m1 = catalogRuleGridCells(rules[0]);
+    const m2 = catalogRuleGridCells(rules[1]);
+    const extra = rules.length > 2 ? ` (+${rules.length - 2} mốc)` : '';
+    return `<tr class="row-h cursor-pointer" data-open-catalog="${c.id}" title="Xem chi tiết hạng mục">
+      <td class="td font-medium text-slate-900 whitespace-nowrap">${esc(c.name)}</td>
+      <td class="td font-mono text-xs text-slate-500 whitespace-nowrap">${esc(c.code || '')}</td>
+      <td class="td whitespace-nowrap">${esc(c.system || '—')}</td>
+      <td class="td whitespace-nowrap">${esc(catalogServiceTypeLabel(c))}</td>
+      <td class="td tabular-nums whitespace-nowrap">${esc(m1.value)}</td>
+      <td class="td whitespace-nowrap">${esc(m1.kind)}</td>
+      <td class="td whitespace-nowrap">${esc(m1.action)}</td>
+      <td class="td tabular-nums whitespace-nowrap">${esc(m2.value)}${extra ? `<span class="text-slate-400">${esc(extra)}</span>` : ''}</td>
+      <td class="td whitespace-nowrap">${esc(m2.kind)}</td>
+      <td class="td whitespace-nowrap">${esc(m2.action)}</td>
+      <td class="td whitespace-nowrap">${esc(catalogEvalBadShort(c))}</td>
+      <td class="td text-center whitespace-nowrap" onclick="event.stopPropagation()">
+        <button type="button" data-open-catalog="${c.id}" class="btn btn-outline btn-sm">Chi tiết</button>
+      </td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="12" class="px-5 py-12 text-center text-slate-500">Không tìm thấy hạng mục phù hợp</td></tr>`;
+
   return pageShell(
     'Danh mục bảo dưỡng',
-    'Bấm dòng để mở chi tiết · gắn vào xe ở tab Danh mục trên chi tiết xe',
-    `<button id="btnBulkAssignCatalogs" class="btn btn-outline btn-sm">Áp hàng loạt</button>
-     <button id="btnAddCatalog" class="btn btn-primary btn-sm">+ Thêm</button>`,
+    'Bảng danh mục theo cột · bấm dòng để xem / chỉnh chi tiết',
+    `<button id="btnBulkAssignCatalogs" class="btn btn-outline btn-sm">Gắn hàng loạt vào xe</button>
+     <button id="btnAddCatalog" class="btn btn-primary btn-sm">+ Thêm hạng mục</button>`,
     `
-    ${filterBarShell([
-      filterSearch('flt-search', 'Tìm mã / tên…', f.search),
-      filterSelect('flt-system', 'Hệ thống', f.system, [['ALL','Tất cả'], ...systems().map(s => [s, s])]),
-    ].join(''), `${filtered.length} danh mục`)}
+    <div class="card mb-4 p-3">
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="min-w-[14rem] flex-1">
+          <label class="mb-1 block text-[11px] font-medium text-slate-500">Tìm hạng mục</label>
+          <div class="flt-search !w-full !min-w-0">
+            <span class="flt-search-icon" aria-hidden="true">⌕</span>
+            <input id="flt-search" type="search" placeholder="Tên, mã, bộ phận…" value="${esc(f.search || '')}" autocomplete="off" />
+          </div>
+        </div>
+        <div class="w-full sm:w-48">
+          <label class="mb-1 block text-[11px] font-medium text-slate-500">Bộ phận xe</label>
+          <select id="flt-system" class="form-control">
+            <option value="ALL">Tất cả</option>
+            ${systemNames.map(s => `<option value="${esc(s)}" ${f.system === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}
+          </select>
+        </div>
+        <div class="w-full sm:w-48">
+          <label class="mb-1 block text-[11px] font-medium text-slate-500">Loại công việc</label>
+          <select id="flt-serviceType" class="form-control">
+            <option value="ALL">Tất cả</option>
+            ${svcOpts}
+          </select>
+        </div>
+      </div>
+      <p class="mt-2 text-xs text-slate-500">${filtered.length} dòng</p>
+    </div>
+
     <div class="card overflow-hidden">
       <div class="overflow-x-auto">
         <table class="min-w-full text-sm">
-          <thead class="bg-slate-50 text-slate-600"><tr>
-            <th class="th text-left">Danh mục</th>
-            <th class="th text-left">Hệ thống</th>
-            <th class="th text-left">Chu kỳ</th>
-            <th class="th text-left">Mốc</th>
-            <th class="th text-left w-20">ĐG lỗi</th>
-            <th class="th text-center w-24">Thao tác</th>
-          </tr></thead>
-          <tbody>
-            ${(() => {
-              const groups = new Map();
-              pg.items.forEach(c => {
-                const cy = catalogKmCycle(c);
-                if (!groups.has(cy.key)) groups.set(cy.key, { label: cy.label, items: [] });
-                groups.get(cy.key).items.push(c);
-              });
-              const keys = [...groups.keys()].sort((a, b) => a - b);
-              if (!keys.length) return `<tr><td colspan="6" class="px-5 py-12 text-center text-slate-500">Không có danh mục khớp bộ lọc</td></tr>`;
-              return keys.map(k => {
-                const g = groups.get(k);
-                const head = `<tr class="bg-slate-50/90"><td colspan="6" class="px-4 py-1.5 text-[11px] font-semibold text-slate-600">${esc(g.label)} <span class="font-normal text-slate-400">· ${g.items.length}</span></td></tr>`;
-                const body = g.items.map(c => {
-                  normalizeCatalog(c);
-                  const brief = catalogRulesBrief(c);
-                  const primary = catalogCycleMeta(c).label;
-                  return `<tr class="row-h cursor-pointer" data-open-catalog="${c.id}" title="Mở chi tiết">
-                    <td class="td py-2.5">
-                      <div class="font-medium text-slate-900">${esc(c.name)}</div>
-                      <div class="mt-0.5 font-mono text-[11px] text-slate-400">${esc(c.code)}</div>
-                    </td>
-                    <td class="td text-slate-600">${esc(c.system || '—')}</td>
-                    <td class="td"><span class="tabular-nums font-medium text-slate-800">${esc(primary)}</span></td>
-                    <td class="td max-w-[280px] text-xs leading-snug text-slate-500" title="${esc(brief)}">${esc(brief)}</td>
-                    <td class="td">${catalogEvalBadShort(c)}</td>
-                    <td class="td text-center" onclick="event.stopPropagation()">
-                      <button type="button" data-open-catalog="${c.id}" class="btn btn-primary btn-sm">Chi tiết</button>
-                    </td>
-                  </tr>`;
-                }).join('');
-                return head + body;
-              }).join('');
-            })()}
-          </tbody>
+          <thead class="bg-slate-50 text-slate-600">
+            <tr>
+              <th class="th text-left">Hạng mục</th>
+              <th class="th text-left">Mã</th>
+              <th class="th text-left">Bộ phận xe</th>
+              <th class="th text-left">Loại công việc</th>
+              <th class="th text-left">Mốc 1</th>
+              <th class="th text-left">Kiểu mốc 1</th>
+              <th class="th text-left">Việc mốc 1</th>
+              <th class="th text-left">Mốc 2</th>
+              <th class="th text-left">Kiểu mốc 2</th>
+              <th class="th text-left">Việc mốc 2</th>
+              <th class="th text-left">Khi hỏng</th>
+              <th class="th text-center">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
         </table>
       </div>
+      ${paginationBar(pg)}
     </div>`
   );
 }
 
+/* ========== CATALOG V2 · SlickGrid + side panel ========== */
+function vehiclesUsingCatalog(cid) {
+  ensureVehicleCatalogAssign();
+  const id = Number(cid);
+  return (DB.vehicles || []).filter(v => {
+    if (v.isTrailer) return false;
+    return vehicleAssignedCatalogIds(v.id).map(Number).includes(id);
+  });
+}
+function openCatalogV2Panel(catalogId) {
+  view.selectedCatalogId = Number(catalogId);
+  view.catalogV2PanelOpen = true;
+  view.catalogV2PanelTab = view.catalogV2PanelTab === 'vehicles' ? 'vehicles' : 'rules';
+  view._listSelKey = 'catalogV2';
+  view._listSelId = Number(catalogId);
+  render();
+}
+function closeCatalogV2Panel() {
+  view.catalogV2PanelOpen = false;
+  view.selectedCatalogId = null;
+  render();
+}
+function catalogV2RuleKindLabel(r) {
+  if (!r) return '—';
+  if (!r.repeat) return 'Một lần';
+  if (r.maxOccurrences != null) return 'Lặp · tối đa ' + r.maxOccurrences + ' lần';
+  return 'Lặp vô hạn';
+}
+function catalogV2SidePanelHtml(c) {
+  if (!c) return '';
+  normalizeCatalog(c);
+  const tab = view.catalogV2PanelTab === 'vehicles' ? 'vehicles' : 'rules';
+  const vehicles = vehiclesUsingCatalog(c.id);
+  const rules = (c.rules || []).slice().sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
+  const vehRows = vehicles.length
+    ? vehicles.map(v => {
+        const st = getCatState(v.id, c.id);
+        const next = st.nextKm != null ? (kmFmt(st.nextKm) + ' km') : (st.nextDate || '—');
+        return `<tr class="row-h">
+          <td class="td"><button type="button" class="text-left text-blue-700 hover:underline" data-open-vehicle="${v.id}">${esc(v.plate)}</button></td>
+          <td class="td text-xs text-slate-600">${esc(v.type || '—')}</td>
+          <td class="td text-xs text-slate-600">${esc(formatAreaLabel?.(v.area) || v.area || '—')}</td>
+          <td class="td tabular-nums text-xs">${esc(next)}</td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="4" class="px-4 py-8 text-center text-slate-400 text-sm">Chưa có xe nào gắn danh mục này</td></tr>`;
+  const ruleRows = rules.length
+    ? rules.map((r, i) => {
+        const idx = (c.rules || []).indexOf(r);
+        return `<tr class="row-h">
+          <td class="td tabular-nums text-slate-500">#${r.seq || i + 1}</td>
+          <td class="td font-medium">${esc(catalogRuleAmountLabel(r))}</td>
+          <td class="td text-xs">${esc(catalogV2RuleKindLabel(r))}</td>
+          <td class="td text-xs">${r.forceReplace ? 'Phải thay mới' : 'Kiểm tra / BD'}</td>
+          <td class="td text-xs text-slate-500">${esc(r.label || '—')}</td>
+          <td class="td text-center whitespace-nowrap space-x-1">
+            <button type="button" data-edit-rule="${c.id}:${idx}" class="btn btn-outline btn-sm">Sửa</button>
+            <button type="button" data-del-rule="${c.id}:${idx}" class="btn btn-outline btn-sm text-rose-700 !border-rose-300">Xóa</button>
+          </td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="6" class="px-4 py-8 text-center text-slate-400 text-sm">Chưa có mốc — bấm «+ Thêm mốc»</td></tr>`;
+  return `
+    <div class="flex h-full min-h-0 flex-col">
+      <div class="flex items-start justify-between gap-2 border-b border-slate-200 px-4 py-3">
+        <div class="min-w-0">
+          <div class="font-mono text-[11px] text-slate-400">${esc(c.code)}</div>
+          <h3 class="truncate text-base font-semibold text-slate-900">${esc(c.name)}</h3>
+          <p class="mt-0.5 text-xs text-slate-500">${esc(c.system || '—')} · ${esc(catalogServiceTypeLabel(c))}</p>
+        </div>
+        <button type="button" id="btnCloseCatalogV2Panel" class="btn btn-outline btn-sm" title="Đóng">✕</button>
+      </div>
+      <div class="flex gap-4 border-b border-slate-200 px-4 pt-1">
+        <button type="button" data-catalog-v2-tab="rules" class="tab-underline border-b-2 px-1 pb-2.5 text-sm font-medium ${tab === 'rules' ? 'active' : 'border-transparent text-slate-600'}">
+          Chu kỳ <span class="text-xs text-slate-400">(${rules.length} mốc)</span>
+        </button>
+        <button type="button" data-catalog-v2-tab="vehicles" class="tab-underline border-b-2 px-1 pb-2.5 text-sm font-medium ${tab === 'vehicles' ? 'active' : 'border-transparent text-slate-600'}">
+          Xe đang dùng <span class="text-xs text-slate-400">(${vehicles.length})</span>
+        </button>
+      </div>
+      <div class="min-h-0 flex-1 overflow-auto p-4">
+        ${tab === 'rules' ? `
+          <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p class="text-xs text-slate-500">Mỗi danh mục có thể có nhiều mốc (một lần / lặp / bắt buộc thay).</p>
+            <button type="button" id="btnCatalogV2AddRule" class="btn btn-primary btn-sm">+ Thêm mốc</button>
+          </div>
+          <div class="overflow-hidden rounded-md border border-slate-200">
+            <table class="min-w-full text-sm">
+              <thead class="bg-slate-50 text-slate-600"><tr>
+                <th class="th text-left">#</th>
+                <th class="th text-left">Giá trị</th>
+                <th class="th text-left">Kiểu</th>
+                <th class="th text-left">Việc làm</th>
+                <th class="th text-left">Mô tả</th>
+                <th class="th text-center">Thao tác</th>
+              </tr></thead>
+              <tbody>${ruleRows}</tbody>
+            </table>
+          </div>` : `
+          <p class="mb-3 text-xs text-slate-500">Các xe đã gắn danh mục này (từ tab Danh mục trên chi tiết xe).</p>
+          <div class="overflow-hidden rounded-md border border-slate-200">
+            <table class="min-w-full text-sm">
+              <thead class="bg-slate-50 text-slate-600"><tr>
+                <th class="th text-left">Biển số</th>
+                <th class="th text-left">Loại</th>
+                <th class="th text-left">Khu vực</th>
+                <th class="th text-left">Mốc tiếp</th>
+              </tr></thead>
+              <tbody>${vehRows}</tbody>
+            </table>
+          </div>`}
+      </div>
+      <div class="border-t border-slate-200 px-4 py-3">
+        <button type="button" data-open-catalog="${c.id}" class="btn btn-outline btn-sm w-full">Mở trang chi tiết đầy đủ</button>
+      </div>
+    </div>`;
+}
+function registerCatalogV2Grid(list) {
+  const rows = list.map(c => {
+    normalizeCatalog(c);
+    const rules = (c.rules || []).slice().sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
+    const m1 = catalogRuleGridCells(rules[0]);
+    const m2 = catalogRuleGridCells(rules[1]);
+    const vehN = vehiclesUsingCatalog(c.id).length;
+    return {
+      id: Number(c.id),
+      catalogId: Number(c.id),
+      name: c.name || '',
+      code: c.code || '',
+      system: c.system || '',
+      systemId: c.systemId || '',
+      serviceType: catalogServiceTypeLabel(c),
+      serviceTypeId: c.serviceTypeId || '',
+      evalBad: catalogEvalBadShort(c),
+      evalBadCode: c.defaultOnEvalBad || 'REPAIR',
+      m1Value: m1.value,
+      m1Kind: m1.kind,
+      m1Action: m1.action,
+      m2Value: m2.value,
+      m2Kind: m2.kind,
+      m2Action: m2.action,
+      ruleCount: rules.length,
+      vehicleCount: vehN,
+      vehicleCountText: String(vehN),
+    };
+  });
+  const editBtn = (field, cid, label) => cellPopBtnHtml(label, `data-catalog-v2-edit="${esc(field)}" data-catalog-id="${cid}"`);
+  const ruleBtn = (ruleIdx, cid, label) => cellPopBtnHtml(label, `data-catalog-v2-edit-rule="${ruleIdx}" data-catalog-id="${cid}"`);
+  const cols = [
+    { id: 'name', name: 'Hạng mục', field: 'name', width: 220, minWidth: 160, sortable: true,
+      formatter: (_r, _c, v, _cd, item) => editBtn('name', item.catalogId, v || '—') },
+    { id: 'code', name: 'Mã', field: 'code', width: 110, minWidth: 80, sortable: true,
+      formatter: (_r, _c, v) => `<span class="font-mono text-xs text-slate-500">${esc(v || '')}</span>` },
+    { id: 'system', name: 'Bộ phận xe', field: 'system', width: 140, minWidth: 100, sortable: true, filterType: 'select',
+      formatter: (_r, _c, v, _cd, item) => editBtn('system', item.catalogId, v || '—') },
+    { id: 'serviceType', name: 'Loại công việc', field: 'serviceType', width: 130, minWidth: 100, sortable: true, filterType: 'select',
+      formatter: (_r, _c, v, _cd, item) => editBtn('serviceType', item.catalogId, v || '—') },
+    { id: 'm1Value', name: 'Mốc 1', field: 'm1Value', width: 110, minWidth: 80, sortable: true,
+      formatter: (_r, _c, v, _cd, item) => (item.ruleCount > 0 ? ruleBtn(0, item.catalogId, v || '—') : esc(v || '—')) },
+    { id: 'm1Kind', name: 'Kiểu mốc 1', field: 'm1Kind', width: 100, minWidth: 80, sortable: true, filterType: 'select',
+      formatter: (_r, _c, v, _cd, item) => (item.ruleCount > 0 ? ruleBtn(0, item.catalogId, v || '—') : esc(v || '—')) },
+    { id: 'm1Action', name: 'Việc mốc 1', field: 'm1Action', width: 130, minWidth: 100, sortable: true, filterType: 'select',
+      formatter: (_r, _c, v, _cd, item) => (item.ruleCount > 0 ? ruleBtn(0, item.catalogId, v || '—') : esc(v || '—')) },
+    { id: 'm2Value', name: 'Mốc 2', field: 'm2Value', width: 110, minWidth: 80, sortable: true,
+      formatter: (_r, _c, v, _cd, item) => (item.ruleCount > 1 ? ruleBtn(1, item.catalogId, v || '—') : esc(v || '—')) },
+    { id: 'm2Kind', name: 'Kiểu mốc 2', field: 'm2Kind', width: 100, minWidth: 80, sortable: true, filterType: 'select',
+      formatter: (_r, _c, v, _cd, item) => (item.ruleCount > 1 ? ruleBtn(1, item.catalogId, v || '—') : esc(v || '—')) },
+    { id: 'm2Action', name: 'Việc mốc 2', field: 'm2Action', width: 130, minWidth: 100, sortable: true, filterType: 'select',
+      formatter: (_r, _c, v, _cd, item) => (item.ruleCount > 1 ? ruleBtn(1, item.catalogId, v || '—') : esc(v || '—')) },
+    { id: 'evalBad', name: 'Khi hỏng', field: 'evalBad', width: 100, minWidth: 80, sortable: true, filterType: 'select',
+      formatter: (_r, _c, v, _cd, item) => editBtn('evalBad', item.catalogId, v || '—') },
+    { id: 'vehicleCountText', name: 'Số xe dùng', field: 'vehicleCountText', width: 90, minWidth: 70, sortable: true,
+      formatter: (_r, _c, v) => `<span class="tabular-nums">${esc(v)}</span>` },
+    { id: 'ruleCount', name: 'Số mốc', field: 'ruleCount', width: 70, minWidth: 60, sortable: true,
+      formatter: (_r, _c, v) => `<span class="tabular-nums">${esc(String(v))}</span>` },
+  ];
+  registerListGrid('catalogV2', rows, cols, {
+    forceFitColumns: false,
+    fullWidthRows: true,
+    colFilters: true,
+    rowHeight: 34,
+    frozenColumn: 3,
+  });
+  return { rows, leafCount: rows.length };
+}
+function pageCatalogMasterV2() {
+  if (view.name === 'catalogV2') view.name = 'catalog';
+  const f = F();
+  ensureVehicleCatalogAssign();
+  const all = (DB.catalog || []).map(c => { normalizeCatalog(c); return c; });
+  const filtered = all.filter(c => {
+    if (!matchSearch([c.code, c.name, c.system, c.serviceType, catalogServiceTypeLabel(c)].join(' '), f.search)) return false;
+    if (f.system && f.system !== 'ALL' && c.system !== f.system) return false;
+    if (f.serviceType && f.serviceType !== 'ALL' && String(c.serviceTypeId) !== String(f.serviceType) && c.serviceType !== f.serviceType) return false;
+    return true;
+  }).slice().sort((a, b) =>
+    String(a.system || '').localeCompare(String(b.system || ''), 'vi')
+    || String(a.name || '').localeCompare(String(b.name || ''), 'vi')
+  );
+  const { leafCount } = registerCatalogV2Grid(filtered);
+  const selected = view.catalogV2PanelOpen && view.selectedCatalogId != null
+    ? catById(view.selectedCatalogId)
+    : null;
+  if (view.catalogV2PanelOpen && !selected) {
+    view.catalogV2PanelOpen = false;
+    view.selectedCatalogId = null;
+  }
+  const panelOpen = !!(view.catalogV2PanelOpen && selected);
+  const systemNames = [...new Set(all.map(c => c.system || '').filter(Boolean))].sort((a, b) => a.localeCompare(b, 'vi'));
+  const svcOpts = activeServiceTypes().map(st =>
+    `<option value="${esc(st.id)}" ${String(f.serviceType) === String(st.id) ? 'selected' : ''}>${esc(st.name)}</option>`
+  ).join('');
+  return pageShell(
+    'Danh mục bảo dưỡng',
+    'Lưới chỉnh sửa ô · bấm dòng mở panel Chu kỳ / Xe đang dùng',
+    `<button id="btnBulkAssignCatalogs" class="btn btn-outline btn-sm">Gắn hàng loạt vào xe</button>
+     <button id="btnAddCatalog" class="btn btn-primary btn-sm">+ Thêm hạng mục</button>`,
+    `
+    <div class="mb-3 flex flex-wrap items-end gap-3 rounded-md border border-slate-200 bg-white p-3">
+      <div class="min-w-[12rem] flex-1">
+        <label class="mb-1 block text-[11px] font-medium text-slate-500">Tìm</label>
+        <div class="flt-search !w-full !min-w-0">
+          <span class="flt-search-icon" aria-hidden="true">⌕</span>
+          <input id="flt-search" type="search" placeholder="Tên, mã, bộ phận…" value="${esc(f.search || '')}" autocomplete="off" />
+        </div>
+      </div>
+      <div class="w-full sm:w-44">
+        <label class="mb-1 block text-[11px] font-medium text-slate-500">Bộ phận xe</label>
+        <select id="flt-system" class="form-control">
+          <option value="ALL">Tất cả</option>
+          ${systemNames.map(s => `<option value="${esc(s)}" ${f.system === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="w-full sm:w-44">
+        <label class="mb-1 block text-[11px] font-medium text-slate-500">Loại công việc</label>
+        <select id="flt-serviceType" class="form-control">
+          <option value="ALL">Tất cả</option>
+          ${svcOpts}
+        </select>
+      </div>
+    </div>
+    <div class="plan-workspace list-slick-workspace ${panelOpen ? 'is-open' : ''}" data-list-workspace="catalogV2" data-catalog-v2-workspace>
+      <div class="plan-grid-pane">
+        <div class="plan-period-bar">
+          <div class="flex items-center gap-2 flex-wrap min-w-0">
+            <span class="plan-period-label">Danh mục bảo dưỡng</span>
+            <span class="text-xs text-slate-500">${leafCount} hạng mục · hover ô bấm ✎ để sửa · bấm dòng mở panel</span>
+          </div>
+          <div class="plan-kpi-strip">
+            <div class="plan-kpi-chip" title="Số danh mục"><span class="plan-kpi-ico">Σ</span><span class="plan-kpi-val">${leafCount}</span></div>
+          </div>
+        </div>
+        <div class="plan-grid-toolbar">
+          <div class="plan-grid-toolbar-left">
+            <span class="text-xs text-slate-500 hidden md:inline">F2 / double-click chưa dùng · chỉnh bằng nút ✎ trên ô · panel bên phải quản lý xe & mốc chu kỳ</span>
+          </div>
+          <div class="plan-grid-toolbar-right">
+            <span class="text-xs text-slate-500 tabular-nums" data-list-vis-count="catalogV2">${leafCount} dòng</span>
+            <button type="button" class="plan-tb-btn" data-clear-list-col-filters="catalogV2" title="Xóa lọc theo cột">Xóa lọc cột</button>
+            <span class="plan-tb-divider"></span>
+            <button type="button" class="plan-tb-btn is-ghost" title="Tải lại" data-list-reload="catalogV2" aria-label="Tải lại">${planTbIco('refresh')}</button>
+          </div>
+        </div>
+        <div class="list-grid-container">
+          <div id="listSlick-catalogV2" data-list-slick="catalogV2" class="list-slick-host slickgrid-container"></div>
+        </div>
+      </div>
+      <button type="button" class="plan-side-backdrop" id="catalogV2SideBackdrop" aria-label="Đóng panel" tabindex="-1"></button>
+      <aside id="catalogV2SidePanel" class="plan-side" role="dialog" aria-modal="true">${panelOpen ? catalogV2SidePanelHtml(selected) : ''}</aside>
+    </div>`
+  );
+}
+function handleCatalogV2CellEdit(btn) {
+  if (!btn) return;
+  const cid = Number(btn.getAttribute('data-catalog-id'));
+  const cat = catById(cid);
+  if (!cat) return;
+  normalizeCatalog(cat);
+  const ruleIdxRaw = btn.getAttribute('data-catalog-v2-edit-rule');
+  if (ruleIdxRaw != null && ruleIdxRaw !== '') {
+    const sorted = (cat.rules || []).slice().sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0));
+    const sortedIdx = Number(ruleIdxRaw);
+    const rule = sorted[sortedIdx];
+    const realIdx = rule ? (cat.rules || []).indexOf(rule) : -1;
+    if (realIdx < 0) {
+      view.catalogV2PanelTab = 'rules';
+      openCatalogV2Panel(cid);
+      return;
+    }
+    openEditCatRules(cid, realIdx);
+    return;
+  }
+  const field = btn.getAttribute('data-catalog-v2-edit');
+  const anchor = btn;
+  if (field === 'name') {
+    openCellValueEditor({
+      title: 'Sửa tên hạng mục',
+      value: cat.name || '',
+      anchor,
+      onCommit: (val) => {
+        const name = String(val || '').trim();
+        if (!name) { toast('Tên không được trống'); return; }
+        cat.name = name;
+        toast('Đã cập nhật tên');
+        render();
+      },
+    });
+    return;
+  }
+  if (field === 'system') {
+    openCellPickPopover({
+      title: 'Chọn bộ phận xe',
+      value: cat.systemId || cat.system || '',
+      anchor,
+      allowCreate: false,
+      getOptions: () => activeVehicleSystems().map(s => ({ id: s.id, name: s.name, code: s.code || '' })),
+      onPick: (o) => {
+        cat.systemId = o.id;
+        cat.system = o.name;
+        const st = serviceTypesForSystem(o.id).find(s => s.id === cat.serviceTypeId)
+          || serviceTypesForSystem(o.id)[0];
+        if (st) { cat.serviceTypeId = st.id; cat.serviceType = st.name; }
+        toast('Đã cập nhật bộ phận xe');
+        render();
+      },
+    });
+    return;
+  }
+  if (field === 'serviceType') {
+    openCellPickPopover({
+      title: 'Chọn loại công việc',
+      value: cat.serviceTypeId || '',
+      anchor,
+      allowCreate: false,
+      getOptions: () => {
+        const list = cat.systemId ? serviceTypesForSystem(cat.systemId) : activeServiceTypes();
+        return (list.length ? list : activeServiceTypes()).map(s => ({ id: s.id, name: s.name, code: s.code || '' }));
+      },
+      onPick: (o) => {
+        cat.serviceTypeId = o.id;
+        cat.serviceType = o.name;
+        toast('Đã cập nhật loại công việc');
+        render();
+      },
+    });
+    return;
+  }
+  if (field === 'evalBad') {
+    openCellPickPopover({
+      title: 'Khi đánh giá lỗi',
+      value: cat.defaultOnEvalBad || 'REPAIR',
+      anchor,
+      allowCreate: false,
+      getOptions: () => [
+        { id: 'REPAIR', name: 'Sửa chữa' },
+        { id: 'REPLACE', name: 'Thay thế' },
+      ],
+      onPick: (o) => {
+        cat.defaultOnEvalBad = o.id;
+        toast('Đã cập nhật khi hỏng');
+        render();
+      },
+    });
+  }
+}
+function isCatalogV2EditBtn(t) {
+  return !!(t && t.closest && t.closest('.sg-cell-edit-btn[data-catalog-v2-edit], .sg-cell-edit-btn[data-catalog-v2-edit-rule], button[data-catalog-v2-edit], button[data-catalog-v2-edit-rule]'));
+}
+if (!window._catalogV2EditBound) {
+  window._catalogV2EditBound = true;
+  document.addEventListener('pointerdown', (e) => {
+    if (!isCatalogV2EditBtn(e.target)) return;
+    const btn = e.target.closest('.sg-cell-edit-btn[data-catalog-v2-edit], .sg-cell-edit-btn[data-catalog-v2-edit-rule], button[data-catalog-v2-edit], button[data-catalog-v2-edit-rule]');
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+    handleCatalogV2CellEdit(btn);
+  }, true);
+  document.addEventListener('mousedown', (e) => {
+    if (!isCatalogV2EditBtn(e.target)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+  }, true);
+  document.addEventListener('click', (e) => {
+    if (!isCatalogV2EditBtn(e.target)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+  }, true);
+}
+function bindCatalogV2Panel() {
+  const panel = $('#catalogV2SidePanel');
+  $('#catalogV2SideBackdrop')?.addEventListener('click', () => closeCatalogV2Panel());
+  $('#btnCloseCatalogV2Panel')?.addEventListener('click', () => closeCatalogV2Panel());
+  $$('[data-catalog-v2-tab]').forEach(b => b.onclick = () => {
+    view.catalogV2PanelTab = b.dataset.catalogV2Tab === 'rules' ? 'rules' : 'vehicles';
+    render();
+  });
+  $('#btnCatalogV2AddRule')?.addEventListener('click', () => {
+    if (view.selectedCatalogId == null) return;
+    openEditCatRules(view.selectedCatalogId, -1);
+  });
+  if (panel) {
+    $$('[data-edit-rule]', panel).forEach(b => b.onclick = () => {
+      const [cid, idx] = b.dataset.editRule.split(':');
+      openEditCatRules(Number(cid), Number(idx));
+    });
+    $$('[data-del-rule]', panel).forEach(b => b.onclick = () => {
+      const [cid, idx] = b.dataset.delRule.split(':');
+      const c = catById(Number(cid));
+      if (!c) return;
+      if ((c.rules || []).length <= 1) { toast('Giữ ít nhất 1 mốc'); return; }
+      c.rules.splice(Number(idx), 1);
+      c.rules.forEach((r, i) => { r.seq = i + 1; });
+      toast('Đã xóa mốc');
+      render();
+    });
+    $$('[data-open-vehicle]', panel).forEach(b => b.onclick = () => {
+      view = { ...view, name: 'vehicle', vehicleId: Number(b.dataset.openVehicle), vehicleTab: 'catalog', from: 'catalog', filters: defaultFilters(), page: 1 };
+      render();
+    });
+    $$('[data-open-catalog]', panel).forEach(b => b.onclick = (e) => {
+      e.stopPropagation();
+      view = { ...view, name: 'catalogDetail', catalogId: Number(b.dataset.openCatalog), page: 1, filters: defaultFilters() };
+      render();
+    });
+  }
+}
 
 /* ========== PWMS vehicle map (TMS ↔ Object PWMS, ID bất biến) ========== */
 function stablePwmsObjectId(v) {
@@ -78092,6 +78701,61 @@ function pageBaremHoursMaster() {
   );
 }
 
+function normSysKey(s) {
+  return String(s || '').trim().toLowerCase().normalize('NFC');
+}
+function repairItemsForSystem(systemId, systemName) {
+  const all = DB.repairItems || DEFAULT_REPAIR_ITEMS;
+  const sys = systemId ? vehicleSystemById(systemId) : null;
+  const name = (sys?.name || systemName || '').trim();
+  if (!name && !systemId) return [];
+  const key = normSysKey(name);
+  const id = String(systemId || sys?.id || '');
+  return all.filter(ri => {
+    if (ri.systemId && id && String(ri.systemId) === id) return true;
+    return !!key && normSysKey(ri.system) === key;
+  });
+}
+function catalogRepairListHtml(items, selectedIds) {
+  const selected = new Set(selectedIds || []);
+  if (!items.length) {
+    return '<div class="px-3 py-8 text-center text-slate-400 text-sm" data-cat-repair-empty>Không có hạng mục sửa chữa cho hệ thống này</div>'
+      + '<div id="catRepairSearchEmpty" class="hidden px-3 py-8 text-center text-slate-400 text-sm">Không có hạng mục khớp</div>';
+  }
+  const rows = items.map(ri => {
+    const on = selected.has(ri.id);
+    const hay = `${ri.name} ${ri.system || ''} ${ri.code || ''}`.toLowerCase();
+    return `<label class="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-blue-50/40 ${on ? 'bg-blue-50/30' : ''}" data-cat-repair-row data-search="${esc(hay)}">
+      <input type="checkbox" class="!w-auto cat-repair-link" value="${esc(ri.id)}" ${on ? 'checked' : ''} />
+      <span class="text-slate-800">${esc(ri.name)}</span>
+    </label>`;
+  }).join('');
+  return `<div data-cat-repair-group>${rows}</div>`
+    + '<div id="catRepairSearchEmpty" class="hidden px-3 py-8 text-center text-slate-400 text-sm">Không có hạng mục khớp</div>';
+}
+function refreshCatalogRepairPanel(systemId, systemName, selectedIds) {
+  const items = repairItemsForSystem(systemId, systemName);
+  const selected = selectedIds || $$('.cat-repair-link:checked').map(x => x.value);
+  const list = $('#catRepairList');
+  if (list) list.innerHTML = catalogRepairListHtml(items, selected);
+  const hint = $('#catRepairSysHint');
+  if (hint) hint.textContent = systemName || '—';
+  const totalEl = $('#catRepairTotalCount');
+  if (totalEl) totalEl.textContent = String(items.length);
+  const linkedEl = $('#catRepairLinkedCount');
+  if (linkedEl) {
+    const n = $$('.cat-repair-link:checked').length;
+    linkedEl.textContent = String(n);
+  }
+  $$('.cat-repair-link').forEach(el => el.addEventListener('change', () => {
+    const n = $$('.cat-repair-link:checked').length;
+    const elCount = $('#catRepairLinkedCount');
+    if (elCount) elCount.textContent = String(n);
+  }));
+  const search = $('#catRepairSearch');
+  if (search) search.value = '';
+}
+
 function pageCatalogDetail() {
   const c = catById(view.catalogId);
   if (!c) return pageShell('Không tìm thấy danh mục', '', '', '<button data-back-catalog class="btn btn-outline">← Danh sách</button>');
@@ -78100,42 +78764,123 @@ function pageCatalogDetail() {
   const evalFlat = allEvalItemsFlat();
   const nextDec = planDecisionForCatalog(c, 1);
   const nextDec2 = planDecisionForCatalog(c, 2);
-  const repairsOfSys = DB.repairItems || DEFAULT_REPAIR_ITEMS;
-  return `
-  <div class="min-h-full space-y-4 px-6 py-6">
-    <button data-back-catalog class="text-sm text-blue-600 hover:underline">← Danh mục bảo dưỡng</button>
-    <div class="flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <div class="font-mono text-xs text-slate-500">${esc(c.code)}</div>
-        <h1 class="text-2xl font-bold text-slate-900">${esc(c.name)}</h1>
-        <p class="mt-1 text-sm text-slate-600">Thuộc <strong>${esc(c.system || 'chưa gắn hệ thống')}</strong> · mốc chu kỳ · bảo dưỡng tiếp hoặc bắt buộc thay thế</p>
-        <div class="mt-2 flex flex-wrap gap-2">${evalBadBadge(c)} ${decisionBadge(nextDec)} <span class="text-xs text-slate-500 self-center">lần 1</span> ${decisionBadge(nextDec2)} <span class="text-xs text-slate-500 self-center">lần 2 trở đi</span></div>
-      </div>
-      <div class="flex gap-2">
-        <button id="btnEditCatalogMeta" class="btn btn-outline">Sửa thông tin</button>
-        <button id="btnAddRuleDetail" class="btn btn-primary">+ Thêm mốc</button>
-      </div>
-    </div>
+  const repairsOfSys = repairItemsForSystem(c.systemId, c.system);
+  const ruleCount = (c.rules || []).length;
+  const repeatCount = (c.rules || []).filter(r => r.repeat).length;
+  const forceCount = (c.rules || []).filter(r => r.forceReplace).length;
+  const evalLinked = (c.evalItemIds || []).length;
+  const repairLinked = (c.repairItemIds || []).filter(id => repairsOfSys.some(r => r.id === id)).length;
+  const unitSuffix = (t) => t === 'HOUR' ? ' giờ' : t === 'KM' ? ' km' : t === 'MONTH' ? ' tháng' : t === 'YEAR' ? ' năm' : '';
 
-    <div class="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-700 leading-relaxed">
-      <strong>Logic:</strong>
-      <ul class="mt-1 mb-0 list-disc pl-4 space-y-1">
-        <li><em>Một lần</em> = chỉ áp đúng lần BD #seq (vd. lần đầu đặc biệt).</li>
-        <li><em>Lặp ∞</em> = từ lần đó trở đi, mỗi lần xong cộng thêm value.</li>
-        <li><strong>Nhiều mốc lặp cùng lúc</strong> (vd. 10.000 km <em>và</em> 3 tháng) = quan hệ <strong>OR</strong>: hệ thống tính cả hai mốc tiếp theo rồi lấy <strong>cái đến hạn sớm hơn</strong> — không phải “xong #1 rồi mới xét #2”.</li>
-        <li>«Tối đa N lần» giới hạn số lần áp mốc lặp.</li>
-      </ul>
-    </div>
+  const evalBadLabel = c.defaultOnEvalBad === 'REPLACE' ? 'Thay thế' : 'Sửa chữa';
+  const stLabel = catalogServiceTypeLabel(c);
+  const sysLabel = c.system || '';
+
+  const evalByGroup = {};
+  evalFlat.forEach(it => {
+    const g = it.groupName || 'Khác';
+    if (!evalByGroup[g]) evalByGroup[g] = [];
+    evalByGroup[g].push(it);
+  });
+  const evalGroupsHtml = Object.keys(evalByGroup).length
+    ? Object.entries(evalByGroup).map(([gName, items]) => {
+        const linkedInGroup = items.filter(it => c.evalItemIds.includes(it.id)).length;
+        return `<div class="border-b border-slate-100 last:border-0" data-cat-eval-group>
+          <div class="sticky top-0 z-[1] flex items-center justify-between bg-slate-50 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            <span>${esc(gName)}</span>
+            <span class="font-normal normal-case tracking-normal" data-cat-eval-group-count>${linkedInGroup}/${items.length}</span>
+          </div>
+          ${items.map(it => {
+            const on = c.evalItemIds.includes(it.id);
+            const hay = `${it.label} ${it.groupName || ''} ${it.code || ''}`.toLowerCase();
+            return `<label class="flex items-start gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-blue-50/40 ${on ? 'bg-blue-50/30' : ''}" data-cat-eval-row data-search="${esc(hay)}">
+              <input type="checkbox" class="mt-0.5 !w-auto cat-eval-link" value="${esc(it.id)}" ${on ? 'checked' : ''} />
+              <span class="font-medium text-slate-800">${esc(it.label)}</span>
+            </label>`;
+          }).join('')}
+        </div>`;
+      }).join('')
+    : '<div class="px-3 py-8 text-center text-slate-400 text-sm" data-cat-eval-empty>Chưa có tiêu chí</div>';
+
+  const repairsHtml = catalogRepairListHtml(repairsOfSys, c.repairItemIds);
+
+  return `
+  <div class="min-h-full space-y-5 px-6 py-6">
+    <button data-back-catalog class="text-sm text-blue-600 hover:underline">← Danh mục bảo dưỡng</button>
 
     <div class="card overflow-hidden">
-      <div class="border-b border-slate-200 px-5 py-4 flex items-center justify-between">
-        <h2 class="text-base font-semibold">Mốc chu kỳ</h2>
-        <span class="text-xs text-slate-500">Bật «Lặp vô hạn» cho kiểu cứ X km/giờ/tháng · «Bắt buộc thay» khi đến mốc</span>
+      <div class="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-5">
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="chip bg-slate-200/80 font-mono text-slate-700">${esc(c.code)}</span>
+            <span class="chip bg-slate-100 text-slate-600">${esc(stLabel)}</span>
+            <span class="chip bg-indigo-50 text-indigo-800">${esc(c.system || 'Chưa gắn hệ thống')}</span>
+          </div>
+          <h1 class="mt-2 text-2xl font-bold tracking-tight text-slate-900">${esc(c.name)}</h1>
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            ${evalBadBadge(c)}
+            <span class="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
+              Lần 1 ${decisionBadge(nextDec)}
+            </span>
+            <span class="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
+              Lần 2+ ${decisionBadge(nextDec2)}
+            </span>
+          </div>
+        </div>
+        <div class="flex shrink-0 flex-wrap gap-2">
+          <button id="btnEditCatalogMeta" class="btn btn-outline">Sửa thông tin</button>
+          <button id="btnAddRuleDetail" class="btn btn-primary">+ Thêm mốc</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 divide-x divide-y divide-slate-100 sm:grid-cols-4 sm:divide-y-0">
+        <div class="px-5 py-3">
+          <p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Mốc chu kỳ</p>
+          <p class="mt-0.5 text-lg font-semibold tabular-nums text-slate-900">${ruleCount}</p>
+          <p class="text-[11px] text-slate-500">${repeatCount} lặp · ${forceCount} bắt buộc thay</p>
+        </div>
+        <div class="px-5 py-3">
+          <p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Loại bảo dưỡng</p>
+          <p class="mt-0.5 truncate text-sm font-semibold text-slate-900" title="${esc(stLabel)}">${esc(stLabel)}</p>
+        </div>
+        <div class="px-5 py-3">
+          <p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Hệ thống xe</p>
+          <p class="mt-0.5 truncate text-sm font-semibold text-slate-900" title="${esc(c.system || '—')}">${esc(c.system || '—')}</p>
+        </div>
+        <div class="px-5 py-3">
+          <p class="text-[11px] font-medium uppercase tracking-wide text-slate-400">Liên kết</p>
+          <p class="mt-0.5 text-sm font-semibold text-slate-900">${evalLinked} tiêu chí · ${repairLinked} SC</p>
+        </div>
+      </div>
+    </div>
+
+    <details class="rounded-md border border-slate-200 bg-slate-50/80 px-4 py-2.5 text-xs text-slate-600">
+      <summary class="cursor-pointer select-none font-medium text-slate-700">Cách hệ thống tính mốc chu kỳ</summary>
+      <ul class="mt-2 mb-1 list-disc space-y-1 pl-5 leading-relaxed">
+        <li><em>Một lần</em> — chỉ áp đúng lần BD #seq (vd. lần đầu đặc biệt).</li>
+        <li><em>Lặp ∞</em> — từ lần đó trở đi, mỗi lần xong cộng thêm giá trị mốc.</li>
+        <li><strong>Nhiều mốc lặp cùng lúc</strong> (vd. 10.000 km <em>và</em> 3 tháng) = quan hệ <strong>OR</strong>: lấy mốc <strong>đến hạn sớm hơn</strong>.</li>
+        <li>«Tối đa N lần» giới hạn số lần áp mốc lặp.</li>
+      </ul>
+    </details>
+
+    <div class="card overflow-hidden">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+        <div class="flex items-center gap-3">
+          <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">1</span>
+          <div>
+            <h2 class="text-base font-semibold text-slate-900">Mốc chu kỳ</h2>
+            <p class="text-xs text-slate-500">Định nghĩa khi nào đến hạn · lặp hay một lần · có bắt buộc thay thế</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <input id="catRuleSearch" type="search" autocomplete="off" class="form-control !w-52 !py-1.5 text-sm" placeholder="Tìm mốc…" />
+          <button type="button" id="btnAddRuleDetailTop" class="btn btn-outline btn-sm">+ Thêm mốc</button>
+        </div>
       </div>
       <div class="overflow-x-auto">
-        <table class="min-w-full text-sm">
+        <table class="min-w-full text-sm" id="catRulesTable">
           <thead class="bg-slate-50 text-slate-600"><tr>
-            <th class="th text-left">Thứ tự</th>
+            <th class="th text-left w-16">#</th>
             <th class="th text-left">Cách tính</th>
             <th class="th text-right">Giá trị</th>
             <th class="th text-left">Kiểu mốc</th>
@@ -78144,76 +78889,115 @@ function pageCatalogDetail() {
             <th class="th text-center">Thao tác</th>
           </tr></thead>
           <tbody>
-            ${rulesPg.items.map(r => `<tr class="row-h">
-              <td class="td">#${r.seq}</td>
+            ${rulesPg.items.map(r => {
+              const hay = `#${r.seq} ${ruleTypeLabel(r.type)} ${r.value}${unitSuffix(r.type)} ${r.label || ''} ${ruleIntervalLabel(r)}`.toLowerCase();
+              return `<tr class="row-h" data-cat-rule-row data-search="${esc(hay)}">
+              <td class="td">
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">#${r.seq}</span>
+              </td>
               <td class="td"><span class="chip bg-slate-100 text-slate-700">${ruleTypeLabel(r.type)}</span></td>
-              <td class="td text-right tabular-nums font-medium">${r.value}${r.type==='HOUR'?' giờ':r.type==='KM'?' km':r.type==='MONTH'?' tháng':r.type==='YEAR'?' năm':''}</td>
+              <td class="td text-right tabular-nums font-semibold text-slate-900">${r.value}${unitSuffix(r.type)}</td>
               <td class="td text-xs">
                 <label class="inline-flex items-center gap-1.5 cursor-pointer">
-                  <input type="checkbox" class="!w-auto" data-repeat-rule="${c.id}:${r._i}" ${r.repeat?'checked':''} />
+                  <input type="checkbox" class="!w-auto" data-repeat-rule="${c.id}:${r._i}" ${r.repeat ? 'checked' : ''} />
                   ${r.repeat
-                    ? `<span class="chip bg-sky-100 text-sky-800">Lặp ∞${r.maxOccurrences!=null?' · max '+r.maxOccurrences:''}</span>`
+                    ? `<span class="chip bg-sky-100 text-sky-800">Lặp ∞${r.maxOccurrences != null ? ' · max ' + r.maxOccurrences : ''}</span>`
                     : `<span class="chip bg-slate-100 text-slate-600">Một lần</span>`}
                 </label>
                 <div class="mt-0.5 text-[10px] text-slate-500">${esc(ruleIntervalLabel(r))}</div>
               </td>
-              <td class="td">${esc(r.label)}</td>
+              <td class="td text-slate-700">${esc(r.label)}</td>
               <td class="td text-center">
-                <label class="inline-flex items-center gap-2 text-xs cursor-pointer">
-                  <input type="checkbox" class="!w-auto" data-force-replace="${c.id}:${r._i}" ${r.forceReplace?'checked':''} />
-                  ${r.forceReplace?'<span class="text-rose-700 font-medium">Có</span>':'<span class="text-slate-400">Không</span>'}
+                <label class="inline-flex items-center justify-center gap-2 text-xs cursor-pointer">
+                  <input type="checkbox" class="!w-auto" data-force-replace="${c.id}:${r._i}" ${r.forceReplace ? 'checked' : ''} />
+                  ${r.forceReplace
+                    ? '<span class="chip bg-rose-100 text-rose-800">Có</span>'
+                    : '<span class="text-slate-400">Không</span>'}
                 </label>
               </td>
-              <td class="td text-center space-x-1">
+              <td class="td text-center space-x-1 whitespace-nowrap">
                 <button data-edit-rule="${c.id}:${r._i}" class="btn btn-outline btn-sm">Sửa</button>
                 <button data-del-rule="${c.id}:${r._i}" class="btn btn-outline btn-sm text-rose-700 !border-rose-300">Xóa</button>
               </td>
-            </tr>`).join('') || `<tr><td colspan="6" class="px-5 py-10 text-center text-slate-500">Chưa có mốc — bấm «+ Thêm mốc»</td></tr>`}
+            </tr>`;
+            }).join('') || `<tr data-cat-rule-empty><td colspan="7" class="px-5 py-12 text-center text-slate-500">Chưa có mốc — bấm «+ Thêm mốc»</td></tr>`}
+            <tr id="catRuleSearchEmpty" class="hidden"><td colspan="7" class="px-5 py-8 text-center text-slate-400 text-sm">Không có mốc khớp tìm kiếm</td></tr>
           </tbody>
         </table>
       </div>
       ${paginationBar(rulesPg)}
     </div>
 
-    <div class="grid gap-4 lg:grid-cols-2">
-      <div class="card p-5 space-y-3">
-        <h2 class="text-base font-semibold">Hệ thống xe & tiêu chí đánh giá</h2>
-        <label class="block text-sm font-medium">Hệ thống xe (master)
-          <select id="catSystemId" class="form-control">${systemOptionsHtml(c.systemId, c.system)}</select>
-        </label>
-        <p class="text-xs text-slate-500">Ví dụ: Hệ thống phanh — mọi hạng mục bảo dưỡng/sửa chữa thuộc hệ thống này dùng chung khi lập phiếu.</p>
-        <label class="block text-sm font-medium">Khi đánh giá lỗi (mặc định quyết định)
-          <select id="catEvalBad" class="form-control">
-            <option value="REPAIR" ${c.defaultOnEvalBad==='REPAIR'?'selected':''}>Sửa chữa</option>
-            <option value="REPLACE" ${c.defaultOnEvalBad==='REPLACE'?'selected':''}>Thay thế</option>
-          </select>
-        </label>
-        <p class="text-xs font-medium text-slate-600 pt-1">Liên kết tiêu chí đánh giá định kỳ</p>
-        <div class="max-h-48 overflow-auto rounded-md border border-slate-200 divide-y divide-slate-100">
-          ${evalFlat.map(it => {
-            const on = c.evalItemIds.includes(it.id);
-            return `<label class="flex items-start gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
-              <input type="checkbox" class="mt-0.5 !w-auto cat-eval-link" value="${esc(it.id)}" ${on?'checked':''} />
-              <span><span class="font-medium">${esc(it.label)}</span><div class="text-[11px] text-slate-500">${esc(it.groupName)}</div></span>
-            </label>`;
-          }).join('') || '<div class="px-3 py-6 text-center text-slate-400 text-sm">Chưa có tiêu chí</div>'}
+    <div class="card overflow-hidden">
+      <div class="border-b border-slate-200 px-5 py-4">
+        <div class="flex items-center gap-3">
+          <span class="flex h-7 w-7 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">2</span>
+          <div>
+            <h2 class="text-base font-semibold text-slate-900">Phân loại & liên kết</h2>
+            <p class="text-xs text-slate-500">Loại BD · hệ thống · quyết định khi lỗi · tiêu chí · gợi ý sửa chữa</p>
+          </div>
         </div>
-        <button type="button" id="btnSaveCatLinks" class="btn btn-primary btn-sm">Lưu hệ thống & tiêu chí đánh giá</button>
       </div>
-
-      <div class="card p-5 space-y-3">
-        <h2 class="text-base font-semibold">Gợi ý hạng mục sửa chữa (khi chọn sửa chữa)</h2>
-        <p class="text-xs text-slate-500">Không gắn vật tư kho / ngoài kho tại đây. Khi lập phiếu, kỹ thuật viên chọn vật tư theo hệ thống <em>${esc(c.system || '—')}</em>.</p>
-        <div class="max-h-64 overflow-auto rounded-md border border-slate-200 divide-y divide-slate-100">
-          ${repairsOfSys.map(ri => {
-            const on = c.repairItemIds.includes(ri.id);
-            return `<label class="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-slate-50">
-              <input type="checkbox" class="!w-auto cat-repair-link" value="${esc(ri.id)}" ${on?'checked':''} />
-              <span>${esc(ri.name)} <span class="text-[11px] text-slate-400">${esc(ri.system)}</span></span>
-            </label>`;
-          }).join('')}
+      <div class="space-y-5 p-5">
+        <div class="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700">Hệ thống xe</label>
+            <div class="ac-wrap">
+              <input type="hidden" id="catSystemId" value="${esc(c.systemId || '')}" />
+              <input id="catSystemAc" type="search" autocomplete="off" class="form-control" placeholder="Tìm / chọn hệ thống…" value="${esc(sysLabel)}" />
+              <div class="ac-dropdown hidden" id="catSystemDd"></div>
+            </div>
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700">Loại bảo dưỡng</label>
+            <div class="ac-wrap">
+              <input type="hidden" id="catServiceTypeId" value="${esc(c.serviceTypeId || '')}" />
+              <input id="catServiceTypeAc" type="search" autocomplete="off" class="form-control" placeholder="Tìm / chọn loại BD…" value="${esc(stLabel === '—' ? '' : stLabel)}" />
+              <div class="ac-dropdown hidden" id="catServiceTypeDd"></div>
+            </div>
+          </div>
+          <div>
+            <label class="mb-1 block text-sm font-medium text-slate-700">Khi đánh giá lỗi</label>
+            <div class="ac-wrap">
+              <input type="hidden" id="catEvalBad" value="${esc(c.defaultOnEvalBad || 'REPAIR')}" />
+              <input id="catEvalBadAc" type="search" autocomplete="off" class="form-control" placeholder="Tìm / chọn quyết định…" value="${esc(evalBadLabel)}" />
+              <div class="ac-dropdown hidden" id="catEvalBadDd"></div>
+            </div>
+          </div>
         </div>
-        <button type="button" id="btnSaveCatRepairs" class="btn btn-primary btn-sm">Lưu gợi ý sửa chữa</button>
+        <p class="text-xs text-slate-500">Hạng mục thuộc cùng hệ thống dùng chung khi lập phiếu. Liên kết tiêu chí để gợi ý khi đánh giá định kỳ phát hiện lỗi.</p>
+
+        <div class="grid gap-4 lg:grid-cols-2">
+          <div class="space-y-2 rounded-md border border-slate-200 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-sm font-semibold text-slate-800">Tiêu chí đánh giá định kỳ</p>
+              <span class="text-xs text-slate-500">Đã chọn <span id="catEvalLinkedCount">${evalLinked}</span>/${evalFlat.length}</span>
+            </div>
+            <input id="catEvalSearch" type="search" autocomplete="off" class="form-control text-sm" placeholder="Tìm tiêu chí theo tên / nhóm…" />
+            <div class="max-h-72 overflow-auto rounded-md border border-slate-200 bg-white" id="catEvalList">
+              ${evalGroupsHtml}
+              <div id="catEvalSearchEmpty" class="hidden px-3 py-8 text-center text-slate-400 text-sm">Không có tiêu chí khớp</div>
+            </div>
+            <div class="flex justify-end pt-2">
+              <button type="button" id="btnSaveCatLinks" class="btn btn-primary btn-sm">Lưu phân loại & tiêu chí</button>
+            </div>
+          </div>
+
+          <div class="space-y-2 rounded-md border border-slate-200 p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <p class="text-sm font-semibold text-slate-800">Gợi ý hạng mục sửa chữa</p>
+              <span class="text-xs text-slate-500">Đã chọn <span id="catRepairLinkedCount">${repairLinked}</span>/<span id="catRepairTotalCount">${repairsOfSys.length}</span></span>
+            </div>
+            <p class="text-xs text-slate-500">Chỉ hiện hạng mục của hệ thống đang chọn · khi lập phiếu vật tư theo hệ thống <strong id="catRepairSysHint">${esc(c.system || '—')}</strong>.</p>
+            <input id="catRepairSearch" type="search" autocomplete="off" class="form-control text-sm" placeholder="Tìm hạng mục sửa chữa…" />
+            <div class="max-h-72 overflow-auto rounded-md border border-slate-200 bg-white" id="catRepairList">
+              ${repairsHtml}
+            </div>
+            <div class="flex justify-end pt-2">
+              <button type="button" id="btnSaveCatRepairs" class="btn btn-primary btn-sm">Lưu gợi ý sửa chữa</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>`;
@@ -80016,6 +80800,8 @@ function openEditCatRules(cid, ruleIndex) {
   const r = isNew
     ? { type: 'KM', value: 10000, label: 'Cứ 10.000 km / lần', forceReplace: false, repeat: true, maxOccurrences: null }
     : c.rules[ruleIndex];
+  const isRepeat = !!r.repeat;
+  const isUnlimited = isRepeat && (r.maxOccurrences == null || r.maxOccurrences === '');
   openModal(`
     <div class="border-b border-slate-200 px-5 py-4"><h2 class="text-lg font-bold">${isNew ? 'Thêm chu kỳ' : 'Sửa chu kỳ'} · ${esc(c.name)}</h2></div>
     <form id="ruleForm" class="space-y-3 px-5 py-4">
@@ -80028,15 +80814,22 @@ function openEditCatRules(cid, ruleIndex) {
         </select>
       </label>
       <label class="block text-sm font-medium text-slate-700">Giá trị (km / giờ / số tháng / số năm)<input name="value" type="number" value="${r.value}" required /></label>
-      <p class="text-xs text-slate-500 -mt-1">Ví dụ lặp vô hạn: <strong>10.000 km</strong> = cứ chạy thêm 10.000 km thì BD 1 lần</p>
+      <p class="text-xs text-slate-500 -mt-1">Ví dụ: <strong>10.000 km</strong> = cứ chạy thêm 10.000 km thì BD 1 lần</p>
       <label class="block text-sm font-medium text-slate-700">Mô tả ngắn<input name="label" type="text" value="${esc(r.label)}" required /></label>
       <label class="flex items-start gap-2 text-sm font-medium text-slate-700">
-        <input type="checkbox" name="repeat" class="!w-auto mt-0.5" ${r.repeat?'checked':''} />
-        <span>Lặp vô hạn (interval) — mỗi lần xong cộng thêm giá trị trên, không giới hạn số lần trừ khi nhập «Tối đa»</span>
+        <input type="checkbox" name="repeat" id="ruleRepeat" class="!w-auto mt-0.5" ${isRepeat?'checked':''} />
+        <span>Lặp lại theo chu kỳ — mỗi lần xong cộng thêm giá trị trên</span>
       </label>
-      <label class="block text-sm font-medium text-slate-700">Tối đa số lần (để trống = không giới hạn)
-        <input name="maxOccurrences" type="number" min="1" value="${r.maxOccurrences != null ? esc(String(r.maxOccurrences)) : ''}" placeholder="∞" />
-      </label>
+      <div id="ruleRepeatOpts" class="space-y-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 ${isRepeat?'':'hidden'}">
+        <label class="flex items-start gap-2 text-sm font-medium text-slate-700">
+          <input type="checkbox" name="unlimited" id="ruleUnlimited" class="!w-auto mt-0.5" ${isUnlimited?'checked':''} />
+          <span>Lặp vô hạn — không giới hạn số lần</span>
+        </label>
+        <label id="ruleMaxOccWrap" class="block text-sm font-medium text-slate-700 ${isUnlimited?'hidden':''}">Tối đa số lần
+          <input name="maxOccurrences" id="ruleMaxOcc" type="number" min="1" value="${!isUnlimited && r.maxOccurrences != null ? esc(String(r.maxOccurrences)) : ''}" placeholder="Nhập số lần tối đa" />
+          <span class="mt-1 block text-xs font-normal text-slate-500">Bắt buộc khi không chọn «Lặp vô hạn»</span>
+        </label>
+      </div>
       <label class="flex items-center gap-2 text-sm font-medium text-slate-700">
         <input type="checkbox" name="forceReplace" class="!w-auto" ${r.forceReplace?'checked':''} />
         Bắt buộc thay thế ở mốc này
@@ -80045,17 +80838,41 @@ function openEditCatRules(cid, ruleIndex) {
       <div class="flex justify-end gap-2"><button type="button" data-close class="btn btn-outline">Hủy</button><button class="btn btn-primary">${isNew?'Thêm':'Lưu'}</button></div>
     </form>`);
   $('[data-close]').onclick = closeModal;
+  const syncRuleRepeatUi = () => {
+    const repeatOn = !!$('#ruleRepeat')?.checked;
+    const unlimitedOn = !!$('#ruleUnlimited')?.checked;
+    $('#ruleRepeatOpts')?.classList.toggle('hidden', !repeatOn);
+    $('#ruleMaxOccWrap')?.classList.toggle('hidden', !repeatOn || unlimitedOn);
+    if (!repeatOn || unlimitedOn) {
+      const maxInp = $('#ruleMaxOcc');
+      if (maxInp) maxInp.value = '';
+    }
+  };
+  $('#ruleRepeat')?.addEventListener('change', () => {
+    if ($('#ruleRepeat')?.checked && !$('#ruleUnlimited')?.checked && !$('#ruleMaxOcc')?.value) {
+      $('#ruleUnlimited').checked = true;
+    }
+    syncRuleRepeatUi();
+  });
+  $('#ruleUnlimited')?.addEventListener('change', syncRuleRepeatUi);
+  syncRuleRepeatUi();
   $('#ruleForm').onsubmit = (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
+    const repeat = !!fd.get('repeat');
+    const unlimited = repeat && !!fd.get('unlimited');
     const maxRaw = String(fd.get('maxOccurrences') || '').trim();
+    if (repeat && !unlimited && !maxRaw) {
+      toast('Nhập tối đa số lần, hoặc tick «Lặp vô hạn»');
+      return;
+    }
     const row = {
       type: fd.get('type'),
       value: Number(fd.get('value')),
       label: fd.get('label'),
       forceReplace: !!fd.get('forceReplace'),
-      repeat: !!fd.get('repeat'),
-      maxOccurrences: maxRaw ? Number(maxRaw) : null,
+      repeat,
+      maxOccurrences: (repeat && !unlimited && maxRaw) ? Number(maxRaw) : null,
     };
     if (isNew) {
       row.seq = c.rules.length + 1;
@@ -80070,17 +80887,29 @@ function openEditCatRules(cid, ruleIndex) {
 
 function openCatalogMetaModal(cid) {
   const c = catById(cid);
+  normalizeCatalog(c);
   openModal(`
     <div class="border-b border-slate-200 px-5 py-4"><h2 class="text-lg font-bold">Sửa thông tin danh mục</h2></div>
     <form id="catMetaForm" class="space-y-3 px-5 py-4">
       <label class="block text-sm font-medium text-slate-700">Mã<input name="code" type="text" value="${esc(c.code)}" required /></label>
       <label class="block text-sm font-medium text-slate-700">Tên<input name="name" type="text" value="${esc(c.name)}" required /></label>
       <label class="block text-sm font-medium text-slate-700">Hệ thống xe
-        <select name="systemId" class="form-control" required>${systemOptionsHtml(c.systemId, c.system)}</select>
+        <select name="systemId" id="catMetaSystemId" class="form-control" required>${systemOptionsHtml(c.systemId, c.system)}</select>
+      </label>
+      <label class="block text-sm font-medium text-slate-700">Loại bảo dưỡng
+        <select name="serviceTypeId" id="catMetaServiceTypeId" class="form-control" required>${serviceTypeOptionsHtml(c.serviceTypeId, c.systemId)}</select>
+        <span class="mt-1 block text-xs font-normal text-slate-500">Lấy từ master Loại dịch vụ (menu Cấu hình)</span>
       </label>
       <div class="flex justify-end gap-2"><button type="button" data-close class="btn btn-outline">Hủy</button><button class="btn btn-primary">Lưu</button></div>
     </form>`);
   $('[data-close]').onclick = closeModal;
+  const syncMetaSvc = () => {
+    const sid = $('#catMetaSystemId')?.value || '';
+    const cur = $('#catMetaServiceTypeId')?.value || c.serviceTypeId || '';
+    const sel = $('#catMetaServiceTypeId');
+    if (sel) sel.innerHTML = serviceTypeOptionsHtml(cur, sid);
+  };
+  $('#catMetaSystemId')?.addEventListener('change', syncMetaSvc);
   $('#catMetaForm').onsubmit = (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
@@ -80088,32 +80917,56 @@ function openCatalogMetaModal(cid) {
     c.systemId = fd.get('systemId');
     const sys = vehicleSystemById(c.systemId);
     c.system = sys ? sys.name : c.system;
+    const stId = String(fd.get('serviceTypeId') || '');
+    const st = serviceTypeById(stId);
+    if (!stId || !st) { toast('Chọn loại bảo dưỡng'); return; }
+    c.serviceTypeId = stId;
+    c.serviceType = st.name;
     closeModal(); toast('Đã cập nhật danh mục'); render();
   };
 }
 
 function openAddCatalogModal() {
   const firstSys = activeVehicleSystems()[0];
+  const defaultSvc = firstSys ? (serviceTypesForSystem(firstSys.id).find(s => s.id === 'svc-bd') || serviceTypesForSystem(firstSys.id)[0]) : activeServiceTypes()[0];
   openModal(`
     <div class="border-b border-slate-200 px-5 py-4"><h2 class="text-lg font-bold">Thêm danh mục bảo dưỡng</h2></div>
     <form id="catCreateForm" class="space-y-3 px-5 py-4">
-      <label class="block text-sm font-medium text-slate-700">Mã<input name="code" type="text" placeholder="DM-PHANH" required /></label>
-      <label class="block text-sm font-medium text-slate-700">Tên<input name="name" type="text" placeholder="Bảo dưỡng hệ thống phanh" required /></label>
-      <label class="block text-sm font-medium text-slate-700">Hệ thống xe
-        <select name="systemId" class="form-control" required>${systemOptionsHtml(firstSys?.id, firstSys?.name)}</select>
+      <label class="block text-sm font-medium text-slate-700">Mã <span class="text-rose-600">*</span><input name="code" type="text" placeholder="DM-PHANH" required /></label>
+      <label class="block text-sm font-medium text-slate-700">Tên <span class="text-rose-600">*</span><input name="name" type="text" placeholder="Bảo dưỡng hệ thống phanh" required /></label>
+      <label class="block text-sm font-medium text-slate-700">Hệ thống xe <span class="text-rose-600">*</span>
+        <select name="systemId" id="catCreateSystemId" class="form-control" required>${systemOptionsHtml(firstSys?.id, firstSys?.name)}</select>
+      </label>
+      <label class="block text-sm font-medium text-slate-700">Loại bảo dưỡng <span class="text-rose-600">*</span>
+        <select name="serviceTypeId" id="catCreateServiceTypeId" class="form-control" required>${serviceTypeOptionsHtml(defaultSvc?.id, firstSys?.id)}</select>
+        <span class="mt-1 block text-xs font-normal text-slate-500">Lấy từ master Loại dịch vụ</span>
       </label>
       <p class="text-xs text-slate-500">Sau khi tạo, vào chi tiết để thêm mốc chu kỳ (km / giờ vận hành / tháng / năm).</p>
       <div class="flex justify-end gap-2"><button type="button" data-close class="btn btn-outline">Hủy</button><button class="btn btn-primary">Tạo</button></div>
     </form>`);
   $('[data-close]').onclick = closeModal;
+  const syncCreateSvc = () => {
+    const sid = $('#catCreateSystemId')?.value || '';
+    const cur = $('#catCreateServiceTypeId')?.value || '';
+    const preferred = serviceTypesForSystem(sid).find(s => s.id === cur)
+      || serviceTypesForSystem(sid).find(s => s.id === 'svc-bd')
+      || serviceTypesForSystem(sid)[0];
+    const sel = $('#catCreateServiceTypeId');
+    if (sel) sel.innerHTML = serviceTypeOptionsHtml(preferred?.id, sid);
+  };
+  $('#catCreateSystemId')?.addEventListener('change', syncCreateSvc);
   $('#catCreateForm').onsubmit = (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const id = Math.max(0, ...DB.catalog.map(c => c.id)) + 1;
     const sys = vehicleSystemById(fd.get('systemId'));
+    const stId = String(fd.get('serviceTypeId') || '');
+    const st = serviceTypeById(stId);
+    if (!stId || !st) { toast('Chọn loại bảo dưỡng'); return; }
     DB.catalog.push({
       id, code: fd.get('code'), name: fd.get('name'),
       systemId: fd.get('systemId'), system: sys ? sys.name : 'Chưa gắn hệ thống',
+      serviceTypeId: stId, serviceType: st.name,
       rules: [{ seq: 1, type: 'KM', value: 10000, label: 'Cứ 10.000 km / lần (không giới hạn)', forceReplace: false, repeat: true, maxOccurrences: null }],
       evalItemIds: [], defaultOnEvalBad: 'REPAIR', repairItemIds: [],
     });
@@ -81459,6 +82312,7 @@ function bindFilters() {
     'flt-approvalStatus': 'approvalStatus',
     'flt-source': 'source',
     'flt-system': 'system',
+    'flt-serviceType': 'serviceType',
     'flt-area': 'area',
     'flt-kind': 'kind',
     'flt-evalStatus': 'evalStatus',
@@ -82058,6 +82912,121 @@ function bind() {
   $('#btnAddCatalog')?.addEventListener('click', () => openAddCatalogModal());
   $('#btnEditCatalogMeta')?.addEventListener('click', () => openCatalogMetaModal(view.catalogId));
   $('#btnAddRuleDetail')?.addEventListener('click', () => openEditCatRules(view.catalogId, -1));
+  $('#btnAddRuleDetailTop')?.addEventListener('click', () => openEditCatRules(view.catalogId, -1));
+
+  const filterCatGroupedList = (q, rowSel, groupSel, emptyId) => {
+    const needle = String(q || '').trim().toLowerCase();
+    let visible = 0;
+    $$(rowSel).forEach(row => {
+      const on = !needle || (row.dataset.search || '').includes(needle);
+      row.classList.toggle('hidden', !on);
+      if (on) visible += 1;
+    });
+    $$(groupSel).forEach(g => {
+      const any = [...g.querySelectorAll(rowSel)].some(r => !r.classList.contains('hidden'));
+      g.classList.toggle('hidden', !any);
+    });
+    const emptyEl = $(emptyId);
+    if (emptyEl) emptyEl.classList.toggle('hidden', visible > 0 || !needle);
+  };
+  $('#catRuleSearch')?.addEventListener('input', (e) => {
+    const needle = String(e.target.value || '').trim().toLowerCase();
+    let visible = 0;
+    $$('[data-cat-rule-row]').forEach(row => {
+      const on = !needle || (row.dataset.search || '').includes(needle);
+      row.classList.toggle('hidden', !on);
+      if (on) visible += 1;
+    });
+    const emptyEl = $('#catRuleSearchEmpty');
+    if (emptyEl) emptyEl.classList.toggle('hidden', visible > 0 || !needle);
+  });
+  $('#catEvalSearch')?.addEventListener('input', (e) => {
+    filterCatGroupedList(e.target.value, '[data-cat-eval-row]', '[data-cat-eval-group]', '#catEvalSearchEmpty');
+  });
+  $('#catRepairSearch')?.addEventListener('input', (e) => {
+    filterCatGroupedList(e.target.value, '[data-cat-repair-row]', '[data-cat-repair-group]', '#catRepairSearchEmpty');
+  });
+
+  $$('.cat-eval-link').forEach(el => el.addEventListener('change', () => {
+    const n = $$('.cat-eval-link:checked').length;
+    const elCount = $('#catEvalLinkedCount');
+    if (elCount) elCount.textContent = String(n);
+  }));
+  $$('.cat-repair-link').forEach(el => el.addEventListener('change', () => {
+    const n = $$('.cat-repair-link:checked').length;
+    const elCount = $('#catRepairLinkedCount');
+    if (elCount) elCount.textContent = String(n);
+  }));
+
+  const syncServiceTypeAfterSystem = (sid) => {
+    const hid = $('#catServiceTypeId');
+    const ac = $('#catServiceTypeAc');
+    if (!hid || !ac) return;
+    const cur = hid.value || '';
+    const preferred = serviceTypesForSystem(sid).find(s => s.id === cur)
+      || serviceTypesForSystem(sid).find(s => s.id === 'svc-bd')
+      || serviceTypesForSystem(sid)[0]
+      || null;
+    hid.value = preferred?.id || '';
+    ac.value = preferred?.name || '';
+  };
+  bindCreatableAc($('#catSystemAc'), $('#catSystemDd'), {
+    allowCreate: false,
+    getOptions: () => activeVehicleSystems().map(s => ({ id: s.id, name: s.name, code: s.code || '' })),
+    format: (o) => `${esc(o.name)}${o.code ? ` <span class="sub">${esc(o.code)}</span>` : ''}`,
+    onPick: (o) => {
+      const hid = $('#catSystemId');
+      const ac = $('#catSystemAc');
+      if (hid) hid.value = o.id;
+      if (ac) ac.value = o.name;
+      syncServiceTypeAfterSystem(o.id);
+      const cat = catById(view.catalogId);
+      const keepIds = (cat?.repairItemIds || []).filter(id =>
+        repairItemsForSystem(o.id, o.name).some(r => r.id === id)
+      );
+      refreshCatalogRepairPanel(o.id, o.name, keepIds);
+    },
+    onInput: () => { const hid = $('#catSystemId'); if (hid) hid.value = ''; },
+  });
+  bindCreatableAc($('#catServiceTypeAc'), $('#catServiceTypeDd'), {
+    allowCreate: false,
+    getOptions: () => {
+      const sid = $('#catSystemId')?.value || '';
+      const list = sid ? serviceTypesForSystem(sid) : activeServiceTypes();
+      return (list.length ? list : activeServiceTypes()).map(st => ({
+        id: st.id, name: st.name, code: st.code || '',
+      }));
+    },
+    format: (o) => `${esc(o.name)}${o.code ? ` <span class="sub">(${esc(o.code)})</span>` : ''}`,
+    onPick: (o) => {
+      const hid = $('#catServiceTypeId');
+      const ac = $('#catServiceTypeAc');
+      if (hid) hid.value = o.id;
+      if (ac) ac.value = o.name;
+    },
+    onInput: () => { const hid = $('#catServiceTypeId'); if (hid) hid.value = ''; },
+  });
+  bindCreatableAc($('#catEvalBadAc'), $('#catEvalBadDd'), {
+    allowCreate: false,
+    getOptions: () => [
+      { id: 'REPAIR', name: 'Sửa chữa', code: 'REPAIR' },
+      { id: 'REPLACE', name: 'Thay thế', code: 'REPLACE' },
+    ],
+    format: (o) => esc(o.name),
+    onPick: (o) => {
+      const hid = $('#catEvalBad');
+      const ac = $('#catEvalBadAc');
+      if (hid) hid.value = o.id;
+      if (ac) ac.value = o.name;
+    },
+    onInput: () => { const hid = $('#catEvalBad'); if (hid) hid.value = ''; },
+  });
+  if (view.name === 'catalogDetail' && !document.body.dataset.catAcOutside) {
+    document.body.dataset.catAcOutside = '1';
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.ac-wrap')) hideAllAcDropdowns();
+    });
+  }
 
   $$('[data-force-replace]').forEach(el => el.onchange = () => {
     const [cid, idx] = el.dataset.forceReplace.split(':');
@@ -82078,18 +83047,32 @@ function bind() {
   $('#btnSaveCatLinks')?.addEventListener('click', () => {
     const cat = catById(view.catalogId);
     if (!cat) return;
-    cat.systemId = $('#catSystemId')?.value || cat.systemId;
+    const sid = $('#catSystemId')?.value || '';
+    if (!sid) { toast('Chọn hệ thống xe'); return; }
+    cat.systemId = sid;
     const sys = vehicleSystemById(cat.systemId);
     if (sys) cat.system = sys.name;
-    cat.defaultOnEvalBad = $('#catEvalBad')?.value || 'REPAIR';
+    const stId = $('#catServiceTypeId')?.value || '';
+    const st = serviceTypeById(stId);
+    if (!stId || !st) { toast('Chọn loại bảo dưỡng'); return; }
+    cat.serviceTypeId = stId;
+    cat.serviceType = st.name;
+    const evalBad = $('#catEvalBad')?.value || '';
+    if (evalBad !== 'REPAIR' && evalBad !== 'REPLACE') { toast('Chọn quyết định khi đánh giá lỗi'); return; }
+    cat.defaultOnEvalBad = evalBad;
     cat.evalItemIds = $$('.cat-eval-link:checked').map(x => x.value);
-    toast('Đã lưu hệ thống & tiêu chí đánh giá · ' + cat.evalItemIds.length + ' hạng mục');
+    const allowed = new Set(repairItemsForSystem(cat.systemId, cat.system).map(r => r.id));
+    cat.repairItemIds = (cat.repairItemIds || []).filter(id => allowed.has(id));
+    toast('Đã lưu loại BD · hệ thống & tiêu chí · ' + cat.evalItemIds.length + ' hạng mục');
     render();
   });
   $('#btnSaveCatRepairs')?.addEventListener('click', () => {
     const cat = catById(view.catalogId);
     if (!cat) return;
-    cat.repairItemIds = $$('.cat-repair-link:checked').map(x => x.value);
+    const sid = $('#catSystemId')?.value || cat.systemId;
+    const sysName = $('#catSystemAc')?.value || cat.system;
+    const allowed = new Set(repairItemsForSystem(sid, sysName).map(r => r.id));
+    cat.repairItemIds = $$('.cat-repair-link:checked').map(x => x.value).filter(id => allowed.has(id));
     toast('Đã lưu gợi ý sửa chữa · ' + cat.repairItemIds.length + ' hạng mục');
     render();
   });
