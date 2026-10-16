@@ -74884,7 +74884,7 @@ function pageTireBattery() {
   if (mount !== 'WAREHOUSE' && mount !== 'LIQUIDATED') left = vehRows.filter(r => matchRowSearch(r) && matchRowWarn(r));
   if (warehouseRow && (mount === 'ALL' || mount === 'WAREHOUSE') && matchRowSearch(warehouseRow) && matchRowWarn(warehouseRow)) left.push(warehouseRow);
   if (liquidatedRow && (mount === 'ALL' || mount === 'LIQUIDATED') && matchRowSearch(liquidatedRow) && matchRowWarn(liquidatedRow)) left.push(liquidatedRow);
-  const vehN = vehRows.length;
+  const totalUnitsN = allUnits.length;
   const mountedN = allUnits.filter((u) => tireBatteryAttachStatus(u) === 'MOUNTED').length;
   const whN = whUnits.length;
   const liqN = liqUnits.length;
@@ -75003,8 +75003,8 @@ function pageTireBattery() {
     `
     <div class="mb-4 grid grid-cols-2 gap-3 md:grid-cols-5">
       <button type="button" data-tb-kpi="total" class="card p-3 text-left cursor-pointer ${kpiOn(mount === 'ALL' && warnF === 'ALL')}" title="Hiện tất cả">
-        <p class="text-xs text-slate-500">Tổng xe / mooc</p>
-        <p class="text-xl font-bold">${vehN}</p>
+        <p class="text-xs text-slate-500">Tổng vỏ lốp / ắc quy</p>
+        <p class="text-xl font-bold">${totalUnitsN}</p>
       </button>
       <button type="button" data-tb-kpi="mounted" class="card p-3 text-left cursor-pointer ${kpiOn(mount === 'MOUNTED')}" title="Seri đang gắn xe">
         <p class="text-xs text-slate-500">Đang gắn xe</p>
@@ -75027,7 +75027,7 @@ function pageTireBattery() {
       <div class="card overflow-hidden">
         <div class="border-b border-slate-200 p-3 space-y-2">
           <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Xe · kho · thanh lý</div>
-          <p class="text-[11px] text-slate-400 m-0">${left.filter(r => r.v || r.pair).length} xe · ${whN} kho · ${liqN} thanh lý</p>
+          <p class="text-[11px] text-slate-400 m-0">${left.filter(r => r.v).length} xe/mooc · ${whN} kho · ${liqN} thanh lý</p>
           <label class="block">
             <span class="sr-only">Tìm biển số hoặc tiêu đề</span>
             <input id="flt-search" type="search" class="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Tìm biển số xe / tiêu đề…" value="${esc(f.search || '')}" autocomplete="off" />
