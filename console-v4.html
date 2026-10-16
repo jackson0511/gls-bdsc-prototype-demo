@@ -64242,6 +64242,48 @@ function hashStr(s) {
 }
 
 /** Gán giá tham chiếu / NCC / kho / tồn mẫu từ PWMS nếu thiếu (cache danh mục). */
+/** Suy nhóm / hệ thống Product PWMS (cột nhom · he_thong) từ mã / tên — khớp sheet mẫu. */
+function inferMaterialPwmsCatalog(m) {
+  const code = String(m?.code || '');
+  const byCode = {
+    'VTU-342-1000002': ['Phụ Tùng Xe', 'Hệ Thống Gầm'],
+    'VTU-342-1000003': ['Phụ Tùng Xe', 'Hệ Thống Gầm'],
+    'VTU-342-1000004': ['Phụ Tùng Xe', 'Hệ Thống Gầm'],
+    'VTU-342-1000005': ['Phụ Tùng Xe', 'Hệ Thống Gầm'],
+    'VTU-342-1000006': ['Phụ Tùng Xe', 'Hệ Thống Gầm'],
+    'VTU-348-1000007': ['Phụ Tùng Xe', 'Hệ Thống Lái'],
+    'VTU-344-1000008': ['Phụ Tùng Xe', 'Hệ Thống Máy Xe'],
+    'VTU-342-1000009': ['Phụ Tùng Xe', 'Hệ Thống Gầm'],
+    'VTU-342-1000010': ['Phụ Tùng Xe', 'Hệ Thống Gầm'],
+    'VTU-211-1000011': ['Trang Thiết Bị Bảo Hộ', 'Trang Thiết Bị Bảo Hộ'],
+    'VTU-343-1000012': ['Phụ Tùng Xe', 'Hệ Thống Máy Lạnh'],
+    'VTU-351-1000013': ['Dụng Cụ', 'Hoá Chất Vệ Sinh'],
+    'VTU-348-1000014': ['Phụ Tùng Xe', 'Hệ Thống Lái'],
+    'VTU-348-1000015': ['Phụ Tùng Xe', 'Hệ Thống Lái'],
+    'VTU-348-1000016': ['Phụ Tùng Xe', 'Hệ Thống Lái'],
+    'VTU-342-1000017': ['Phụ Tùng Xe', 'Hệ Thống Gầm'],
+  };
+  if (byCode[code]) return { nhom: byCode[code][0], heThong: byCode[code][1] };
+  const blob = `${m?.name || ''} ${code}`.toLowerCase();
+  if (/áo phản quang|bảo hộ|găng|nón|giày/.test(blob)) return { nhom: 'Trang Thiết Bị Bảo Hộ', heThong: 'Trang Thiết Bị Bảo Hộ' };
+  if (/axit|hoá chất|hoa chat|dung môi|rửa|ve sinh/.test(blob)) return { nhom: 'Dụng Cụ', heThong: 'Hoá Chất Vệ Sinh' };
+  if (/dụng cụ|dung cu|công cụ|cong cu/.test(blob)) return { nhom: 'Dụng Cụ', heThong: 'Công Cụ Hỗ Trợ' };
+  if (/nhớt|mo\b|mỡ|dầu|loc nhớt|lọc nhớt|lọc dầu|lọc gió|lọc nhiên/.test(blob)) return { nhom: 'Mỡ - Dầu Nhớt', heThong: 'Mỡ - Dầu Nhớt' };
+  if (/lốp|lop\b|vỏ lốp|tire/.test(blob)) return { nhom: 'Phụ Tùng Xe', heThong: 'Vỏ Lốp' };
+  if (/ắc quy|ac quy|acquy|battery/.test(blob)) return { nhom: 'Phụ Tùng Xe', heThong: 'Ắc Quy' };
+  if (/áp suất|ap suat|gas|máy lạnh|may lanh/.test(blob)) return { nhom: 'Phụ Tùng Xe', heThong: 'Hệ Thống Máy Lạnh' };
+  if (/piston|máy xe|may xe|loc|lọc/.test(blob) && /máy|may|piston/.test(blob)) return { nhom: 'Phụ Tùng Xe', heThong: 'Hệ Thống Máy Xe' };
+  if (/phi dê|phi de|lái|lai\b|rô tuyn|ro tuyn/.test(blob)) return { nhom: 'Phụ Tùng Xe', heThong: 'Hệ Thống Lái' };
+  if (/bạc đạn|bac dan|hộp số|hop so|truyền động/.test(blob)) return { nhom: 'Phụ Tùng Xe', heThong: 'Hệ Thống Truyền Động Hộp Số' };
+  if (/điện|dien|đèn|den|relay|cảm biến/.test(blob)) return { nhom: 'Phụ Tùng Xe', heThong: 'Hệ Thống Điện' };
+  if (/hơi|hoi|van hơi|bầu hơi/.test(blob)) return { nhom: 'Phụ Tùng Xe', heThong: 'Hệ Thống Hơi' };
+  return { nhom: 'Phụ Tùng Xe', heThong: 'Hệ Thống Gầm' };
+}
+function truncatePwmsSiteName(name, maxLen) {
+  const s = String(name || '').trim();
+  const n = maxLen || 22;
+  return s.length > n ? s.slice(0, n) : s;
+}
 function enrichMaterialPwmsFields(m, force) {
   if (!m || m.localOnly) return m;
   const h = hashStr(m.code || m.id || m.name);
@@ -64251,6 +64293,22 @@ function enrichMaterialPwmsFields(m, force) {
   if (force || !m.warehouse) m.warehouse = PWMS_WAREHOUSE_POOL[h % PWMS_WAREHOUSE_POOL.length];
   if (force || m.stockQty == null) m.stockQty = (h % 40) + 1;
   if (!m.uom) m.uom = 'Cái';
+  const cat = inferMaterialPwmsCatalog(m);
+  if (force || !m.nhom) m.nhom = cat.nhom;
+  if (force || !m.heThong) m.heThong = cat.heThong;
+  const ten = m.name || '';
+  if (force || !m.tenHcm) m.tenHcm = truncatePwmsSiteName(ten, 22);
+  if (force || !m.tenDa) m.tenDa = truncatePwmsSiteName(ten, 22);
+  if (force || !m.tenCl) m.tenCl = truncatePwmsSiteName(ten, 22);
+  if (force || !m.tenHph) m.tenHph = truncatePwmsSiteName(ten, 22);
+  if (force || m.moTa == null) m.moTa = ten;
+  if (force || m.seri == null) {
+    const blob = `${m.name || ''} ${m.code || ''}`.toLowerCase();
+    m.seri = /lốp|lop|tire|ắc quy|ac quy|acquy|battery|vỏ lốp/.test(blob);
+  }
+  if (force || m.hinhAnh == null) m.hinhAnh = '';
+  if (force || m.toiThieu == null) m.toiThieu = 1;
+  if (force || m.apDung == null) m.apDung = true;
   // Mẫu định mức kép cho lốp/ắc (hiển thị màn Vỏ lốp / ắc quy)
   const blob = `${m.name || ''} ${m.code || ''}`.toLowerCase();
   if (/lốp|lop|tire|ắc|acquy|battery/.test(blob)) {
@@ -67256,6 +67314,9 @@ function showListCtx(ev, key, item) {
     bits.push(slickMenuItem('eval', 'file', 'Đánh giá'));
     bits.push(slickMenuItem('view-orders', 'files', 'Xem phiếu theo xe'));
     el._listCtx = { key, item, vehicleId: item.vehicleId != null ? item.vehicleId : item.id, plate: item.plate };
+  } else if (key === 'materials') {
+    bits.push(slickMenuItem('copy-code', 'copy', 'Sao chép id ' + (item.code || '')));
+    el._listCtx = { key, item, code: item.code };
   } else if (key === 'assessResults') {
     const groupId = item.__group ? item.id : ('g-' + item.groupKey);
     const group = item.__group ? item : findAssessFailRowById(groupId);
@@ -77726,45 +77787,61 @@ function pageVehicleSystemsMaster() {
 
 function pageMaterialsMaster() {
   const f = F();
+  enrichAllMaterials(false);
   const list = (DB.materials || []).filter(m => !m.localOnly);
-  const filtered = list.filter(m => matchSearch([m.code, m.name, m.uom, m.supplier, m.warehouse].join(' '), f.search));
-  const pg = paginate(filtered);
+  const filtered = list.filter(m => matchSearch([
+    m.code, m.nhom, m.heThong, m.name, m.tenHcm, m.tenDa, m.tenCl, m.tenHph, m.moTa, m.uom,
+  ].join(' '), f.search));
+  const boolTxt = (v) => (v === true || v === 'TRUE' || v === 'true' || v === 1) ? 'TRUE' : 'FALSE';
+  const rows = filtered.map((m) => ({
+    id: m.code || m.id,
+    materialId: m.id,
+    code: m.code || '—',
+    nhom: m.nhom || '—',
+    heThong: m.heThong || '—',
+    tenVatTu: m.name || '—',
+    tenHcm: m.tenHcm || '',
+    tenDa: m.tenDa || '',
+    tenCl: m.tenCl || '',
+    tenHph: m.tenHph || '',
+    moTa: m.moTa || m.name || '',
+    dvt: m.uom || 'Cái',
+    seri: boolTxt(m.seri),
+    hinhAnh: m.hinhAnh || '',
+    toiThieu: m.toiThieu != null ? m.toiThieu : 1,
+    apDung: boolTxt(m.apDung !== false),
+  }));
+  registerListGrid('materials', rows, [
+    { id: 'code', field: 'code', name: 'id', width: 150, minWidth: 120, sortable: true,
+      formatter: (r, c, v) => `<span class="font-mono text-xs text-sky-700">${esc(v || '—')}</span>` },
+    { id: 'nhom', field: 'nhom', name: 'nhom', width: 140, minWidth: 110, sortable: true, filterType: 'select' },
+    { id: 'heThong', field: 'heThong', name: 'he_thong', width: 170, minWidth: 130, sortable: true, filterType: 'select' },
+    { id: 'tenVatTu', field: 'tenVatTu', name: 'ten_vat_tu', width: 220, minWidth: 160, sortable: true },
+    { id: 'tenHcm', field: 'tenHcm', name: 'ten_hcm', width: 150, minWidth: 110, sortable: true },
+    { id: 'tenDa', field: 'tenDa', name: 'ten_da', width: 150, minWidth: 110, sortable: true },
+    { id: 'tenCl', field: 'tenCl', name: 'ten_cl', width: 150, minWidth: 110, sortable: true },
+    { id: 'tenHph', field: 'tenHph', name: 'ten_hph', width: 150, minWidth: 110, sortable: true },
+    { id: 'moTa', field: 'moTa', name: 'mo_ta', width: 200, minWidth: 140, sortable: true },
+    { id: 'dvt', field: 'dvt', name: 'dvt', width: 70, minWidth: 56, sortable: true, cssClass: 'c', filterType: 'select' },
+    { id: 'seri', field: 'seri', name: 'seri', width: 70, minWidth: 56, sortable: true, cssClass: 'c', filterType: 'select' },
+    { id: 'hinhAnh', field: 'hinhAnh', name: 'hinh_anh', width: 90, minWidth: 70, sortable: false },
+    { id: 'toiThieu', field: 'toiThieu', name: 'toi_thieu', width: 80, minWidth: 64, sortable: true, cssClass: 'r' },
+    { id: 'apDung', field: 'apDung', name: 'ap_dung', width: 80, minWidth: 64, sortable: true, cssClass: 'c', filterType: 'select' },
+  ], { forceFitColumns: false, colFilters: true });
+  const body = listSlickHostHtml('materials', 'Danh mục vật tư (Product PWMS)', {
+    countLabel: filtered.length + ' / ' + list.length + ' vật tư',
+    kpiTotal: filtered.length,
+    searchPlaceholder: 'id / ten_vat_tu / nhom / he_thong…',
+    searchTitle: 'Tìm theo id, tên vật tư, nhóm, hệ thống…',
+    searchValue: f.search || '',
+  });
   return pageShell(
     'Vật tư',
-    'Bộ nhớ đệm danh mục Product từ PWMS — dùng tra cứu khi lập phiếu / kế hoạch. Số seri không lưu master tại đây (chỉ tra cứu khi gắn hạng mục).',
+    'Cache Product PWMS — cột theo sheet nguồn: id · nhom · he_thong · ten_vat_tu · ten_* · mo_ta · dvt · seri · hinh_anh · toi_thieu · ap_dung.',
     pwmsSyncActions('materials'),
     `
     ${pwmsSourceBanner('Product là nguồn sự thật trên PWMS. TMS chỉ cache để lookup; dòng KTV nhập tay nằm riêng và không ghi đè danh mục này.')}
-    ${filterBarShell([
-      filterSearch('flt-search', 'Mã, tên vật tư…', f.search),
-    ].join(''), `${filtered.length} / ${list.length} vật tư`)}
-    <div class="card overflow-hidden">
-      <table class="min-w-full text-sm">
-        <thead class="bg-slate-50 text-slate-600"><tr>
-          <th class="th text-left">Mã</th>
-          <th class="th text-left">Tên vật tư</th>
-          <th class="th text-left">Đơn vị tính</th>
-          <th class="th text-right">Giá tham chiếu</th>
-          <th class="th text-left">Nhà cung cấp</th>
-          <th class="th text-left">Kho</th>
-          <th class="th text-right">Tồn</th>
-          <th class="th text-left">Đồng bộ gần nhất</th>
-        </tr></thead>
-        <tbody>
-          ${pg.items.map(m => { enrichMaterialPwmsFields(m, false); return `<tr class="row-h">
-            <td class="td font-mono text-xs text-sky-700">${esc(m.code || '—')}</td>
-            <td class="td font-medium">${esc(m.name)}</td>
-            <td class="td">${esc(m.uom || 'Cái')}</td>
-            <td class="td text-right tabular-nums">${money(m.refPrice)}</td>
-            <td class="td text-xs">${esc(m.supplier || '—')}</td>
-            <td class="td text-xs">${esc(m.warehouse || '—')}</td>
-            <td class="td text-right tabular-nums">${m.stockQty ?? '—'}</td>
-            <td class="td text-xs text-slate-500 tabular-nums">${esc(m.lastPwmsSyncAt || pwmsSyncMeta('materials').lastSyncedAt || '—')}</td>
-          </tr>`; }).join('') || `<tr><td colspan="8" class="px-5 py-12 text-center text-slate-500">Chưa có vật tư · bấm Đồng bộ từ PWMS</td></tr>`}
-        </tbody>
-      </table>
-      ${paginationBar(pg)}
-    </div>`
+    ${body}`
   );
 }
 
