@@ -67784,7 +67784,7 @@ function openPlanCellAutocomplete(grid, row, cell) {
 }
 function listStatusLabel(kind, code) {
   if (kind === 'eval') {
-    return ({ due: 'Đến hạn', soon: 'Sắp đến hạn', ok: 'Đúng hạn', overdue: 'Quá hạn' }[code] || code || '');
+    return ({ due: 'Đến hạn', soon: 'Sắp đến hạn', ok: 'Còn hạn', overdue: 'Quá hạn' }[code] || code || '');
   }
   if (kind === 'approval') {
     return ({
@@ -71393,7 +71393,7 @@ function vehicleChip(v) {
 }
 function evalBadge(s) {
   const m = {
-    ok: ['bg-emerald-100 text-emerald-800', 'Đúng hạn'],
+    ok: ['bg-emerald-100 text-emerald-800', 'Còn hạn'],
     soon: ['bg-orange-100 text-orange-800', 'Gần tới hạn'],
     due: ['bg-amber-100 text-amber-900', 'Tới hạn'],
     overdue: ['bg-rose-100 text-rose-800 border border-rose-300', 'Quá hạn'],
