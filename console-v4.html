@@ -64267,16 +64267,29 @@ function enrichAllMaterials(force) {
   (DB.materials || []).forEach(m => enrichMaterialPwmsFields(m, force));
 }
 
-const TB_SEED_VER = 3; // gắn xe / kho / thanh lý — không còn vị trí lắp chi tiết
+const TB_SEED_VER = 4; // tách Seri/Mã · thêm nhãn hiệu + tình trạng
 const DEMO_TIRE_SKUS = [
-  { code: 'VTU-LOP-385', name: 'Vỏ lốp 385/65R22.5', uom: 'Cái', maxKm: 80000, maxMonth: 18, refPrice: 6850000 },
-  { code: 'VTU-LOP-11R', name: 'Vỏ lốp 11R22.5', uom: 'Cái', maxKm: 90000, maxMonth: 18, refPrice: 6200000 },
-  { code: 'VTU-LOP-295', name: 'Vỏ lốp 295/80R22.5', uom: 'Cái', maxKm: 85000, maxMonth: 18, refPrice: 5980000 },
+  { code: 'VTU-LOP-385', name: 'Vỏ lốp 385/65R22.5', brand: 'Bridgestone', uom: 'Cái', maxKm: 80000, maxMonth: 18, refPrice: 6850000 },
+  { code: 'VTU-LOP-11R', name: 'Vỏ lốp 11R22.5', brand: 'Michelin', uom: 'Cái', maxKm: 90000, maxMonth: 18, refPrice: 6200000 },
+  { code: 'VTU-LOP-295', name: 'Vỏ lốp 295/80R22.5', brand: 'Dunlop', uom: 'Cái', maxKm: 85000, maxMonth: 18, refPrice: 5980000 },
 ];
 const DEMO_BATTERY_SKUS = [
-  { code: 'VTU-ACQ-N200', name: 'Ắc quy N200 12V', uom: 'Cái', maxKm: 200000, maxMonth: 24, refPrice: 4200000 },
-  { code: 'VTU-ACQ-N150', name: 'Ắc quy N150 12V', uom: 'Cái', maxKm: 180000, maxMonth: 24, refPrice: 3650000 },
+  { code: 'VTU-ACQ-N200', name: 'Ắc quy N200 12V', brand: 'GS', uom: 'Cái', maxKm: 200000, maxMonth: 24, refPrice: 4200000 },
+  { code: 'VTU-ACQ-N150', name: 'Ắc quy N150 12V', brand: 'Rocket', uom: 'Cái', maxKm: 180000, maxMonth: 24, refPrice: 3650000 },
 ];
+const TB_CONDITION_LABELS = {
+  NEW: 'Mới',
+  USED: 'Đã qua sử dụng',
+  WORN: 'Cũ / mòn',
+  FAULTY: 'Hỏng',
+  LIQUIDATED: 'Thanh lý',
+};
+function tireBatteryConditionLabel(u) {
+  if (!u) return '—';
+  if (u.conditionLabel) return u.conditionLabel;
+  const code = u.condition || '';
+  return TB_CONDITION_LABELS[code] || code || '—';
+}
 
 function classifyTireBatteryKind(blob) {
   const s = String(blob || '').toLowerCase();
@@ -64311,6 +64324,13 @@ function normalizeTireBatteryUnit(u) {
   }
   // Bỏ vị trí lắp chi tiết (Trái trước…) — chỉ giữ trạng thái gắn
   u.position = tireBatteryAttachLabel(u);
+  if (!u.brand) u.brand = u.kind === 'BATTERY' ? '—' : '—';
+  if (!u.condition) {
+    if (tireBatteryAttachStatus(u) === 'LIQUIDATED') u.condition = 'LIQUIDATED';
+    else if (tireBatteryAttachStatus(u) === 'WAREHOUSE') u.condition = 'NEW';
+    else u.condition = 'USED';
+  }
+  u.conditionLabel = TB_CONDITION_LABELS[u.condition] || u.conditionLabel || u.condition;
   return u;
 }
 /** Cảnh báo định mức chỉ với seri đang gắn trên xe */
@@ -64370,11 +64390,20 @@ function ensureTireBatteryUnits(force) {
     const maxMonth = Number(sku.maxMonth || (kind === 'BATTERY' ? 24 : 18));
     const mounted = attachStatus === 'MOUNTED' && v;
     const bias = usageBias != null ? usageBias : (0.28 + (h % 72) / 100);
+    let condition = 'USED';
+    if (attachStatus === 'LIQUIDATED') condition = 'LIQUIDATED';
+    else if (attachStatus === 'WAREHOUSE') condition = (h % 3 === 0) ? 'NEW' : 'USED';
+    else if (bias >= 1) condition = (h % 2 === 0) ? 'WORN' : 'FAULTY';
+    else if (bias >= 0.9) condition = 'WORN';
+    else if (bias < 0.4) condition = 'NEW';
     const u = {
       id: 'tbu-' + (++n),
       kind,
       code: sku.code,
       name: sku.name,
+      brand: sku.brand || (kind === 'BATTERY' ? 'GS' : 'Bridgestone'),
+      condition,
+      conditionLabel: TB_CONDITION_LABELS[condition] || condition,
       uom: sku.uom || 'Cái',
       vat: 8,
       refPrice: sku.refPrice || 0,
@@ -74812,7 +74841,7 @@ function pageTireBattery() {
     const plate = row.v?.plate || '';
     const bucket = row.bucket === 'liq' ? 'thanh lý' : (row.bucket === 'wh' ? 'kho chưa gắn' : '');
     if (matchPlateSearch(plate, f.search) || matchSearch([plate, row.v?.type, bucket, 'kho', 'thanh lý'].join(' '), f.search)) return true;
-    return row.units.some(u => matchSearch([u.code, u.name, u.serial, u.supplier, tireBatteryAttachLabel(u)].join(' '), f.search));
+    return row.units.some(u => matchSearch([u.code, u.name, u.serial, u.brand, tireBatteryConditionLabel(u), u.supplier, tireBatteryAttachLabel(u)].join(' '), f.search));
   };
   const matchRowWarn = (row) => {
     // Cảnh báo chỉ tính seri đang gắn xe — kho / thanh lý không đưa vào lọc cảnh báo
@@ -74877,13 +74906,20 @@ function pageTireBattery() {
     const col = pct >= 100 ? 'bg-rose-500' : pct >= 90 ? 'bg-amber-500' : 'bg-emerald-500';
     return `<div class="mt-0.5 h-1 overflow-hidden rounded-full bg-slate-100"><div class="h-full ${col}" style="width:${Math.min(100, Math.max(0, pct))}%"></div></div>`;
   };
+  const conditionChip = (u) => {
+    const label = tireBatteryConditionLabel(u);
+    const code = u.condition || '';
+    const cls = code === 'NEW' ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+      : code === 'USED' ? 'bg-sky-50 text-sky-800 border-sky-200'
+      : code === 'WORN' ? 'bg-amber-50 text-amber-900 border-amber-200'
+      : code === 'FAULTY' || code === 'LIQUIDATED' ? 'bg-rose-50 text-rose-800 border-rose-200'
+      : 'bg-slate-100 text-slate-700 border-slate-200';
+    return `<span class="chip border ${cls}">${esc(label)}</span>`;
+  };
   const unitRow = (u) => {
     const level = tireBatteryWarnLevel(u);
     const warn = !!level;
     const moP = tbUsagePct(u.usedMonth, u.maxMonth);
-    const kindChip = u.kind === 'BATTERY'
-      ? '<span class="chip bg-violet-100 text-violet-800">Ắc quy</span>'
-      : '<span class="chip bg-sky-100 text-sky-800">Vỏ lốp</span>';
     const side = selected?.pair
       ? (String(u.vehicleId) === String(selected.pair.trailer.id)
         ? '<span class="chip bg-slate-100 text-slate-700">Rơ-mooc</span> '
@@ -74900,13 +74936,12 @@ function pageTireBattery() {
       : `<button type="button" data-tb-warn-chip="${level === 'overdue' ? 'OVERDUE' : (warn ? 'SOON' : 'OK')}" class="bg-transparent p-0 border-0 cursor-pointer">${level === 'overdue' ? evalBadge('overdue') : (warn ? evalBadge('soon') : evalBadge('ok'))}</button>`;
     return `<tr class="row-h ${warn ? 'bg-amber-50/50' : ''}">
       <td class="td text-center"><input type="checkbox" class="tb-row" data-id="${esc(u.id)}" data-group-key="${esc(sel)}" ${warn ? 'checked' : ''} ${attach !== 'MOUNTED' ? 'disabled' : ''} /></td>
-      <td class="td">${kindChip}</td>
       <td class="td">${side}${attachChip}</td>
-      <td class="td">
-        <div class="font-mono text-sm font-bold tracking-wide text-slate-900">${esc(u.serial || '—')}</div>
-        <div class="mt-0.5 font-mono text-xs text-slate-600">${esc(u.code || '—')}</div>
-      </td>
+      <td class="td font-mono text-sm font-bold tracking-wide text-slate-900 whitespace-nowrap">${esc(u.serial || '—')}</td>
+      <td class="td font-mono text-xs text-slate-700 whitespace-nowrap">${esc(u.code || '—')}</td>
+      <td class="td text-xs font-medium text-slate-800">${esc(u.brand || '—')}</td>
       <td class="td">${esc(u.name || '—')}</td>
+      <td class="td text-center">${conditionChip(u)}</td>
       <td class="td text-xs">${esc(u.supplier || '—')}</td>
       <td class="td text-right text-xs tabular-nums">${u.usedMonth} / ${u.maxMonth} th<div class="text-[10px] text-slate-400">${moP}%</div>${usageBar(moP)}</td>
       <td class="td text-center">${ttCell}</td>
@@ -74917,13 +74952,15 @@ function pageTireBattery() {
         <table class="min-w-full text-sm">
           <thead class="sticky top-0 bg-slate-50 text-slate-600"><tr>
             <th class="th"><input type="checkbox" id="tbCheckAll" /></th>
-            <th class="th text-left">Loại</th>
             <th class="th text-left">Gắn / trạng thái</th>
-            <th class="th text-left">Seri / Mã</th>
+            <th class="th text-left">Seri</th>
+            <th class="th text-left">Mã</th>
+            <th class="th text-left">Nhãn hiệu</th>
             <th class="th text-left">Tên</th>
+            <th class="th text-center">Tình trạng</th>
             <th class="th text-left">Nhà cung cấp</th>
             <th class="th text-right">Tháng đã dùng</th>
-            <th class="th text-center">TT</th>
+            <th class="th text-center">TT hạn</th>
           </tr></thead>
           <tbody>${detailUnits.map(unitRow).join('')}</tbody>
         </table>
