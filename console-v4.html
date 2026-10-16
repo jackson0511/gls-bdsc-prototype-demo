@@ -1246,9 +1246,10 @@
         <button type="button" id="btnToggleSidebar" class="sidebar-toggle" title="Thu gọn / mở rộng menu" aria-label="Thu gọn menu">«</button>
       </div>
       <nav class="flex-1 scroll-y px-2 py-3 text-[13px]">
-        <div class="nav-section mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Quản lý xe</div>
-        <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="fleet" title="Xe & mooc"><span class="nav-ico">XE</span><span class="nav-label">Xe &amp; mooc</span></a>
-        <div class="nav-section mb-1 mt-4 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Bảo dưỡng</div>
+        <!-- Xe & mooc (page=fleet) — tạm ẩn toàn bộ menu + lối vào -->
+        <div class="nav-section mb-1 hidden px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500" aria-hidden="true">Quản lý xe</div>
+        <a href="#" class="nav-item mb-0.5 hidden items-center gap-2.5 rounded-md px-3 py-2" data-nav="fleet" title="Xe & mooc (tạm ẩn)" aria-hidden="true" tabindex="-1"><span class="nav-ico">XE</span><span class="nav-label">Xe &amp; mooc</span></a>
+        <div class="nav-section mb-1 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Bảo dưỡng</div>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="historyMaint" title="Bảo dưỡng"><span class="nav-ico">BD</span><span class="nav-label">Bảo dưỡng</span></a>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="reminder" title="Nhắc bảo dưỡng"><span class="nav-ico">NB</span><span class="nav-label">Nhắc bảo dưỡng</span></a>
         <a href="#" class="nav-item mb-0.5 flex items-center gap-2.5 rounded-md px-3 py-2" data-nav="plansMaint" title="Kế hoạch bảo dưỡng"><span class="nav-ico">KH</span><span class="nav-label">Kế hoạch bảo dưỡng</span></a>
@@ -1312,6 +1313,8 @@ const STORAGE_KEY_LEGACY = ['fleet-bdsc-proto-v4-02','fleet-bdsc-proto-v4-01','f
 /* v4-03: lưới KH group theo xe + cột KTV / ngày thực hiện + đồng bộ BASE cấp xe */
 const DRIVER_INBOX_KEY = 'fleet-bdsc-driver-inbox-v4';
 const VIEW_STATE_KEY = 'fleet-bdsc-view-v4';
+/** Ẩn menu / nút / deep-link page=fleet (Xe & mooc) */
+const FLEET_MENU_HIDDEN = true;
 let _saveFailToastAt = 0;
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -67152,7 +67155,7 @@ function listSlickHostHtml(key, title, opts) {
   const searchTitle = o.searchTitle || 'Tìm theo biển số, loại xe, GPS…';
   const filterActive = !!(String(searchVal || '').trim() || view?.ordersByPlate);
   const filterPlate = String(view?.ordersByPlate || searchVal || '').trim();
-  const showBackFleet = !!(o.showBackFleet || (view?.from === 'fleet' && key === 'histOrders'));
+  const showBackFleet = !FLEET_MENU_HIDDEN && !!(o.showBackFleet || (view?.from === 'fleet' && key === 'histOrders'));
   const updatedAt = new Date().toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   const extraKpis = Array.isArray(o.kpiChips) ? o.kpiChips.map((c) =>
     `<div class="plan-kpi-chip" title="${esc(c.title || c.ico || '')}"><span class="plan-kpi-ico">${esc(c.ico || '')}</span><span class="plan-kpi-val">${esc(String(c.val != null ? c.val : '—'))}</span></div>`
@@ -69583,7 +69586,9 @@ ensureTireBatteryUnits(false);
 // evaluationHistory ensured after helper defs (see ensureEvaluationHistoryBoot)
 function defaultView(overrides = {}) {
   const base = {
-    name: 'fleet', histTab: 'vehicles', vehicleId: null, vehicleTab: 'catalog',
+    name: FLEET_MENU_HIDDEN ? 'historyMaint' : 'fleet',
+    histTab: FLEET_MENU_HIDDEN ? 'orders' : 'vehicles',
+    vehicleId: null, vehicleTab: 'catalog',
     plansTab: 'lines', templateId: null,
     expandedPlanGroups: {},
     selectedPlanGroupKey: null,
@@ -69602,12 +69607,20 @@ function defaultView(overrides = {}) {
     selectedAssessFailId: null,
     checkedAssessFailIds: [],
     orderId: null, catalogId: null, criteriaGroupId: null, from: null,
-    menuScope: null,
+    menuScope: FLEET_MENU_HIDDEN ? 'MAINT' : null,
     page: 1, pageSize: 10,
-    filters: defaultFilters(),
+    filters: FLEET_MENU_HIDDEN
+      ? Object.assign(defaultFilters(), { orderType: 'MAINT' })
+      : defaultFilters(),
   };
   const next = { ...base, ...overrides };
   next.filters = { ...defaultFilters(), ...(overrides.filters || base.filters || {}) };
+  if (FLEET_MENU_HIDDEN && next.name === 'fleet') {
+    next.name = 'historyMaint';
+    next.histTab = 'orders';
+    next.menuScope = next.menuScope || 'MAINT';
+    next.filters = Object.assign(defaultFilters(), { ...(next.filters || {}), orderType: next.filters?.orderType || 'MAINT' });
+  }
   return next;
 }
 function loadViewState() {
@@ -69632,9 +69645,10 @@ function parseViewFromQuery(search) {
   try {
     const sp = new URLSearchParams(search != null ? search : (typeof location !== 'undefined' ? location.search : ''));
     if (!hasDeepLinkQuery(sp)) return null;
-    let page = sp.get('page') || sp.get('nav') || 'fleet';
+    let page = sp.get('page') || sp.get('nav') || (FLEET_MENU_HIDDEN ? 'historyMaint' : 'fleet');
     if (page === 'plans') page = 'plansMaint';
     if (page === 'history') page = 'historyMaint';
+    if (FLEET_MENU_HIDDEN && page === 'fleet') page = 'historyMaint';
     const tab = String(sp.get('tab') || '').trim();
     const plate = String(sp.get('plate') || '').trim();
     let vehicleId = sp.get('vehicleId') || sp.get('vid');
@@ -69887,12 +69901,28 @@ function sanitizeRestoredView(raw) {
     v.filters.source = 'ALL';
   }
   if (v.name === 'history' || (v.name === 'historyMaint' && v.histTab === 'vehicles' && !v.vehicleId)) {
-    // Tab «Theo xe» cũ → menu Xe & mooc
+    // Tab «Theo xe» cũ → menu Xe & mooc (hoặc BD nếu fleet đang ẩn)
     if (v.histTab === 'vehicles') {
-      v.name = 'fleet';
-      v.menuScope = null;
-      v.filters = defaultFilters();
+      if (FLEET_MENU_HIDDEN) {
+        v.name = 'historyMaint';
+        v.menuScope = 'MAINT';
+        v.histTab = 'orders';
+        v.filters = Object.assign(defaultFilters(), { orderType: 'MAINT' });
+      } else {
+        v.name = 'fleet';
+        v.menuScope = null;
+        v.filters = defaultFilters();
+      }
     }
+  }
+  if (FLEET_MENU_HIDDEN && (v.name === 'fleet' || v.from === 'fleet')) {
+    if (v.name === 'fleet') {
+      v.name = 'historyMaint';
+      v.menuScope = 'MAINT';
+      v.histTab = 'orders';
+      v.filters = Object.assign(defaultFilters(), { ...(v.filters || {}), orderType: 'MAINT' });
+    }
+    if (v.from === 'fleet') v.from = 'historyMaint';
   }
   if (v.name === 'historyMaint' || v.name === 'historyRepair') v.histTab = 'orders';
   if (v.name === 'fleet') { v.histTab = 'vehicles'; v.menuScope = null; }
@@ -71664,14 +71694,14 @@ function menuWorkScope() {
   return null;
 }
 function menuScopeLabel(scope) {
-  if (view?.name === 'fleet' || view?.from === 'fleet') return 'Xe & mooc';
+  if (!FLEET_MENU_HIDDEN && (view?.name === 'fleet' || view?.from === 'fleet')) return 'Xe & mooc';
   const s = scope || menuWorkScope();
   if (s === 'MAINT') return 'Bảo dưỡng';
   if (s === 'REPAIR') return 'Sửa chữa';
   return 'Bảo dưỡng / sửa chữa';
 }
 function menuHomeNav(scope) {
-  if (view?.from === 'fleet' || view?.name === 'fleet') return 'fleet';
+  if (!FLEET_MENU_HIDDEN && (view?.from === 'fleet' || view?.name === 'fleet')) return 'fleet';
   const s = scope || menuWorkScope();
   if (s === 'REPAIR') return 'historyRepair';
   return 'historyMaint';
@@ -71743,6 +71773,18 @@ function render() {
     const focusId = active?.id;
     const sel = active && 'selectionStart' in active ? active.selectionStart : null;
     // Đổi tab UI không cần toast quota — lưu im lặng; mutation quan trọng gọi save() riêng
+    if (FLEET_MENU_HIDDEN && view.name === 'fleet') {
+      view = defaultView({
+        name: 'historyMaint',
+        histTab: 'orders',
+        menuScope: 'MAINT',
+        from: null,
+        ordersByPlate: null,
+        filters: Object.assign(defaultFilters(), { orderType: 'MAINT' }),
+        page: 1,
+        pageSize: view.pageSize || 10,
+      });
+    }
     save({ fromRender: true });
     updateNav();
     const main = $('#main');
@@ -73317,7 +73359,7 @@ function pageOrder() {
   const backLabel = view.from === 'catHistory' ? '← Lịch sử danh mục'
     : view.from === 'vehicleHistory' ? '← Lịch sử xe'
     : view.from === 'vehicle' ? '← Chi tiết xe'
-    : view.from === 'fleet' ? '← Xe & mooc'
+    : (!FLEET_MENU_HIDDEN && view.from === 'fleet') ? '← Xe & mooc'
     : view.from === 'historyRepair' ? '← Danh sách sửa chữa'
     : view.from === 'historyMaint' || view.from === 'history' ? '← Danh sách bảo dưỡng'
     : (typeof isPlansNav === 'function' && isPlansNav(view.from)) ? '← Kế hoạch bảo dưỡng'
@@ -81450,7 +81492,11 @@ function bind() {
       render(); return;
     }
     if (from === 'fleet') {
-      view = defaultView({ name: 'fleet', histTab: 'vehicles', menuScope: null, from: null, ordersByPlate: null, filters: defaultFilters(), page: 1, pageSize });
+      if (FLEET_MENU_HIDDEN) {
+        view = defaultView({ name: 'historyMaint', histTab: 'orders', menuScope: 'MAINT', from: null, ordersByPlate: null, filters: Object.assign(defaultFilters(), { orderType: 'MAINT' }), page: 1, pageSize });
+      } else {
+        view = defaultView({ name: 'fleet', histTab: 'vehicles', menuScope: null, from: null, ordersByPlate: null, filters: defaultFilters(), page: 1, pageSize });
+      }
       render(); return;
     }
     if (from && isPlansNav(from)) {
@@ -81510,7 +81556,11 @@ function bind() {
   });
   $$('[data-clear-list-filter]').forEach(b => b.onclick = () => clearListPlateFilter());
   $$('[data-back-fleet-list]').forEach(b => b.onclick = () => {
-    view = defaultView({ name: 'fleet', histTab: 'vehicles', menuScope: null, from: null, ordersByPlate: null, filters: defaultFilters(), page: 1, pageSize: view.pageSize || 10 });
+    if (FLEET_MENU_HIDDEN) {
+      view = defaultView({ name: 'historyMaint', histTab: 'orders', menuScope: 'MAINT', from: null, ordersByPlate: null, filters: Object.assign(defaultFilters(), { orderType: 'MAINT' }), page: 1, pageSize: view.pageSize || 10 });
+    } else {
+      view = defaultView({ name: 'fleet', histTab: 'vehicles', menuScope: null, from: null, ordersByPlate: null, filters: defaultFilters(), page: 1, pageSize: view.pageSize || 10 });
+    }
     render();
   });
   $$('[data-eval]').forEach(b => b.onclick = () => openEvalModal(Number(b.dataset.eval)));
@@ -81705,7 +81755,7 @@ function bind() {
   });
   $$('[data-nav-back]').forEach(b => b.onclick = () => {
     const home = menuHomeNav();
-    if (home === 'fleet' || view.from === 'fleet') {
+    if (!FLEET_MENU_HIDDEN && (home === 'fleet' || view.from === 'fleet')) {
       view = defaultView({ name: 'fleet', histTab: 'vehicles', menuScope: null, from: null, filters: defaultFilters(), page: 1, pageSize: view.pageSize || 10 });
       render();
       return;
@@ -82000,6 +82050,7 @@ function bind() {
     if (n === 'plans') n = menuPlansNav();
     if (n === 'history') n = menuHomeNav();
     if (n === 'plansRepair') n = 'historyRepair';
+    if (FLEET_MENU_HIDDEN && n === 'fleet') n = 'historyMaint';
     const filters = defaultFilters();
     let menuScope = null;
     let histTab = 'orders';
@@ -82108,6 +82159,7 @@ $$('.nav-item[data-nav]').forEach(a => {
     let n = a.getAttribute('data-nav');
     // SC không có kế hoạch — chuyển về danh sách sửa chữa
     if (n === 'plansRepair') n = 'historyRepair';
+    if (FLEET_MENU_HIDDEN && n === 'fleet') n = 'historyMaint';
     const filters = defaultFilters();
     let menuScope = null;
     let histTab = 'orders';
