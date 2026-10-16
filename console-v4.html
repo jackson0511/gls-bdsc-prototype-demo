@@ -67394,13 +67394,19 @@ function stripCellPlainText(html) {
   d.innerHTML = s;
   return (d.textContent || '').replace(/\s+/g, ' ').trim();
 }
+/** Số «thuần» để sort — không dùng Number() trực tiếp (biển 50E-36177 = scientific notation → ~0). */
+function isPlainGridNumber(v) {
+  if (v == null || v === '' || v === '—') return false;
+  const s = String(v).trim().replace(/,/g, '');
+  return /^-?\d+(\.\d+)?$/.test(s);
+}
 function compareGridValues(a, b, asc) {
   const av = a == null || a === '—' ? '' : a;
   const bv = b == null || b === '—' ? '' : b;
-  const an = av !== '' && !isNaN(Number(av)) && String(av).trim() !== '';
-  const bn = bv !== '' && !isNaN(Number(bv)) && String(bv).trim() !== '';
+  const an = isPlainGridNumber(av);
+  const bn = isPlainGridNumber(bv);
   let cmp = 0;
-  if (an && bn) cmp = Number(av) - Number(bv);
+  if (an && bn) cmp = Number(String(av).trim().replace(/,/g, '')) - Number(String(bv).trim().replace(/,/g, ''));
   else cmp = String(av).localeCompare(String(bv), 'vi', { numeric: true, sensitivity: 'base' });
   return asc ? cmp : -cmp;
 }
