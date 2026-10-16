@@ -74840,8 +74840,7 @@ function pageTireBattery() {
     due: units.filter(u => !!tireBatteryWarnLevel(u)).length,
   });
   const rowTitleText = (row) => {
-    if (row.pair) return `${row.pair.tractor.plate || ''} + ${row.pair.trailer.plate || ''} Cặp đầu kéo rơ-mooc`;
-    if (row.v) return `${row.v.plate || ''} ${row.v.trailerPlate || ''} ${row.v.isTrailer ? 'Mooc' : 'Xe'} ${row.v.type || ''}`;
+    if (row.v) return `${row.v.plate || ''} ${row.v.isTrailer ? 'Rơ-mooc Mooc' : 'Đầu kéo Xe'} ${row.v.type || ''}`;
     if (row.bucket === 'liq') return 'Đã thanh lý';
     if (row.bucket === 'wh') return 'Trong kho';
     return '';
@@ -74850,11 +74849,10 @@ function pageTireBattery() {
     if (!f.search) return true;
     const title = rowTitleText(row);
     const plate = row.v?.plate || '';
-    const trailer = row.pair?.trailer?.plate || row.v?.trailerPlate || '';
-    if (matchPlateSearch(plate, f.search) || matchPlateSearch(trailer, f.search)) return true;
+    if (matchPlateSearch(plate, f.search)) return true;
     if (matchSearch(title, f.search)) return true;
     const bucket = row.bucket === 'liq' ? 'thanh lý' : (row.bucket === 'wh' ? 'kho chưa gắn' : '');
-    if (matchSearch([plate, trailer, row.v?.type, bucket, 'kho', 'thanh lý'].join(' '), f.search)) return true;
+    if (matchSearch([plate, row.v?.type, row.v?.isTrailer ? 'rơ-mooc mooc' : 'đầu kéo', bucket, 'kho', 'thanh lý'].join(' '), f.search)) return true;
     return row.units.some(u => matchSearch([u.code, u.name, u.serial, u.brand, tireBatteryConditionLabel(u), u.supplier, tireBatteryAttachLabel(u)].join(' '), f.search));
   };
   const matchRowWarn = (row) => {
@@ -74869,31 +74867,15 @@ function pageTireBattery() {
     if (warnF === 'OVERDUE') return levels.includes('overdue');
     return true;
   };
-  const vehRowsRaw = (DB.vehicles || []).map(v => pack(String(v.id), v, allUnits.filter(u => tireBatteryAttachStatus(u) === 'MOUNTED' && String(u.vehicleId) === String(v.id))))
-    .filter(r => r.tire + r.battery > 0);
-  const byPlate = new Map(vehRowsRaw.filter(r => r.v && r.v.plate).map(r => [String(r.v.plate).toUpperCase(), r]));
-  const paired = new Set();
-  const vehRows = [];
-  vehRowsRaw.filter(r => r.v && !r.v.isTrailer).forEach(tr => {
-    const moocPlate = String(tr.v.trailerPlate || '').toUpperCase();
-    const mooc = moocPlate ? byPlate.get(moocPlate) : null;
-    if (mooc && mooc.v && String(mooc.v.id) !== String(tr.v.id)) {
-      paired.add(tr.key);
-      paired.add(mooc.key);
-      const units = [...tr.units, ...mooc.units];
-      vehRows.push({
-        key: 'pair-' + tr.v.id + '-' + mooc.v.id,
-        v: tr.v,
-        pair: { tractor: tr.v, trailer: mooc.v },
-        units: sortTireBatteryUnits(units),
-        tire: tr.tire + mooc.tire,
-        battery: tr.battery + mooc.battery,
-        due: tr.due + mooc.due,
-      });
-    }
-  });
-  vehRowsRaw.forEach(r => { if (!paired.has(r.key)) vehRows.push(r); });
-  vehRows.sort((a, b) => String(a.v.plate || '').localeCompare(String(b.v.plate || ''), 'vi'));
+  /* Mỗi đầu kéo / rơ-mooc một dòng riêng — không gộp cặp */
+  const vehRows = (DB.vehicles || []).map(v => pack(String(v.id), v, allUnits.filter(u => tireBatteryAttachStatus(u) === 'MOUNTED' && String(u.vehicleId) === String(v.id))))
+    .filter(r => r.tire + r.battery > 0)
+    .sort((a, b) => {
+      const ta = a.v?.isTrailer ? 1 : 0;
+      const tb = b.v?.isTrailer ? 1 : 0;
+      if (ta !== tb) return ta - tb;
+      return String(a.v?.plate || '').localeCompare(String(b.v?.plate || ''), 'vi');
+    });
   const whUnits = allUnits.filter((u) => tireBatteryAttachStatus(u) === 'WAREHOUSE');
   const liqUnits = allUnits.filter((u) => tireBatteryAttachStatus(u) === 'LIQUIDATED');
   const warehouseRow = whUnits.length ? { ...pack('wh', null, whUnits), bucket: 'wh' } : null;
@@ -74908,7 +74890,7 @@ function pageTireBattery() {
   const liqN = liqUnits.length;
   const dueAll = allUnits.filter(u => !!tireBatteryWarnLevel(u)).length;
   let sel = String(f.tbVehicleKey || '');
-  if (!left.some(r => r.key === sel)) sel = left[0]?.key || '';
+  if (sel.startsWith('pair-') || !left.some(r => r.key === sel)) sel = left[0]?.key || '';
   const selected = left.find(r => r.key === sel) || null;
   const detailUnits = selected
     ? selected.units.filter(u => kindF === 'ALL' || u.kind === kindF)
@@ -74933,11 +74915,6 @@ function pageTireBattery() {
     const level = tireBatteryWarnLevel(u);
     const warn = !!level;
     const moP = tbUsagePct(u.usedMonth, u.maxMonth);
-    const side = selected?.pair
-      ? (String(u.vehicleId) === String(selected.pair.trailer.id)
-        ? '<span class="chip bg-slate-100 text-slate-700">Rơ-mooc</span> '
-        : '<span class="chip bg-slate-100 text-slate-700">Đầu kéo</span> ')
-      : '';
     const attach = tireBatteryAttachStatus(u);
     const attachChip = attach === 'MOUNTED'
       ? `<span class="chip bg-emerald-50 text-emerald-800">${esc(tireBatteryAttachLabel(u))}</span>`
@@ -74954,7 +74931,7 @@ function pageTireBattery() {
       <td class="td">${esc(u.name || '—')}</td>
       <td class="td text-xs font-medium text-slate-800">${esc(u.brand || '—')}</td>
       <td class="td text-xs">${esc(u.supplier || '—')}</td>
-      <td class="td">${side}${attachChip}</td>
+      <td class="td">${attachChip}</td>
       <td class="td text-right text-xs tabular-nums">${u.usedMonth} / ${u.maxMonth} th<div class="text-[10px] text-slate-400">${moP}%</div>${usageBar(moP)}</td>
       <td class="td text-center">${conditionChip(u)}</td>
       <td class="td text-center">${ttCell}</td>
@@ -74981,14 +74958,10 @@ function pageTireBattery() {
     : `<div class="px-5 py-12 text-center text-sm text-slate-400">Không có lốp / ắc khớp bộ lọc trên ${selected?.v ? 'xe này' : 'kho'}.</div>`;
   const leftList = left.length ? left.map(r => {
     const on = r.key === sel;
-    const title = r.pair
-      ? `${esc(r.pair.tractor.plate)} + ${esc(r.pair.trailer.plate)}`
-      : (r.v ? esc(r.v.plate) : (r.bucket === 'liq' ? 'Đã thanh lý' : 'Trong kho'));
-    const sub = r.pair
-      ? 'Cặp đầu kéo · rơ-mooc'
-      : (r.v
-      ? `${r.v.isTrailer ? 'Mooc' : 'Xe'}${r.v.type ? ' · ' + esc(r.v.type) : ''}`
-      : (r.bucket === 'liq' ? 'Không cảnh báo định mức' : 'Chưa gắn xe · không cảnh báo'));
+    const title = r.v ? esc(r.v.plate) : (r.bucket === 'liq' ? 'Đã thanh lý' : 'Trong kho');
+    const sub = r.v
+      ? `${r.v.isTrailer ? 'Rơ-mooc' : 'Đầu kéo'}${r.v.type ? ' · ' + esc(r.v.type) : ''}`
+      : (r.bucket === 'liq' ? 'Không cảnh báo định mức' : 'Chưa gắn xe · không cảnh báo');
     return `<button type="button" data-tb-vehicle="${esc(r.key)}" class="w-full border-b border-slate-100 px-3 py-2.5 text-left ${on ? 'bg-blue-50 ring-inset ring-2 ring-blue-500' : 'hover:bg-slate-50'}">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0">
@@ -75000,14 +74973,10 @@ function pageTireBattery() {
       <div class="mt-1.5 text-xs text-slate-700"><span class="font-medium tabular-nums">${r.tire}</span> lốp · <span class="font-medium tabular-nums">${r.battery}</span> ắc</div>
     </button>`;
   }).join('') : `<div class="px-4 py-10 text-center text-sm text-slate-400">Không có xe khớp bộ lọc</div>`;
-  const rightTitle = selected?.pair
-    ? `${esc(selected.pair.tractor.plate)} + ${esc(selected.pair.trailer.plate)}`
-    : (selected?.v ? esc(selected.v.plate) : (selected?.bucket === 'liq' ? 'Đã thanh lý' : 'Trong kho'));
-  const rightSub = selected?.pair
-    ? 'Cặp đầu kéo · rơ-mooc'
-    : (selected?.v
-      ? `${selected.v.isTrailer ? 'Mooc' : 'Xe'}${selected.v.type ? ' · ' + esc(selected.v.type) : ''}${selected.v.km != null ? ' · ' + kmFmt(selected.v.km) + ' km' : ''}`
-      : (selected?.bucket === 'liq' ? 'Seri đã thanh lý — không cảnh báo' : 'Seri trong kho — chưa gắn xe, không cảnh báo'));
+  const rightTitle = selected?.v ? esc(selected.v.plate) : (selected?.bucket === 'liq' ? 'Đã thanh lý' : 'Trong kho');
+  const rightSub = selected?.v
+    ? `${selected.v.isTrailer ? 'Rơ-mooc' : 'Đầu kéo'}${selected.v.type ? ' · ' + esc(selected.v.type) : ''}${selected.v.km != null ? ' · ' + kmFmt(selected.v.km) + ' km' : ''}`
+    : (selected?.bucket === 'liq' ? 'Seri đã thanh lý — không cảnh báo' : 'Seri trong kho — chưa gắn xe, không cảnh báo');
   const rightPanel = !selected ? `<div class="flex h-full min-h-[420px] items-center justify-center px-6 text-sm text-slate-400">Chọn xe / kho / thanh lý bên trái</div>` : `
     <div class="border-b border-slate-200 px-4 py-3">
       <div class="flex flex-wrap items-start justify-between gap-3">
