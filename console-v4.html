@@ -77756,11 +77756,11 @@ function pageCatalogMaster() {
           <label class="mb-1 block text-[11px] font-medium text-slate-500">Tìm hạng mục</label>
           <div class="flt-search !w-full !min-w-0">
             <span class="flt-search-icon" aria-hidden="true">⌕</span>
-            <input id="flt-search" type="search" placeholder="Tên, mã, bộ phận…" value="${esc(f.search || '')}" autocomplete="off" />
+            <input id="flt-search" type="search" placeholder="Tên, mã, hệ thống…" value="${esc(f.search || '')}" autocomplete="off" />
           </div>
         </div>
         <div class="w-full sm:w-48">
-          <label class="mb-1 block text-[11px] font-medium text-slate-500">Bộ phận xe</label>
+          <label class="mb-1 block text-[11px] font-medium text-slate-500">Hệ thống</label>
           <select id="flt-system" class="form-control">
             <option value="ALL">Tất cả</option>
             ${systemNames.map(s => `<option value="${esc(s)}" ${f.system === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}
@@ -77784,7 +77784,7 @@ function pageCatalogMaster() {
             <tr>
               <th class="th text-left">Hạng mục</th>
               <th class="th text-left">Mã</th>
-              <th class="th text-left">Bộ phận xe</th>
+              <th class="th text-left">Hệ thống</th>
               <th class="th text-left">Loại công việc</th>
               <th class="th text-left">Mốc 1</th>
               <th class="th text-left">Kiểu mốc 1</th>
@@ -77957,7 +77957,7 @@ function registerCatalogV2Grid(list) {
       formatter: (_r, _c, v, _cd, item) => editBtn('name', item.catalogId, v || '—') },
     { id: 'code', name: 'Mã', field: 'code', width: 110, minWidth: 80, sortable: true,
       formatter: (_r, _c, v) => `<span class="font-mono text-xs text-slate-500">${esc(v || '')}</span>` },
-    { id: 'system', name: 'Bộ phận xe', field: 'system', width: 140, minWidth: 100, sortable: true, filterType: 'select',
+    { id: 'system', name: 'Hệ thống', field: 'system', width: 140, minWidth: 100, sortable: true, filterType: 'select',
       formatter: (_r, _c, v, _cd, item) => editBtn('system', item.catalogId, v || '—') },
     { id: 'serviceType', name: 'Loại công việc', field: 'serviceType', width: 130, minWidth: 100, sortable: true, filterType: 'select',
       formatter: (_r, _c, v, _cd, item) => editBtn('serviceType', item.catalogId, v || '—') },
@@ -78027,11 +78027,11 @@ function pageCatalogMasterV2() {
         <label class="mb-1 block text-[11px] font-medium text-slate-500">Tìm</label>
         <div class="flt-search !w-full !min-w-0">
           <span class="flt-search-icon" aria-hidden="true">⌕</span>
-          <input id="flt-search" type="search" placeholder="Tên, mã, bộ phận…" value="${esc(f.search || '')}" autocomplete="off" />
+          <input id="flt-search" type="search" placeholder="Tên, mã, hệ thống…" value="${esc(f.search || '')}" autocomplete="off" />
         </div>
       </div>
       <div class="w-full sm:w-44">
-        <label class="mb-1 block text-[11px] font-medium text-slate-500">Bộ phận xe</label>
+        <label class="mb-1 block text-[11px] font-medium text-slate-500">Hệ thống</label>
         <select id="flt-system" class="form-control">
           <option value="ALL">Tất cả</option>
           ${systemNames.map(s => `<option value="${esc(s)}" ${f.system === s ? 'selected' : ''}>${esc(s)}</option>`).join('')}
@@ -78115,7 +78115,7 @@ function handleCatalogV2CellEdit(btn) {
   }
   if (field === 'system') {
     openCellPickPopover({
-      title: 'Chọn bộ phận xe',
+      title: 'Chọn hệ thống',
       value: cat.systemId || cat.system || '',
       anchor,
       allowCreate: false,
@@ -78126,7 +78126,7 @@ function handleCatalogV2CellEdit(btn) {
         const st = serviceTypesForSystem(o.id).find(s => s.id === cat.serviceTypeId)
           || serviceTypesForSystem(o.id)[0];
         if (st) { cat.serviceTypeId = st.id; cat.serviceType = st.name; }
-        toast('Đã cập nhật bộ phận xe');
+        toast('Đã cập nhật hệ thống');
         render();
       },
     });
