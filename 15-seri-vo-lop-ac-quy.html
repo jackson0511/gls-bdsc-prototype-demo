@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Danh mục Vỏ lốp & Ắc quy theo xe</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --ink: #1a2332;
+      --muted: #5c6b7a;
+      --line: #d8e0e8;
+      --accent: #0b6e4f;
+      --accent-soft: #e6f4ef;
+      --warn: #b45309;
+      --warn-bg: #fff7ed;
+      --danger: #b91c1c;
+      --danger-bg: #fef2f2;
+      --ok: #047857;
+      --ok-bg: #ecfdf5;
+      --tire: #1d4ed8;
+      --batt: #7c3aed;
+      --shadow: 0 8px 24px rgba(26, 35, 50, 0.08);
+      --radius: 14px;
+      --font: "Segoe UI", "Be Vietnam Pro", system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      color: var(--ink);
+      background:
+        radial-gradient(1200px 500px at 10% -10%, #d7efe6 0%, transparent 55%),
+        radial-gradient(900px 400px at 100% 0%, #dde7fb 0%, transparent 50%),
+        var(--bg);
+      min-height: 100vh;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      backdrop-filter: blur(10px);
+      background: rgba(244, 246, 248, 0.88);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 20px;
+    }
+
+    .header-inner {
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 16px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      margin: 2px 0 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .file-btn, button, select, input[type="search"] {
+      font: inherit;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      padding: 8px 12px;
+    }
+
+    .file-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+      font-weight: 600;
+    }
+
+    .file-btn input { display: none; }
+
+    button {
+      cursor: pointer;
+      background: var(--panel);
+    }
+    button:hover { border-color: #a9b7c6; }
+    button.active {
+      background: var(--accent-soft);
+      border-color: #9bcbb8;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    input[type="search"] { min-width: 200px; }
+    select { min-width: 140px; }
+
+    .view-tabs {
+      display: inline-flex;
+      gap: 4px;
+      padding: 3px;
+      background: #e8eef4;
+      border-radius: 12px;
+    }
+
+    .view-tabs button {
+      border: 0;
+      background: transparent;
+      padding: 7px 12px;
+      border-radius: 9px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    .view-tabs button.active {
+      background: var(--panel);
+      color: var(--accent);
+      box-shadow: 0 1px 4px rgba(26, 35, 50, 0.12);
+      border: 0;
+    }
+
+    main {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 18px 20px 40px;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 16px;
+    }
+
+    main.view-seri {
+      grid-template-columns: 1fr;
+    }
+
+    @media (max-width: 960px) {
+      main { grid-template-columns: 1fr; }
+    }
+
+    main.view-seri .view-vehicle-only { display: none !important; }
+    .view-seri-only { display: none; }
+    main.view-seri .view-seri-only { display: block; }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 0.95rem;
+    }
+
+    .count-pill {
+      background: #eef2f6;
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 800px) {
+      .stats { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .stat {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .stat .label { color: var(--muted); font-size: 0.78rem; }
+    .stat .value { font-size: 1.35rem; font-weight: 700; margin-top: 2px; letter-spacing: -0.03em; }
+    .stat.danger .value { color: var(--danger); }
+    .stat.warn .value { color: var(--warn); }
+    .stat.ok .value { color: var(--ok); }
+
+    .vehicle-list {
+      max-height: calc(100vh - 180px);
+      overflow: auto;
+    }
+
+    .vehicle-item {
+      width: 100%;
+      text-align: left;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      padding: 12px 14px;
+      background: transparent;
+      display: grid;
+      gap: 4px;
+    }
+
+    .vehicle-item:hover { background: #f7fafc; }
+    .vehicle-item.selected {
+      background: var(--accent-soft);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .vehicle-item .plate {
+      font-weight: 700;
+      font-size: 0.95rem;
+    }
+
+    .vehicle-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+    }
+
+    .badge.ok { background: var(--ok-bg); color: var(--ok); }
+    .badge.warn { background: var(--warn-bg); color: var(--warn); }
+    .badge.danger { background: var(--danger-bg); color: var(--danger); }
+    .badge.tire { background: #eff6ff; color: var(--tire); }
+    .badge.batt { background: #f5f3ff; color: var(--batt); }
+    .badge.neutral { background: #eef2f6; color: var(--muted); }
+
+    .empty {
+      padding: 28px 18px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .content { display: grid; gap: 16px; }
+
+    .section-title {
+      margin: 0;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .grid-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 10px;
+      padding: 12px;
+    }
+
+    .item-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      cursor: pointer;
+      background: linear-gradient(180deg, #fff, #fbfcfd);
+      transition: border-color .15s, transform .15s, box-shadow .15s;
+      text-align: left;
+      width: 100%;
+    }
+
+    .item-card:hover {
+      border-color: #9eb0c2;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(26, 35, 50, 0.08);
+    }
+
+    .item-card .seri {
+      font-weight: 700;
+      font-size: 0.95rem;
+      word-break: break-all;
+    }
+
+    .item-card .brand {
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-top: 2px;
+    }
+
+    .item-card .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .item-card .meta {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: var(--muted);
+      display: grid;
+      gap: 2px;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 0 2px 4px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 50;
+      padding: 16px;
+    }
+
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+      width: min(920px, 100%);
+      max-height: min(88vh, 900px);
+      background: var(--panel);
+      border-radius: 16px 16px 12px 12px;
+      box-shadow: 0 24px 60px rgba(0,0,0,.25);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: slideUp .22s ease;
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(18px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-head {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      gap: 12px;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .modal-head h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      word-break: break-all;
+    }
+
+    .modal-body {
+      padding: 14px 16px 18px;
+      overflow: auto;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .summary-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #f8fafc;
+    }
+
+    .summary-card .k { font-size: 0.75rem; color: var(--muted); }
+    .summary-card .v { font-size: 1.05rem; font-weight: 700; margin-top: 2px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+    }
+
+    th, td {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: var(--muted);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+    }
+
+    tr.current td { background: #f0fdf4; }
+
+    .close-btn {
+      border: 0;
+      background: #eef2f6;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .toast {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      background: #0f172a;
+      color: #fff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+      z-index: 80;
+    }
+    .toast.show { opacity: 1; }
+
+    .seri-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .seri-toolbar .left, .seri-toolbar .right {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .seri-table-wrap {
+      overflow: auto;
+      max-height: calc(100vh - 280px);
+    }
+
+    .seri-table-wrap table {
+      font-size: 0.82rem;
+    }
+
+    .seri-table-wrap tbody tr {
+      cursor: pointer;
+    }
+
+    .seri-table-wrap tbody tr:hover td {
+      background: #f7fafc;
+    }
+
+    .txn-count {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 28px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #0f172a;
+      color: #fff;
+      font-weight: 700;
+      font-size: 0.78rem;
+    }
+
+    .txn-count.multi {
+      background: var(--warn);
+    }
+
+    .txn-count.many {
+      background: var(--danger);
+    }
+
+    .log-chip {
+      font-family: ui-monospace, Consolas, monospace;
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div>
+        <h1>Danh mục Vỏ lốp & Ắc quy</h1>
+        <p class="subtitle">Nguồn: SERI_Transaction · Mốc cảnh báo vòng đời: <strong>24 tháng</strong> (tổng thời gian sử dụng)</p>
+      </div>
+      <div class="controls">
+        <div class="view-tabs" role="tablist">
+          <button type="button" class="active" data-view="vehicle" id="tabVehicle">Theo xe</button>
+          <button type="button" data-view="seri" id="tabSeri">Danh sách seri</button>
+        </div>
+        <label class="file-btn">
+          Chọn file CSV
+          <input id="csvFile" type="file" accept=".csv,text/csv" />
+        </label>
+        <input id="search" type="search" placeholder="Tìm biển số / seri / brand..." />
+        <select id="filterStatus">
+          <option value="all">Tất cả trạng thái</option>
+          <option value="qua_han">Quá hạn</option>
+          <option value="sap_toi">Sắp tới hạn</option>
+          <option value="chua_toi">Chưa tới hạn</option>
+        </select>
+        <select id="filterType">
+          <option value="all">Tất cả loại</option>
+          <option value="tire">Vỏ lốp</option>
+          <option value="battery">Ắc quy</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main id="mainLayout">
+    <aside class="panel view-vehicle-only">
+      <div class="panel-head">
+        <h2>Danh mục xe</h2>
+        <span class="count-pill" id="vehicleCount">0</span>
+      </div>
+      <div class="vehicle-list" id="vehicleList">
+        <div class="empty">Chưa có dữ liệu. Hãy chọn file CSV SERI_Transaction.</div>
+      </div>
+    </aside>
+
+    <section class="content">
+      <div class="stats" id="stats">
+        <div class="stat"><div class="label" id="statPrimaryLabel">Xe</div><div class="value" id="statVehicles">0</div></div>
+        <div class="stat danger"><div class="label">Quá hạn</div><div class="value" id="statOverdue">0</div></div>
+        <div class="stat warn"><div class="label">Sắp tới hạn</div><div class="value" id="statSoon">0</div></div>
+        <div class="stat ok"><div class="label">Chưa tới hạn</div><div class="value" id="statOk">0</div></div>
+      </div>
+
+      <div class="legend">
+        <span class="badge danger">Quá hạn ≥ 24 tháng</span>
+        <span class="badge warn">Sắp tới hạn (21–&lt;24 tháng)</span>
+        <span class="badge ok">Chưa tới hạn (&lt; 21 tháng)</span>
+        <span>Bấm vào từng vỏ lốp / ắc quy để xem lịch sử & tổng thời gian sử dụng.</span>
+      </div>
+
+      <div class="panel view-vehicle-only" id="detailPanel">
+        <div class="panel-head">
+          <h2 class="section-title" id="detailTitle">Chọn một xe để xem chi tiết</h2>
+        </div>
+        <div id="detailBody">
+          <div class="empty">Sau khi tải CSV, chọn xe bên trái để xem vỏ lốp và ắc quy đang lắp.</div>
+        </div>
+      </div>
+
+      <div class="panel view-seri-only" id="seriPanel">
+        <div class="seri-toolbar">
+          <div class="left">
+            <h2 class="section-title" style="margin:0">Danh sách vỏ lốp & ắc quy</h2>
+            <span class="count-pill" id="seriCount">0</span>
+          </div>
+          <div class="right">
+            <select id="filterMount">
+              <option value="all">Tất cả (đang lắp + đã tháo)</option>
+              <option value="mounted">Đang lắp trên xe</option>
+              <option value="removed">Đã tháo / không lắp</option>
+            </select>
+            <select id="sortSeri">
+              <option value="txn_desc">Sort: Log nhiều → ít</option>
+              <option value="txn_asc">Sort: Log ít → nhiều</option>
+              <option value="warn">Sort: Cảnh báo</option>
+              <option value="days_desc">Sort: Thời gian dùng ↓</option>
+              <option value="seri">Sort: Seri A→Z</option>
+            </select>
+          </div>
+        </div>
+        <div class="seri-table-wrap" id="seriTableWrap">
+          <div class="empty">Chưa có dữ liệu. Hãy chọn file CSV SERI_Transaction.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="modal-head">
+        <div>
+          <h3 id="modalTitle">Chi tiết seri</h3>
+          <div class="hint" id="modalSub"></div>
+        </div>
+        <button class="close-btn" id="modalClose" aria-label="Đóng">×</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const LIFE_MONTHS = 24;
+    const SOON_MONTHS = 21; // sắp tới hạn khi đã dùng >= 21 và < 24 tháng
+    const MS_PER_DAY = 86400000;
+
+    /** @type {Array<Record<string,string>>} */
+    let rawRows = [];
+    /** @type {Map<string, any>} */
+    let bySeri = new Map();
+    /** @type {Map<string, any>} */
+    let byVehicle = new Map();
+    let selectedVehicleId = null;
+    /** @type {'vehicle'|'seri'} */
+    let currentView = 'vehicle';
+
+    const $ = (id) => document.getElementById(id);
+
+    function toast(msg) {
+      const el = $('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      clearTimeout(toast._t);
+      toast._t = setTimeout(() => el.classList.remove('show'), 2600);
+    }
+
+    function parseCSV(text) {
+      const rows = [];
+      let i = 0;
+      let field = '';
+      let row = [];
+      let inQuotes = false;
+      const pushField = () => { row.push(field); field = ''; };
+      const pushRow = () => {
+        if (row.length === 1 && row[0] === '') { row = []; return; }
+        rows.push(row);
+        row = [];
+      };
+      while (i < text.length) {
+        const c = text[i];
+        if (inQuotes) {
+          if (c === '"') {
+            if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+            inQuotes = false; i++; continue;
+          }
+          field += c; i++; continue;
+        }
+        if (c === '"') { inQuotes = true; i++; continue; }
+        if (c === ',') { pushField(); i++; continue; }
+        if (c === '\n') { pushField(); pushRow(); i++; continue; }
+        if (c === '\r') { i++; continue; }
+        field += c; i++;
+      }
+      if (field.length || row.length) { pushField(); pushRow(); }
+      if (!rows.length) return [];
+      const headers = rows[0].map((h) => h.trim().replace(/^\uFEFF/, ''));
+      return rows.slice(1).map((cols) => {
+        const obj = {};
+        headers.forEach((h, idx) => { obj[h] = (cols[idx] ?? '').trim(); });
+        return obj;
+      });
+    }
+
+    function normalizeDvt(v) {
+      return (v || '').normalize('NFC').toLowerCase();
+    }
+
+    function classifyType(row) {
+      const dvt = normalizeDvt(row.dvt_xuat);
+      const pid = (row.product_id || '').toUpperCase();
+      if (dvt.includes('bình') || dvt.includes('binh') || pid.startsWith('VTU-321') || pid.startsWith('VTU-124')) {
+        return 'battery';
+      }
+      if (dvt.includes('cái') || dvt.includes('cai') || pid.startsWith('VTU-311') || pid.startsWith('VTU-511')) {
+        return 'tire';
+      }
+      // fallback by brand heuristics
+      const brand = (row.brand || '').toUpperCase();
+      if (/PINACO|GS MF|ROCKET|CMF|SINOTRUK|LVTONG/.test(brand)) return 'battery';
+      if (row.brand) return 'tire';
+      return 'unknown';
+    }
+
+    function typeLabel(t) {
+      if (t === 'battery') return 'Ắc quy';
+      if (t === 'tire') return 'Vỏ lốp';
+      return 'Khác';
+    }
+
+    function parseDate(s) {
+      if (!s) return null;
+      const m = String(s).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (!m) return null;
+      const d = new Date(+m[1], +m[2] - 1, +m[3]);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+
+    function fmtDate(d) {
+      if (!d) return '—';
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      return `${dd}/${mm}/${d.getFullYear()}`;
+    }
+
+    function daysBetween(a, b) {
+      const ua = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+      const ub = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+      return Math.max(0, Math.round((ub - ua) / MS_PER_DAY));
+    }
+
+    function monthsApprox(days) {
+      return days / 30.4375;
+    }
+
+    function formatDuration(days) {
+      if (days == null || Number.isNaN(days)) return '—';
+      const m = monthsApprox(days);
+      const years = Math.floor(m / 12);
+      const months = Math.floor(m % 12);
+      const remDays = Math.round(days - (years * 12 + months) * 30.4375);
+      const parts = [];
+      if (years) parts.push(`${years} năm`);
+      if (months) parts.push(`${months} tháng`);
+      if (!years && !months) parts.push(`${days} ngày`);
+      else if (remDays > 0 && years === 0) parts.push(`${remDays} ngày`);
+      return `${parts.join(' ')} (~${m.toFixed(1)} tháng)`;
+    }
+
+    function warnStatusFromDays(totalDays) {
+      const m = monthsApprox(totalDays);
+      if (m >= LIFE_MONTHS) return 'qua_han';
+      if (m >= SOON_MONTHS) return 'sap_toi';
+      return 'chua_toi';
+    }
+
+    function warnLabel(s) {
+      if (s === 'qua_han') return 'Quá hạn';
+      if (s === 'sap_toi') return 'Sắp tới hạn';
+      return 'Chưa tới hạn';
+    }
+
+    function warnBadgeClass(s) {
+      if (s === 'qua_han') return 'danger';
+      if (s === 'sap_toi') return 'warn';
+      return 'ok';
+    }
+
+    function buildIndex(rows) {
+      bySeri = new Map();
+      byVehicle = new Map();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      for (const row of rows) {
+        const type = classifyType(row);
+        if (type === 'unknown') continue;
+        const seri = row.seri_id || row.seri_name || row.id;
+        if (!seri) continue;
+
+        if (!bySeri.has(seri)) {
+          bySeri.set(seri, {
+            seri,
+            type,
+            brand: row.brand || '',
+            product_id: row.product_id || '',
+            history: [],
+          });
+        }
+        const item = bySeri.get(seri);
+        if (!item.brand && row.brand) item.brand = row.brand;
+        if (!item.product_id && row.product_id) item.product_id = row.product_id;
+        if (item.type === 'unknown' && type !== 'unknown') item.type = type;
+
+        const start = parseDate(row.ngay_lap) || parseDate(row.ngay_su_dung_seri_id);
+        const end = parseDate(row.ngay_thao);
+        const active = !end;
+        const endEffective = end || today;
+        const periodDays = start ? daysBetween(start, endEffective) : 0;
+
+        item.history.push({
+          ...row,
+          type,
+          start,
+          end,
+          active,
+          periodDays,
+          vehicle: row.phuong_tien_id || '',
+        });
+      }
+
+      for (const item of bySeri.values()) {
+        item.history.sort((a, b) => {
+          const ta = a.start ? a.start.getTime() : 0;
+          const tb = b.start ? b.start.getTime() : 0;
+          return ta - tb;
+        });
+        item.totalDays = item.history.reduce((s, h) => s + (h.periodDays || 0), 0);
+        item.warn = warnStatusFromDays(item.totalDays);
+        item.txnCount = item.history.length; // số transaction / log của seri
+        item.current = item.history.filter((h) => h.active && h.vehicle);
+        // nếu nhiều bản ghi active (dữ liệu lỗi), lấy bản mới nhất
+        item.currentMount = item.current.length
+          ? item.current[item.current.length - 1]
+          : null;
+        item.firstStart = item.history.find((h) => h.start)?.start || null;
+        item.lastEnd = [...item.history].reverse().find((h) => h.end)?.end || null;
+      }
+
+      for (const item of bySeri.values()) {
+        for (const h of item.history) {
+          if (!h.vehicle) continue;
+          if (!byVehicle.has(h.vehicle)) {
+            byVehicle.set(h.vehicle, {
+              id: h.vehicle,
+              mounts: [], // current mounts
+              allSeris: new Set(),
+            });
+          }
+          byVehicle.get(h.vehicle).allSeris.add(item.seri);
+        }
+        if (item.currentMount && item.currentMount.vehicle) {
+          const v = byVehicle.get(item.currentMount.vehicle);
+          if (v) v.mounts.push(item);
+        }
+      }
+
+      for (const v of byVehicle.values()) {
+        v.mounts.sort((a, b) => {
+          if (a.type !== b.type) return a.type === 'battery' ? 1 : -1;
+          return a.seri.localeCompare(b.seri);
+        });
+        v.tireCount = v.mounts.filter((x) => x.type === 'tire').length;
+        v.battCount = v.mounts.filter((x) => x.type === 'battery').length;
+        v.worst = 'chua_toi';
+        for (const m of v.mounts) {
+          if (m.warn === 'qua_han') { v.worst = 'qua_han'; break; }
+          if (m.warn === 'sap_toi') v.worst = 'sap_toi';
+        }
+      }
+    }
+
+    function getFilteredVehicles() {
+      const q = ($('search').value || '').trim().toLowerCase();
+      const st = $('filterStatus').value;
+      const tp = $('filterType').value;
+
+      const list = [...byVehicle.values()].filter((v) => {
+        if (!v.mounts.length) return false;
+        if (st !== 'all') {
+          const has = v.mounts.some((m) => m.warn === st);
+          if (!has) return false;
+        }
+        if (tp !== 'all') {
+          const has = v.mounts.some((m) => m.type === tp);
+          if (!has) return false;
+        }
+        if (q) {
+          const hitVehicle = v.id.toLowerCase().includes(q);
+          const hitItem = v.mounts.some((m) =>
+            m.seri.toLowerCase().includes(q) ||
+            (m.brand || '').toLowerCase().includes(q) ||
+            (m.product_id || '').toLowerCase().includes(q)
+          );
+          if (!hitVehicle && !hitItem) return false;
+        }
+        return true;
+      });
+
+      list.sort((a, b) => {
+        const rank = { qua_han: 0, sap_toi: 1, chua_toi: 2 };
+        const ra = rank[a.worst] ?? 9;
+        const rb = rank[b.worst] ?? 9;
+        if (ra !== rb) return ra - rb;
+        return a.id.localeCompare(b.id, 'vi');
+      });
+      return list;
+    }
+
+    function updateStatsFromItems(items, primaryCount, primaryLabel) {
+      let overdue = 0, soon = 0, ok = 0;
+      for (const m of items) {
+        if (m.warn === 'qua_han') overdue++;
+        else if (m.warn === 'sap_toi') soon++;
+        else ok++;
+      }
+      $('statPrimaryLabel').textContent = primaryLabel;
+      $('statVehicles').textContent = String(primaryCount);
+      $('statOverdue').textContent = String(overdue);
+      $('statSoon').textContent = String(soon);
+      $('statOk').textContent = String(ok);
+    }
+
+    function txnBadgeClass(n) {
+      if (n >= 4) return 'many';
+      if (n >= 2) return 'multi';
+      return '';
+    }
+
+    function getFilteredSeris() {
+      const q = ($('search').value || '').trim().toLowerCase();
+      const st = $('filterStatus').value;
+      const tp = $('filterType').value;
+      const mount = $('filterMount')?.value || 'all';
+      const sort = $('sortSeri')?.value || 'txn_desc';
+
+      let list = [...bySeri.values()].filter((m) => {
+        if (tp !== 'all' && m.type !== tp) return false;
+        if (st !== 'all' && m.warn !== st) return false;
+        if (mount === 'mounted' && !m.currentMount) return false;
+        if (mount === 'removed' && m.currentMount) return false;
+        if (q) {
+          const vehicle = (m.currentMount?.vehicle || '').toLowerCase();
+          const hit =
+            m.seri.toLowerCase().includes(q) ||
+            (m.brand || '').toLowerCase().includes(q) ||
+            (m.product_id || '').toLowerCase().includes(q) ||
+            vehicle.includes(q) ||
+            m.history.some((h) => (h.vehicle || '').toLowerCase().includes(q));
+          if (!hit) return false;
+        }
+        return true;
+      });
+
+      const warnRank = { qua_han: 0, sap_toi: 1, chua_toi: 2 };
+      list.sort((a, b) => {
+        if (sort === 'txn_asc') return a.txnCount - b.txnCount || a.seri.localeCompare(b.seri);
+        if (sort === 'txn_desc') return b.txnCount - a.txnCount || a.seri.localeCompare(b.seri);
+        if (sort === 'warn') {
+          const ra = warnRank[a.warn] ?? 9;
+          const rb = warnRank[b.warn] ?? 9;
+          if (ra !== rb) return ra - rb;
+          return b.txnCount - a.txnCount;
+        }
+        if (sort === 'days_desc') return b.totalDays - a.totalDays || a.seri.localeCompare(b.seri);
+        return a.seri.localeCompare(b.seri, 'vi');
+      });
+      return list;
+    }
+
+    function renderVehicleList() {
+      const list = getFilteredVehicles();
+      const mountItems = [];
+      const seen = new Set();
+      for (const v of list) {
+        for (const m of v.mounts) {
+          if (seen.has(m.seri)) continue;
+          seen.add(m.seri);
+          mountItems.push(m);
+        }
+      }
+      updateStatsFromItems(mountItems, list.length, 'Xe');
+      $('vehicleCount').textContent = String(list.length);
+
+      const el = $('vehicleList');
+      if (!list.length) {
+        el.innerHTML = `<div class="empty">${rawRows.length ? 'Không có xe khớp bộ lọc.' : 'Chưa có dữ liệu. Hãy chọn file CSV SERI_Transaction.'}</div>`;
+        return;
+      }
+      el.innerHTML = list.map((v) => `
+        <button class="vehicle-item ${selectedVehicleId === v.id ? 'selected' : ''}" data-id="${escapeAttr(v.id)}">
+          <div class="plate">${escapeHtml(v.id)}</div>
+          <div class="vehicle-meta">
+            <span class="badge tire">${v.tireCount} vỏ lốp</span>
+            <span class="badge batt">${v.battCount} ắc quy</span>
+            <span class="badge ${warnBadgeClass(v.worst)}">${warnLabel(v.worst)}</span>
+          </div>
+        </button>
+      `).join('');
+
+      el.querySelectorAll('.vehicle-item').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          selectedVehicleId = btn.dataset.id;
+          renderVehicleList();
+          renderDetail();
+        });
+      });
+
+      if (selectedVehicleId && !list.some((v) => v.id === selectedVehicleId)) {
+        selectedVehicleId = list[0]?.id || null;
+      }
+      if (!selectedVehicleId && list.length) {
+        selectedVehicleId = list[0].id;
+      }
+    }
+
+    function renderSeriList() {
+      const list = getFilteredSeris();
+      updateStatsFromItems(list, list.length, 'Seri');
+      $('seriCount').textContent = String(list.length);
+
+      const wrap = $('seriTableWrap');
+      if (!list.length) {
+        wrap.innerHTML = `<div class="empty">${rawRows.length ? 'Không có seri khớp bộ lọc.' : 'Chưa có dữ liệu. Hãy chọn file CSV SERI_Transaction.'}</div>`;
+        return;
+      }
+
+      wrap.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th style="width:52px">#</th>
+              <th>Seri</th>
+              <th>Loại</th>
+              <th>Brand / Product</th>
+              <th title="Số transaction (log) của seri">Log / TXN</th>
+              <th>Xe hiện tại</th>
+              <th>Tổng thời gian dùng</th>
+              <th>Cảnh báo</th>
+              <th>Trạng thái lắp</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map((m, idx) => {
+              const remain = Math.max(0, LIFE_MONTHS - monthsApprox(m.totalDays));
+              const over = Math.max(0, monthsApprox(m.totalDays) - LIFE_MONTHS);
+              const logs = m.history.map((_, i) => `#${i + 1}`).join(' ');
+              return `
+                <tr data-seri="${escapeAttr(m.seri)}">
+                  <td>${idx + 1}</td>
+                  <td>
+                    <strong>${escapeHtml(m.seri)}</strong>
+                    <div class="log-chip" title="Thứ tự các transaction">${escapeHtml(logs)}</div>
+                  </td>
+                  <td><span class="badge ${m.type === 'battery' ? 'batt' : 'tire'}">${typeLabel(m.type)}</span></td>
+                  <td>
+                    ${escapeHtml(m.brand || '—')}
+                    <div class="hint" style="margin:0">${escapeHtml(m.product_id || '—')}</div>
+                  </td>
+                  <td>
+                    <span class="txn-count ${txnBadgeClass(m.txnCount)}" title="Số transaction của seri này">${m.txnCount}</span>
+                    <div class="hint" style="margin:2px 0 0">log #1 → #${m.txnCount}</div>
+                  </td>
+                  <td>${escapeHtml(m.currentMount?.vehicle || '—')}</td>
+                  <td>
+                    ${formatDuration(m.totalDays)}
+                    <div class="hint" style="margin:0">${m.warn === 'qua_han'
+                      ? `Quá ${over.toFixed(1)} tháng`
+                      : `Còn ${remain.toFixed(1)} tháng`}</div>
+                  </td>
+                  <td><span class="badge ${warnBadgeClass(m.warn)}">${warnLabel(m.warn)}</span></td>
+                  <td>${m.currentMount
+                    ? `<span class="badge ok">Đang lắp</span><div class="hint" style="margin:2px 0 0">từ ${fmtDate(m.currentMount.start)}</div>`
+                    : '<span class="badge neutral">Đã tháo</span>'}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+
+      wrap.querySelectorAll('tbody tr[data-seri]').forEach((tr) => {
+        tr.addEventListener('click', () => openSeriModal(tr.dataset.seri));
+      });
+    }
+
+    function setView(view) {
+      currentView = view === 'seri' ? 'seri' : 'vehicle';
+      const main = $('mainLayout');
+      main.classList.toggle('view-seri', currentView === 'seri');
+      $('tabVehicle').classList.toggle('active', currentView === 'vehicle');
+      $('tabSeri').classList.toggle('active', currentView === 'seri');
+      refresh();
+    }
+
+    function renderDetail() {
+      const body = $('detailBody');
+      const title = $('detailTitle');
+      if (!selectedVehicleId || !byVehicle.has(selectedVehicleId)) {
+        title.textContent = 'Chọn một xe để xem chi tiết';
+        body.innerHTML = `<div class="empty">Sau khi tải CSV, chọn xe bên trái để xem vỏ lốp và ắc quy đang lắp.</div>`;
+        return;
+      }
+      const v = byVehicle.get(selectedVehicleId);
+      let mounts = v.mounts;
+      const tp = $('filterType').value;
+      const st = $('filterStatus').value;
+      const q = ($('search').value || '').trim().toLowerCase();
+      if (tp !== 'all') mounts = mounts.filter((m) => m.type === tp);
+      if (st !== 'all') mounts = mounts.filter((m) => m.warn === st);
+      if (q) {
+        mounts = mounts.filter((m) =>
+          m.seri.toLowerCase().includes(q) ||
+          (m.brand || '').toLowerCase().includes(q) ||
+          v.id.toLowerCase().includes(q)
+        );
+      }
+
+      title.innerHTML = `Xe <span style="color:var(--accent)">${escapeHtml(v.id)}</span> · đang lắp ${mounts.length} hạng mục`;
+
+      const tires = mounts.filter((m) => m.type === 'tire');
+      const batts = mounts.filter((m) => m.type === 'battery');
+
+      body.innerHTML = `
+        ${renderGroup('Vỏ lốp đang lắp', tires, 'tire')}
+        ${renderGroup('Ắc quy đang lắp', batts, 'batt')}
+      `;
+
+      body.querySelectorAll('[data-seri]').forEach((card) => {
+        card.addEventListener('click', () => openSeriModal(card.dataset.seri));
+      });
+    }
+
+    function renderGroup(label, items, badgeClass) {
+      if (!items.length) {
+        return `
+          <div class="panel-head" style="border-top:1px solid var(--line)">
+            <h2 class="section-title"><span class="badge ${badgeClass}">${label}</span></h2>
+            <span class="count-pill">0</span>
+          </div>
+          <div class="empty" style="padding:16px">Không có hạng mục.</div>
+        `;
+      }
+      return `
+        <div class="panel-head" style="border-top:1px solid var(--line)">
+          <h2 class="section-title"><span class="badge ${badgeClass}">${label}</span></h2>
+          <span class="count-pill">${items.length}</span>
+        </div>
+        <div class="grid-cards">
+          ${items.map((m) => {
+            const mount = m.currentMount;
+            const remain = Math.max(0, LIFE_MONTHS - monthsApprox(m.totalDays));
+            return `
+              <button class="item-card" data-seri="${escapeAttr(m.seri)}" type="button">
+                <div class="seri">${escapeHtml(m.seri)}</div>
+                <div class="brand">${escapeHtml(m.brand || '—')} · ${escapeHtml(m.product_id || '—')}</div>
+                <div class="row">
+                  <span class="badge ${badgeClass}">${typeLabel(m.type)}</span>
+                  <span class="badge ${warnBadgeClass(m.warn)}">${warnLabel(m.warn)}</span>
+                </div>
+                <div class="meta">
+                  <div>Ngày lắp hiện tại: <strong>${fmtDate(mount?.start)}</strong></div>
+                  <div>Tổng đã dùng: <strong>${formatDuration(m.totalDays)}</strong></div>
+                  <div>${m.warn === 'qua_han'
+                    ? `Quá hạn khoảng <strong>${(monthsApprox(m.totalDays) - LIFE_MONTHS).toFixed(1)} tháng</strong>`
+                    : `Còn khoảng <strong>${remain.toFixed(1)} tháng</strong> tới mốc 24 tháng`}</div>
+                  <div>Log / TXN: <strong class="txn-count ${txnBadgeClass(m.txnCount)}" style="display:inline-flex">${m.txnCount}</strong> (log #1 → #${m.txnCount})</div>
+                </div>
+              </button>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    function openSeriModal(seri) {
+      const item = bySeri.get(seri);
+      if (!item) return;
+      const remain = Math.max(0, LIFE_MONTHS - monthsApprox(item.totalDays));
+      const over = Math.max(0, monthsApprox(item.totalDays) - LIFE_MONTHS);
+
+      $('modalTitle').textContent = `${typeLabel(item.type)} · ${item.seri}`;
+      $('modalSub').textContent = `${item.brand || '—'} · ${item.product_id || '—'}`;
+
+      const rowsHtml = item.history.map((h, idx) => `
+        <tr class="${h.active ? 'current' : ''}">
+          <td><span class="txn-count ${txnBadgeClass(item.txnCount)}" title="Log #${idx + 1}">#${idx + 1}</span></td>
+          <td>${escapeHtml(h.vehicle || '—')}</td>
+          <td>${fmtDate(h.start)}</td>
+          <td>${h.end ? fmtDate(h.end) : '<span class="badge ok">Đang lắp</span>'}</td>
+          <td>${formatDuration(h.periodDays)}</td>
+          <td>${escapeHtml(h.km_dong_ho_lap || '—')} → ${escapeHtml(h.km_dong_ho_thao || '—')}</td>
+          <td>${escapeHtml(h.trang_thai_lap || '—')}</td>
+          <td>${escapeHtml(h.trang_thai_thao || (h.active ? '—' : '—'))}</td>
+          <td>${escapeHtml(h.muc_dich_thao || h.muc_dich_lap || '—')}</td>
+          <td>${escapeHtml(h.nhom_lap || h.nhom_quan_ly || '—')}</td>
+        </tr>
+      `).join('');
+
+      $('modalBody').innerHTML = `
+        <div class="summary-grid">
+          <div class="summary-card">
+            <div class="k">Cảnh báo (mốc 24 tháng)</div>
+            <div class="v"><span class="badge ${warnBadgeClass(item.warn)}">${warnLabel(item.warn)}</span></div>
+          </div>
+          <div class="summary-card">
+            <div class="k">Tổng thời gian sử dụng</div>
+            <div class="v">${formatDuration(item.totalDays)}</div>
+          </div>
+          <div class="summary-card">
+            <div class="k">${item.warn === 'qua_han' ? 'Đã quá hạn' : 'Còn tới mốc 24 tháng'}</div>
+            <div class="v">${item.warn === 'qua_han' ? over.toFixed(1) + ' tháng' : remain.toFixed(1) + ' tháng'}</div>
+          </div>
+          <div class="summary-card">
+            <div class="k">Số transaction (log)</div>
+            <div class="v"><span class="txn-count ${txnBadgeClass(item.txnCount)}">${item.txnCount}</span> <span style="font-weight:500;font-size:.85rem;color:var(--muted)">log #1 → #${item.txnCount}</span></div>
+          </div>
+          <div class="summary-card">
+            <div class="k">Xe đang lắp</div>
+            <div class="v">${escapeHtml(item.currentMount?.vehicle || 'Không (đã tháo)')}</div>
+          </div>
+          <div class="summary-card">
+            <div class="k">Ngày lắp hiện tại</div>
+            <div class="v">${fmtDate(item.currentMount?.start)}</div>
+          </div>
+        </div>
+        <div class="hint" style="margin-bottom:10px">
+          Tổng thời gian = cộng dồn mọi khoảng ngày lắp → tháo (nếu chưa tháo thì tính đến hôm nay).
+          Cảnh báo dựa trên tổng thời gian so với mốc 24 tháng.
+        </div>
+        <div style="overflow:auto; max-height: 46vh; border:1px solid var(--line); border-radius:12px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Log #</th>
+                <th>Xe</th>
+                <th>Ngày lắp</th>
+                <th>Ngày tháo</th>
+                <th>Thời gian</th>
+                <th>KM lắp → tháo</th>
+                <th>TT lắp</th>
+                <th>TT tháo</th>
+                <th>Mục đích</th>
+                <th>Nhóm</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+      `;
+
+      $('modalBackdrop').classList.add('open');
+    }
+
+    function closeModal() {
+      $('modalBackdrop').classList.remove('open');
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function escapeAttr(s) {
+      return escapeHtml(s).replace(/'/g, '&#39;');
+    }
+
+    function refresh() {
+      if (currentView === 'seri') {
+        renderSeriList();
+      } else {
+        renderVehicleList();
+        renderDetail();
+      }
+    }
+
+    async function loadFile(file) {
+      const text = await file.text();
+      rawRows = parseCSV(text);
+      buildIndex(rawRows);
+      selectedVehicleId = null;
+      toast(`Đã tải ${rawRows.length.toLocaleString('vi-VN')} dòng · ${byVehicle.size} xe · ${bySeri.size} seri`);
+      refresh();
+    }
+
+    $('csvFile').addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (file) loadFile(file);
+    });
+
+    $('tabVehicle').addEventListener('click', () => setView('vehicle'));
+    $('tabSeri').addEventListener('click', () => setView('seri'));
+
+    ['search', 'filterStatus', 'filterType', 'filterMount', 'sortSeri'].forEach((id) => {
+      const el = $(id);
+      if (!el) return;
+      el.addEventListener('input', refresh);
+      el.addEventListener('change', refresh);
+    });
+
+    $('modalClose').addEventListener('click', closeModal);
+    $('modalBackdrop').addEventListener('click', (e) => {
+      if (e.target === $('modalBackdrop')) closeModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    // Drag & drop
+    document.addEventListener('dragover', (e) => { e.preventDefault(); });
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      const file = e.dataTransfer?.files?.[0];
+      if (file && /\.csv$/i.test(file.name)) loadFile(file);
+      else if (file) toast('Vui lòng thả file .csv');
+    });
+  </script>
+</body>
+</html>

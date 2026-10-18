@@ -1325,6 +1325,23 @@ const DRIVER_INBOX_KEY = 'fleet-bdsc-driver-inbox-v4';
 const VIEW_STATE_KEY = 'fleet-bdsc-view-v4';
 /** Ẩn menu / nút / deep-link page=fleet (Xe & mooc) */
 const FLEET_MENU_HIDDEN = true;
+/** Tạm ẩn mở màn hình chi tiết xe (nút / chuột phải / link) */
+const ALLOW_OPEN_VEHICLE_DETAIL = false;
+function goVehicleDetail(vehicleId, extra) {
+  if (!ALLOW_OPEN_VEHICLE_DETAIL) return false;
+  if (vehicleId == null || vehicleId === '') return false;
+  view = {
+    ...view,
+    name: 'vehicle',
+    vehicleId: Number(vehicleId),
+    vehicleTab: (extra && extra.vehicleTab) || 'catalog',
+    from: (extra && extra.from) != null ? extra.from : (view.from || menuHomeNav()),
+    filters: (extra && extra.filters) || defaultFilters(),
+    page: 1,
+  };
+  render();
+  return true;
+}
 let _saveFailToastAt = 0;
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -64405,17 +64422,14 @@ function normalizeTireBatteryUnit(u) {
   u.conditionLabel = TB_CONDITION_LABELS[u.condition];
   return u;
 }
-/** Cảnh báo định mức chỉ với seri đang gắn trên xe */
+/** Cảnh báo định mức chỉ với seri đang gắn trên xe — vỏ lốp / ắc quy chỉ theo tháng (không dùng định mức km). */
 function tireBatteryWarnLevel(u) {
   if (tireBatteryAttachStatus(u) !== 'MOUNTED' || !u?.vehicleId) return null;
-  const maxKm = Number(u.maxKm || 80000);
   const maxMonth = Number(u.maxMonth || 24);
-  const usedKm = Number(u.usedKm || 0);
   const usedMonth = Number(u.usedMonth || 0);
-  const kmRatio = maxKm ? usedKm / maxKm : 0;
   const moRatio = maxMonth ? usedMonth / maxMonth : 0;
-  if (kmRatio >= 1 || moRatio >= 1) return 'overdue';
-  if (kmRatio >= 0.9 || moRatio >= 0.9) return 'dueSoon';
+  if (moRatio >= 1) return 'overdue';
+  if (moRatio >= 0.9) return 'dueSoon';
   return null;
 }
 
@@ -65243,6 +65257,60 @@ function handleCellPopClick(btn, ev) {
       onCommit: (raw) => {
         if (lineId) applyPlanScheduleDate(lineId, raw);
         else if (vehicleId) applyPlanAssignToVehicle(vehicleId, { scheduleDate: raw || null });
+      },
+    });
+    return;
+  }
+  if (kind === 'remind-avgKm') {
+    const vid = Number(btn.getAttribute('data-vehicle-id') || vehicleId);
+    const veh = vehicleById(vid);
+    if (!veh) { toast('Không tìm thấy xe'); return; }
+    const cur = vehicleAvgKmPerMonth(veh);
+    openCellValueEditor({
+      anchor: btn, cellNode,
+      title: 'Km trung bình / tháng · ' + (veh.plate || ('#' + vid)),
+      value: cur != null ? String(cur) : '',
+      inputType: 'number',
+      step: '1',
+      onCommit: (raw) => {
+        const n = String(raw || '').trim() === '' ? NaN : Number(String(raw).replace(/[^\d.]/g, ''));
+        if (String(raw || '').trim() !== '' && (!Number.isFinite(n) || n <= 0)) {
+          toast('Nhập số km hợp lệ (> 0) hoặc để trống');
+          return;
+        }
+        if (!setVehicleAvgKmPerMonth(vid, n)) {
+          toast('Không tìm thấy xe');
+          return;
+        }
+        save();
+        toast(String(raw || '').trim() === ''
+          ? ('Đã về ước lượng mặc định · ' + (veh.plate || vid))
+          : ('Đã cập nhật ' + Math.round(n).toLocaleString('vi-VN') + ' km/tháng · ' + (veh.plate || vid)));
+        render();
+      },
+    });
+    return;
+  }
+  if (kind === 'remind-expectedDate') {
+    const leafKey = btn.getAttribute('data-leaf-key') || '';
+    const curAttr = btn.getAttribute('data-expected-current') || '';
+    const cur = (/^\d{4}-\d{2}-\d{2}$/.test(String(curAttr).slice(0, 10))
+      ? String(curAttr).slice(0, 10)
+      : (valueText === '—' ? '' : String(valueText || '').slice(0, 10)));
+    openCellValueEditor({
+      anchor: btn, cellNode,
+      title: 'Ngày dự kiến bảo dưỡng' + (leafKey ? '' : ''),
+      value: /^\d{4}-\d{2}-\d{2}$/.test(cur) ? cur : '',
+      inputType: 'date',
+      onCommit: (raw) => {
+        const d = String(raw || '').trim().slice(0, 10);
+        if (!setRemindExpectedDateOverride(leafKey, d)) {
+          toast('Ngày không hợp lệ');
+          return;
+        }
+        save();
+        toast(d ? ('Đã dời ngày dự kiến → ' + d) : 'Đã xoá ghi đè — tính lại tự động');
+        render();
       },
     });
     return;
@@ -66622,7 +66690,7 @@ function showPlanCtx(ev, item) {
       ? slickMenuItem('do-now', 'calCheck', 'Làm tháng này (tạo phiếu)')
       : `<div class="slick-menu-item disabled"><div class="slick-menu-icon">${planTbIco('calCheck')}</div><span class="slick-menu-content">Không còn hạng mục tháng này</span></div>`,
     existing.length ? slickMenuItem('view-order', 'eye', 'Xem phiếu ' + existing.map(o => o.code).join(', ')) : '',
-    slickMenuItem('vehicle', 'truck', 'Mở xe ' + (item.plate || '')),
+    ALLOW_OPEN_VEHICLE_DETAIL ? slickMenuItem('vehicle', 'truck', 'Mở xe ' + (item.plate || '')) : '',
     `<div class="slick-menu-item slick-menu-item-divider"></div>`,
     slickMenuItem('collapse-one', item._collapsed ? 'chev' : 'chev', item._collapsed ? 'Mở rộng nhóm này' : 'Thu gọn nhóm này'),
     slickMenuItem('collapse-all', 'dens', 'Thu gọn tất cả nhóm'),
@@ -66639,7 +66707,7 @@ function showPlanCtx(ev, item) {
       : `<div class="slick-menu-item disabled"><div class="slick-menu-icon">${planTbIco('calCheck')}</div><span class="slick-menu-content">Không còn hạng mục tháng này</span></div>`,
     slickMenuItem('defer', 'cal', 'Dời sang tháng sau'),
     existing.length ? slickMenuItem('view-order', 'eye', 'Xem phiếu ' + existing.map(o => o.code).join(', ')) : '',
-    slickMenuItem('vehicle', 'truck', 'Mở xe ' + (item.plate || '')),
+    ALLOW_OPEN_VEHICLE_DETAIL ? slickMenuItem('vehicle', 'truck', 'Mở xe ' + (item.plate || '')) : '',
     slickMenuItem('copy', 'copy', 'Sao chép dòng'),
     `<div class="slick-menu-item slick-menu-item-divider"></div>`,
     slickMenuItem('toggle', isPlanLineChecked(planLineIdOfRow(item)) ? 'checkOn' : 'checkOff', isPlanLineChecked(planLineIdOfRow(item)) ? 'Bỏ chọn hạng mục này' : 'Chọn hạng mục này'),
@@ -66677,8 +66745,7 @@ function runPlanCtx(act, g, item) {
     return;
   }
   if (act === 'vehicle') {
-    view = { ...view, name: 'vehicle', vehicleId: Number(g.vehicleId), vehicleTab: 'catalog', from: menuPlansNav(), filters: defaultFilters(), page: 1 };
-    render();
+    goVehicleDetail(g.vehicleId, { from: menuPlansNav() });
     return;
   }
   if (act === 'toggle') {
@@ -67169,7 +67236,7 @@ function mountPlanGridFallback(host, rows) {
     const act = r.__vehGroup
       ? `<button type="button" class="btn btn-outline btn-xs" data-plan-sync-base-vehicle="${esc(r.vehicleId)}">BASE</button> <button type="button" class="btn btn-primary btn-xs" data-plan-schedule="${esc(r.key)}">Lên lịch</button>`
       : `<button type="button" class="btn btn-primary btn-xs" data-plan-schedule="${esc(r.key)}">Lên lịch</button>`;
-    const cells = `${ck}<td>${esc(r.year)}</td><td>${esc(r.month)}</td><td><button type="button" class="slick-link" data-open-vehicle="${r.vehicleId}">${esc(r.soXe)}</button></td><td>${esc(r.soMooc)}</td><td>${esc(r.applyTo)}</td><td class="font-mono text-xs">${esc(r.ptId)}</td><td>${esc(r.content)}</td><td>${r.__vehGroup ? '' : esc(r.vendor)}</td><td>${r.__vehGroup ? '' : esc(r.dichVu)}</td><td>${r.__vehGroup ? '' : esc(r.phanLoai)}</td><td>${r.__vehGroup ? '' : esc(r.system)}</td><td>${r.__vehGroup ? '' : esc(r.nhom)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.qtyText)}</td><td>${r.__vehGroup ? '' : esc(r.uom)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.unitPriceText)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.vatText)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.thanhTienText)}</td><td class="text-right tabular-nums fw6">${esc(r.totalText)}</td><td>${r.__vehGroup ? '' : esc(r.pmhNote)}</td><td>${esc(r.technicianName || '—')}</td><td>${esc(r.scheduleDateText || r.scheduleDate || '—')}</td><td>${planBaseSyncBadge({ status: r.baseStatus, code: r.baseCode })}</td><td class="whitespace-nowrap">${act}</td>`;
+    const cells = `${ck}<td>${esc(r.year)}</td><td>${esc(r.month)}</td><td class="font-medium">${esc(r.soXe)}</td><td>${esc(r.soMooc)}</td><td>${esc(r.applyTo)}</td><td class="font-mono text-xs">${esc(r.ptId)}</td><td>${esc(r.content)}</td><td>${r.__vehGroup ? '' : esc(r.vendor)}</td><td>${r.__vehGroup ? '' : esc(r.dichVu)}</td><td>${r.__vehGroup ? '' : esc(r.phanLoai)}</td><td>${r.__vehGroup ? '' : esc(r.system)}</td><td>${r.__vehGroup ? '' : esc(r.nhom)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.qtyText)}</td><td>${r.__vehGroup ? '' : esc(r.uom)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.unitPriceText)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.vatText)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.thanhTienText)}</td><td class="text-right tabular-nums fw6">${esc(r.totalText)}</td><td>${r.__vehGroup ? '' : esc(r.pmhNote)}</td><td>${esc(r.technicianName || '—')}</td><td>${esc(r.scheduleDateText || r.scheduleDate || '—')}</td><td>${planBaseSyncBadge({ status: r.baseStatus, code: r.baseCode })}</td><td class="whitespace-nowrap">${act}</td>`;
     return `<tr class="${on}" data-gkey="${esc(r.key)}" data-line-id="${esc(lid)}" data-vehicle-id="${esc(r.vehicleId)}">${cells}</tr>`;
   }).join('') || `<tr><td colspan="25" class="px-4 py-10 text-center text-slate-500">Không có kế hoạch khớp bộ lọc</td></tr>`}</tbody></table>`;
   host.querySelectorAll('.pg-row').forEach(cb => {
@@ -67322,11 +67389,11 @@ function showListCtx(ev, key, item) {
   const bits = [];
   if (key === 'histOrders') {
     bits.push(slickMenuItem('open-order', 'file', 'Xem chi tiết phiếu' + (item.code ? ' ' + item.code : '')));
-    bits.push(slickMenuItem('open-vehicle', 'truck', 'Mở xe ' + (item.plate || '')));
+    if (ALLOW_OPEN_VEHICLE_DETAIL) bits.push(slickMenuItem('open-vehicle', 'truck', 'Mở xe ' + (item.plate || '')));
     bits.push(slickMenuItem('copy-code', 'copy', 'Sao chép mã phiếu'));
     el._listCtx = { key, item, orderId: item.orderId != null ? item.orderId : item.id, vehicleId: item.vehicleId, code: item.code, plate: item.plate };
   } else if (key === 'fleetVehicles') {
-    bits.push(slickMenuItem('open-vehicle', 'truck', 'Chi tiết xe ' + (item.plate || '')));
+    if (ALLOW_OPEN_VEHICLE_DETAIL) bits.push(slickMenuItem('open-vehicle', 'truck', 'Chi tiết xe ' + (item.plate || '')));
     bits.push(slickMenuItem('eval', 'file', 'Đánh giá'));
     bits.push(slickMenuItem('view-orders', 'files', 'Xem phiếu theo xe'));
     el._listCtx = { key, item, vehicleId: item.vehicleId != null ? item.vehicleId : item.id, plate: item.plate };
@@ -67350,7 +67417,7 @@ function showListCtx(ev, key, item) {
     if (group && group.canCreateSc) {
       bits.push(slickMenuItem('assess-create-sc', 'plus', 'Tạo phiếu SC (cả hạng mục lỗi)'));
     }
-    if (item.vehicleId != null) bits.push(slickMenuItem('open-vehicle', 'truck', 'Mở xe ' + (item.plate || '')));
+    if (ALLOW_OPEN_VEHICLE_DETAIL && item.vehicleId != null) bits.push(slickMenuItem('open-vehicle', 'truck', 'Mở xe ' + (item.plate || '')));
     bits.push(slickMenuItem('copy-code', 'copy', 'Sao chép biển số'));
     el._listCtx = {
       key, item,
@@ -67363,8 +67430,8 @@ function showListCtx(ev, key, item) {
     };
   } else if (key === 'remindDashboard') {
     const group = item.__group ? item : (window._listGridPacks?.remindDashboard?.rows || []).find(r => r.__group && String(r.groupKey) === String(item.groupKey));
-    if (item.vehicleId != null) bits.push(slickMenuItem('open-vehicle', 'truck', 'Mở xe ' + (item.plate || '')));
-    bits.push(slickMenuItem('remind-open-catalog', 'file', 'Sửa kỳ / danh mục xe'));
+    if (ALLOW_OPEN_VEHICLE_DETAIL && item.vehicleId != null) bits.push(slickMenuItem('open-vehicle', 'truck', 'Mở xe ' + (item.plate || '')));
+    /* Tạm ẩn «Sửa kỳ / danh mục xe» trên nhắc bảo dưỡng */
     if (!item.__group && item.rowKind === 'CATALOG' && item.catalogId) {
       bits.push(slickMenuItem('remind-push-one', 'plus', 'Đưa hạng mục này → KH'));
       bits.push(slickMenuItem('remind-create-order', 'calCheck', 'Tạo phiếu từ danh mục'));
@@ -67425,8 +67492,8 @@ function showListCtx(ev, key, item) {
         render(); return;
       }
       if (act === 'open-vehicle' && ctx.vehicleId != null) {
-        view = { ...view, name: 'vehicle', vehicleId: Number(ctx.vehicleId), vehicleTab: 'catalog', from: view.name, filters: defaultFilters(), page: 1 };
-        render(); return;
+        goVehicleDetail(ctx.vehicleId, { from: view.name });
+        return;
       }
       if (act === 'eval' && ctx.vehicleId != null) { openEvalModal(Number(ctx.vehicleId)); return; }
       if (act === 'view-orders' && ctx.plate) {
@@ -67463,8 +67530,8 @@ function showListCtx(ev, key, item) {
         return;
       }
       if (act === 'remind-open-catalog' && ctx.vehicleId != null) {
-        view = { ...view, name: 'vehicle', vehicleId: Number(ctx.vehicleId), vehicleTab: 'catalog', from: 'reminder', filters: defaultFilters(), page: 1 };
-        render(); return;
+        goVehicleDetail(ctx.vehicleId, { from: 'reminder' });
+        return;
       }
       if (act === 'remind-push-one' && ctx.vehicleId != null && ctx.catalogId != null) {
         openSchedulePlanModal({
@@ -67795,7 +67862,17 @@ function openCellValueEditor(cfg) {
     if (e.key === 'Enter') { e.preventDefault(); commit(); }
     if (e.key === 'Escape') closeCellPickPopover();
   });
-  setTimeout(() => { inp?.focus(); inp?.select?.(); }, 0);
+  setTimeout(() => {
+    try {
+      if (!inp) return;
+      inp.focus();
+      if (inputType === 'date' && typeof inp.showPicker === 'function') {
+        try { inp.showPicker(); } catch (_) {}
+      } else {
+        inp.select?.();
+      }
+    } catch (_) {}
+  }, 0);
 }
 function applyPlanNumericField(lineId, field, raw) {
   const p = planByLineId(lineId);
@@ -68319,8 +68396,7 @@ function mountListSlickGrid(host, rows, cols, opts) {
         if (openVeh) {
           if (native && native.stopPropagation) native.stopPropagation();
           const from = view.name === 'fleet' || isHistoryNav(view.name) || isPlansNav(view.name) ? view.name : (view.from || menuHomeNav());
-          view = { ...view, name: 'vehicle', from, vehicleId: Number(openVeh.getAttribute('data-open-vehicle')), vehicleTab: 'catalog', filters: defaultFilters(), page: 1 };
-          render();
+          goVehicleDetail(openVeh.getAttribute('data-open-vehicle'), { from });
           return;
         }
         const evalBtn = t.closest('[data-eval]');
@@ -68393,9 +68469,11 @@ function mountListSlickGrid(host, rows, cols, opts) {
           if (native && native.stopPropagation) native.stopPropagation();
           const vid = pushPlanRow.getAttribute('data-push-plan-row');
           const cid = pushPlanRow.getAttribute('data-cid');
+          const pref = pushPlanRow.getAttribute('data-expected-date') || '';
           if (typeof openSchedulePlanModal === 'function') {
             openSchedulePlanModal({
               title: 'Đưa danh mục vào kế hoạch',
+              defaultScheduleDate: pref,
               onConfirm: ({ period, scheduleDate }) => {
                 const n = pushReminderRowsToPlan([{ dataset: { vid, cid } }], period, scheduleDate, 'Từ nhắc BD · chỉ định');
                 save();
@@ -68411,9 +68489,11 @@ function mountListSlickGrid(host, rows, cols, opts) {
         if (pushTbRow) {
           if (native && native.stopPropagation) native.stopPropagation();
           const uid = pushTbRow.getAttribute('data-push-tb-row');
+          const pref = pushTbRow.getAttribute('data-expected-date') || '';
           if (typeof openSchedulePlanModal === 'function') {
             openSchedulePlanModal({
               title: 'Đưa lốp/ắc vào kế hoạch',
+              defaultScheduleDate: pref,
               onConfirm: ({ period, scheduleDate }) => {
                 const n = pushTireBatteryUnitsToPlan([uid], period, scheduleDate, 'Từ nhắc BD · lốp/ắc');
                 save();
@@ -68437,8 +68517,7 @@ function mountListSlickGrid(host, rows, cols, opts) {
         if (openCat) {
           if (native && native.stopPropagation) native.stopPropagation();
           const vid = Number(openCat.getAttribute('data-open-vehicle-catalog'));
-          view = { ...view, name: 'vehicle', vehicleId: vid, vehicleTab: 'catalog', from: 'reminder', filters: defaultFilters(), page: 1 };
-          render();
+          goVehicleDetail(vid, { from: 'reminder' });
           return;
         }
         /* data-open-tire-battery: để document listener xử lý (cùng luồng trang Vỏ lốp / ắc quy) */
@@ -68660,9 +68739,9 @@ function mountPlanSlickGrid() {
   window._planGridData = rows;
   const soXeFmt = (row, cell, val, col, item) => {
     if (item.__vehGroup) {
-      return `<span class="inline-flex items-center gap-1 min-w-0">${planTreeToggleBtnHtml(item)}<button type="button" class="slick-link font-semibold" data-open-vehicle="${item.vehicleId}">${esc(item.soXe)}</button></span>`;
+      return `<span class="inline-flex items-center gap-1 min-w-0">${planTreeToggleBtnHtml(item)}<span class="font-semibold text-slate-800">${esc(item.soXe)}</span></span>`;
     }
-    return `<button type="button" class="slick-link" data-open-vehicle="${item.vehicleId}">${esc(item.soXe)}</button>`;
+    return esc(item.soXe || '—');
   };
   const checkFmt = (row, cell, val, col, item) => {
     if (item.__vehGroup) {
@@ -69190,8 +69269,7 @@ function mountPlanSlickGrid() {
     }
     const veh = t && t.closest && t.closest('[data-open-vehicle]');
     if (veh) {
-      view = { ...view, name: 'vehicle', vehicleId: Number(veh.dataset.openVehicle), vehicleTab: 'catalog', from: menuPlansNav(), filters: defaultFilters(), page: 1 };
-      render();
+      goVehicleDetail(veh.dataset.openVehicle, { from: menuPlansNav() });
       return;
     }
     /* Click hàng group (ngoài checkbox/link): thu-mở — panel mở bằng double-click */
@@ -69279,8 +69357,7 @@ function bindPlanSidePanel() {
   });
   $$('[data-open-vehicle]', panel).forEach(b => b.onclick = () => {
     const from = view.name === 'fleet' || isHistoryNav(view.name) || isPlansNav(view.name) ? view.name : (view.from || menuHomeNav());
-    view = { ...view, name: 'vehicle', from, vehicleId: Number(b.dataset.openVehicle), vehicleTab: 'catalog', filters: defaultFilters(), page: 1 };
-    render();
+    goVehicleDetail(b.dataset.openVehicle, { from });
   });
   $$('[data-open-order]', panel).forEach(b => b.onclick = () => {
     view = { ...view, name: 'order', orderId: b.dataset.openOrder, from: menuPlansNav() };
@@ -69546,6 +69623,9 @@ function load() {
         materials: parsed.materials?.length ? parsed.materials : structuredClone(DEFAULT_MATERIALS),
         tireBatteryUnits: Array.isArray(parsed.tireBatteryUnits) ? parsed.tireBatteryUnits : [],
         tireBatterySeedVer: parsed.tireBatterySeedVer || 0,
+        remindExpectedDateOverrides: (parsed.remindExpectedDateOverrides && typeof parsed.remindExpectedDateOverrides === 'object')
+          ? parsed.remindExpectedDateOverrides
+          : {},
         vehicleSystems: parsed.vehicleSystems?.length ? parsed.vehicleSystems : structuredClone(DEFAULT_VEHICLE_SYSTEMS),
         serviceTypes: parsed.serviceTypes?.length ? parsed.serviceTypes : structuredClone(DEFAULT_SERVICE_TYPES),
         baremHours: parsed.baremHours?.length ? parsed.baremHours : structuredClone(DEFAULT_BAREM_HOURS),
@@ -71762,6 +71842,9 @@ function openSchedulePlanModal(opts) {
   const title = opts?.title || 'Đưa vào kế hoạch';
   const subtitle = opts?.subtitle || 'Chọn tháng này, tháng sau, hoặc chỉ định ngày cụ thể.';
   const today = (typeof todayDateKey === 'function' ? todayDateKey() : new Date().toISOString().slice(0, 10));
+  const prefDate = String(opts?.defaultScheduleDate || '').slice(0, 10);
+  const usePref = /^\d{4}-\d{2}-\d{2}$/.test(prefDate);
+  const dateVal = usePref ? prefDate : today;
   openModal(`
     <div class="border-b border-slate-200 px-5 py-4">
       <h2 class="text-lg font-bold text-slate-900">${esc(title)}</h2>
@@ -71770,17 +71853,17 @@ function openSchedulePlanModal(opts) {
     <form id="schedulePlanForm" class="space-y-4 px-5 py-4">
       <div class="grid gap-2 sm:grid-cols-3">
         <label class="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm">
-          <input type="radio" name="mode" value="this" checked /> Tháng này
+          <input type="radio" name="mode" value="this" ${usePref ? '' : 'checked'} /> Tháng này
         </label>
         <label class="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm">
           <input type="radio" name="mode" value="next" /> Tháng sau
         </label>
         <label class="flex cursor-pointer items-center gap-2 rounded-md border border-slate-200 px-3 py-2 text-sm">
-          <input type="radio" name="mode" value="date" /> Chỉ định ngày
+          <input type="radio" name="mode" value="date" ${usePref ? 'checked' : ''} /> Chỉ định ngày
         </label>
       </div>
       <label class="block text-sm font-medium text-slate-700">Ngày cụ thể
-        <input name="scheduleDate" type="date" id="schedulePlanDate" value="${esc(today)}" disabled />
+        <input name="scheduleDate" type="date" id="schedulePlanDate" value="${esc(dateVal)}" ${usePref ? '' : 'disabled'} />
       </label>
       <p class="m-0 text-xs text-slate-500">Kỳ kế hoạch = tháng của ngày chọn. Dòng được gắn <code>scheduleDate</code> để xưởng biết ngày dự kiến.</p>
       <div class="flex justify-end gap-2">
@@ -72309,9 +72392,7 @@ function renderMaintTrackGrid(vehicles, opts = {}) {
         + `<td class="mt-noi">${esc(o.garage || '—')}</td>`;
     }).join('');
     const pad = Array.from({ length: Math.max(0, maxLan - r.events.length) }, () => emptyLan).join('');
-    const plateBtn = opts.lockVehicle
-      ? `<span class="font-semibold text-slate-900">${esc(v.plate)}</span>`
-      : `<button type="button" data-open-vehicle="${v.id}" class="mt-order-link font-semibold">${esc(v.plate)}</button>`;
+    const plateBtn = `<span class="font-semibold text-slate-900">${esc(v.plate)}</span>`;
     return `<tr>
       <td class="mt-stt mt-meta">${startIdx + idx + 1}</td>
       <td class="mt-meta mt-pin">${plateBtn}</td>
@@ -72408,7 +72489,7 @@ function pageHistory() {
     });
     registerListGrid('fleetVehicles', rows, [
       { id: 'plate', field: 'plate', name: 'Biển số', width: 120, minWidth: 96, sortable: true, formatter: (r, c, v, col, item) =>
-        `<button type="button" class="slick-link" data-open-vehicle="${item.vehicleId}">${esc(item.plate)}</button>` },
+        esc(item.plate || '—') },
       { id: 'kind', field: 'kindLabel', name: 'Loại xe', width: 88, minWidth: 72, sortable: true, cssClass: 'c', filterType: 'select', filterField: 'kindLabel',
         formatter: (r, c, v, col, item) => item.kindHtml || esc(item.kindLabel || '—') },
       { id: 'gps', field: 'gps', name: 'GPS', width: 110, minWidth: 80, sortable: true },
@@ -72438,7 +72519,7 @@ function pageHistory() {
       { id: '_act', field: 'act', name: 'Thao tác', width: 220, minWidth: 180, sortable: false, filterable: false, formatter: (r, c, v, col, item) =>
         `<div class="flex h-full items-center justify-center gap-1">
           <button type="button" data-eval="${item.vehicleId}" class="btn btn-outline btn-xs">Đánh giá</button>
-          <button type="button" data-open-vehicle="${item.vehicleId}" class="btn btn-primary btn-xs">Chi tiết</button>
+          ${ALLOW_OPEN_VEHICLE_DETAIL ? `<button type="button" data-open-vehicle="${item.vehicleId}" class="btn btn-primary btn-xs">Chi tiết</button>` : ''}
           <button type="button" data-view-orders-plate="${esc(item.plate)}" class="btn btn-outline btn-xs">Phiếu</button>
         </div>` },
     ], { forceFitColumns: false, colFilters: true });
@@ -72495,7 +72576,7 @@ function pageHistory() {
       { id: 'code', field: 'code', name: 'Mã phiếu', width: 140, minWidth: 110, sortable: true, formatter: (r, c, v, col, item) =>
         `<button type="button" class="slick-link" data-open-order="${item.orderId}">${esc(item.code)}</button>` },
       { id: 'plate', field: 'plate', name: 'Biển số', width: 110, minWidth: 90, sortable: true, formatter: (r, c, v, col, item) =>
-        `<button type="button" class="slick-link" data-open-vehicle="${item.vehicleId}">${esc(item.plate)}</button>` },
+        esc(item.plate || '—') },
       { id: 'vehicleKind', field: 'vehicleKind', name: 'Loại xe', width: 80, minWidth: 64, sortable: true, cssClass: 'c', filterType: 'select',
         formatter: (r, c, v, col, item) => item.vehicleKind === 'Mooc'
           ? '<span class="chip bg-orange-100 text-orange-800">Mooc</span>'
@@ -72719,6 +72800,7 @@ function tireBatteryAlertsForVehicle(v) {
       maxKm: Number(u.maxKm || 80000),
       usedMonth: Number(u.usedMonth || 0),
       maxMonth: Number(u.maxMonth || 24),
+      installedAt: u.installedAt || null,
     };
   }).filter(Boolean);
 }
@@ -72736,7 +72818,7 @@ function tireAlertBannerHtml(alerts, opts) {
     <strong>Cảnh báo vỏ lốp / ắc quy:</strong>
     ${overdue ? ` <span class="text-rose-700 font-semibold">${overdue} quá hạn</span>` : ''}
     ${soon ? ` <span class="font-semibold">${soon} sắp đến hạn</span>` : ''}
-    · định mức kép km + tháng · gắn theo xe.
+    · định mức theo tháng · gắn theo xe.
     ${openBtn}
     ${opts?.extra || ''}
   </div>`;
@@ -73235,7 +73317,7 @@ function pageCatHistory() {
       </div>
       <div class="flex gap-2">
         <button data-edit-due="${c.id}" class="btn btn-outline">Sửa mốc tiếp theo</button>
-        <button data-open-vehicle="${v.id}" class="btn btn-outline">Chi tiết xe</button>
+        ${ALLOW_OPEN_VEHICLE_DETAIL ? `<button data-open-vehicle="${v.id}" class="btn btn-outline">Chi tiết xe</button>` : ''}
       </div>
     </div>
     <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -73277,7 +73359,9 @@ function pageVehicleHistory() {
   });
   return `
   <div class="min-h-full space-y-4 px-6 py-6">
-    <button data-open-vehicle="${v.id}" class="text-sm text-blue-600 hover:underline">← ${v.plate}</button>
+    ${ALLOW_OPEN_VEHICLE_DETAIL
+      ? `<button data-open-vehicle="${v.id}" class="text-sm text-blue-600 hover:underline">← ${v.plate}</button>`
+      : `<button type="button" data-nav-back class="text-sm text-blue-600 hover:underline">← Quay lại</button>`}
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h1 class="text-2xl font-bold text-slate-900">Lịch sử BD / SC · ${v.plate}</h1>
@@ -73732,7 +73816,7 @@ function pageOrder() {
             <div class="text-xs text-slate-500">${r.date} · ${orderWorkKindBadges(r)} ${approvalBadge(r.approvalStatus)}</div></li>`;
           }).join('') || '<li class="text-slate-400 text-xs">Không có</li>'}
         </ul>
-        <button data-open-vehicle="${o.vehicleId}" class="btn btn-outline btn-sm mt-4 w-full">Mở chi tiết xe</button>
+        ${ALLOW_OPEN_VEHICLE_DETAIL ? `<button data-open-vehicle="${o.vehicleId}" class="btn btn-outline btn-sm mt-4 w-full">Mở chi tiết xe</button>` : ''}
         <div class="mt-4 rounded-md border border-dashed border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600">
           <div class="mb-1 font-semibold text-slate-800">Xem nhanh chu kỳ duyệt</div>
           Mở mẫu logic VT / mốc giờ:
@@ -74438,7 +74522,7 @@ function pagePlanTemplate() {
             const v = vehicleById(a.vehicleId);
             return `<tr class="row-h">
               <td class="td text-slate-600">${esc(a.appliedAt)}</td>
-              <td class="td"><button data-open-vehicle="${a.vehicleId}" class="text-blue-600 hover:underline">${v?v.plate:'—'}</button>
+              <td class="td">${v ? esc(v.plate) : '—'}
                 <div class="text-[11px] text-slate-500">${v?esc(v.area):''}</div></td>
               <td class="td font-medium">${esc(a.period)}</td>
               <td class="td text-xs text-slate-500">${esc(a.periodStart||'—')} → ${esc(a.periodEnd||'—')}</td>
@@ -75176,7 +75260,7 @@ function pageTireBattery() {
         <div>
           <div class="flex flex-wrap items-center gap-2">
             <h2 class="text-lg font-bold text-slate-900">${rightTitle}</h2>
-            ${selected.v ? `<button type="button" data-open-vehicle="${selected.v.id}" class="text-xs text-blue-700 hover:underline">Hồ sơ xe</button>` : ''}
+            ${ALLOW_OPEN_VEHICLE_DETAIL && selected.v ? `<button type="button" data-open-vehicle="${selected.v.id}" class="text-xs text-blue-700 hover:underline">Hồ sơ xe</button>` : ''}
           </div>
           <p class="mt-1 text-xs text-slate-500">${rightSub}</p>
           <p class="mt-1 text-xs text-slate-700">${selected.tire} lốp · ${selected.battery} ắc${selected.due ? ` · <span class="text-amber-800 font-medium">${selected.due} sắp/đến hạn (chỉ seri gắn xe)</span>` : ''}</p>
@@ -75325,12 +75409,12 @@ function remindGroupTitleCellHtml(item) {
   const title = item.groupTitle || '';
   return `<span class="plan-group-title-text" title="${esc(title)}">${esc(title)}</span>`;
 }
-/** Chevron thu/mở + biển số — nút collapse nằm ở cột Số xe. */
+/** Chevron thu/mở + biển số — nút collapse nằm ở cột Số xe (biển số không link sang chi tiết xe). */
 function remindPlateCellHtml(item) {
   if (!item) return '—';
-  const plateBtn = `<button type="button" class="slick-link" data-open-vehicle="${item.vehicleId}">${esc(item.plate || '—')}</button>`;
-  if (!item.__group) return plateBtn;
-  return `<span class="plan-group-title-cell" data-remind-group-toggle-row="1" data-remind-group-key="${esc(item.groupKey)}">${remindGroupToggleHtml(item)}<span class="plan-group-title-text">${plateBtn}</span></span>`;
+  const plateTxt = `<span class="font-medium text-slate-800">${esc(item.plate || '—')}</span>`;
+  if (!item.__group) return plateTxt;
+  return `<span class="plan-group-title-cell" data-remind-group-toggle-row="1" data-remind-group-key="${esc(item.groupKey)}">${remindGroupToggleHtml(item)}<span class="plan-group-title-text">${plateTxt}</span></span>`;
 }
 function toggleRemindGroupCollapse(groupKeyOrItem) {
   let groupKey = groupKeyOrItem;
@@ -75398,6 +75482,85 @@ function vehicleAvgKmPerMonth(v) {
   const areaBoost = v.area === 'HN' ? 500 : v.area === 'DN' ? -400 : 0;
   const typeBoost = /đầu kéo|tractor|casca|freight/i.test(String(v.type || '') + ' ' + String(v.brand || '')) ? 800 : 0;
   return Math.max(1500, 7200 + areaBoost + typeBoost + (id % 13) * 280);
+}
+function ensureRemindExpectedDateMap() {
+  if (!DB.remindExpectedDateOverrides || typeof DB.remindExpectedDateOverrides !== 'object') {
+    DB.remindExpectedDateOverrides = {};
+  }
+  return DB.remindExpectedDateOverrides;
+}
+/** Cộng tháng vào ngày YYYY-MM-DD (giữ ngày trong tháng hợp lệ). */
+function addMonthsToDateKey(iso, months) {
+  const s = String(iso || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return '';
+  const d = new Date(s + 'T12:00:00');
+  if (Number.isNaN(d.getTime())) return '';
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + Number(months || 0));
+  if (d.getDate() < day) d.setDate(0);
+  return d.toISOString().slice(0, 10);
+}
+/** Ước ngày dự kiến từ số km còn lại và km trung bình / tháng. */
+function estimateDateFromKmLeft(kmLeft, avgKmPerMonth, fromDate) {
+  if (kmLeft == null || !Number.isFinite(Number(kmLeft))) return '';
+  const avg = Number(avgKmPerMonth);
+  if (!Number.isFinite(avg) || avg <= 0) return '';
+  const base = String(fromDate || (typeof todayDateKey === 'function' ? todayDateKey() : new Date().toISOString().slice(0, 10))).slice(0, 10);
+  const days = Math.round((Number(kmLeft) / avg) * 30.437);
+  return shiftDateKey(base, days);
+}
+/**
+ * Ngày dự kiến bảo dưỡng trên nhắc:
+ * - Có ghi đè tay → dùng ghi đè
+ * - Danh mục: ưu tiên mốc ngày; không có thì ước từ km còn lại ÷ km TB/tháng
+ * - Vỏ lốp / ắc quy: theo tháng còn lại (không dùng định mức km); có ngày lắp thì = ngày lắp + định mức tháng
+ */
+function remindComputeExpectedDate(leaf) {
+  if (!leaf || leaf.__group) return '';
+  const map = ensureRemindExpectedDateMap();
+  const key = remindLeafKey(leaf);
+  const ov = key && map[key] != null ? String(map[key]).slice(0, 10) : '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(ov)) return ov;
+  if (leaf.rowKind === 'TIRE_BATTERY') {
+    const u = leaf.tbId ? tireBatteryUnitById(leaf.tbId) : null;
+    const maxMonth = Number(leaf.maxMonthNum != null ? leaf.maxMonthNum : u?.maxMonth) || 0;
+    const usedMonth = Number(leaf.usedMonthNum != null ? leaf.usedMonthNum : u?.usedMonth) || 0;
+    const installed = u?.installedAt ? String(u.installedAt).slice(0, 10) : '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(installed) && maxMonth > 0) {
+      return addMonthsToDateKey(installed, maxMonth);
+    }
+    const leftMo = Math.max(0, maxMonth - usedMonth);
+    const today = typeof todayDateKey === 'function' ? todayDateKey() : new Date().toISOString().slice(0, 10);
+    return addMonthsToDateKey(today, leftMo);
+  }
+  /* CATALOG */
+  const planDate = String(leaf.remindPlanDate || leaf.nextDate || '').slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(planDate)) return planDate;
+  return estimateDateFromKmLeft(leaf.kmLeft, leaf.avgKmPerMonthNum);
+}
+function setVehicleAvgKmPerMonth(vehicleId, value) {
+  const v = vehicleById(vehicleId);
+  if (!v) return false;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) {
+    delete v.avgKmPerMonth;
+  } else {
+    v.avgKmPerMonth = Math.round(n);
+  }
+  return true;
+}
+function setRemindExpectedDateOverride(leafKey, dateStr) {
+  const map = ensureRemindExpectedDateMap();
+  const k = String(leafKey || '');
+  if (!k) return false;
+  const d = String(dateStr || '').trim().slice(0, 10);
+  if (!d) {
+    delete map[k];
+    return true;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  map[k] = d;
+  return true;
 }
 /** Phân loại bảo dưỡng trên nhắc BD: theo mốc chu kỳ danh mục, hoặc Vỏ lốp / Ắc quy. */
 function remindMaintClassLabel(rowKind, catalogOrAlert) {
@@ -75470,7 +75633,7 @@ function collectRemindDueLeaves(filters) {
       if (f.remindStatus !== 'ALL' && status !== f.remindStatus) return;
       if (f.catalogId === '__TIRE__' || f.catalogId === '__BATTERY__') return;
       if (f.catalogId !== 'ALL' && String(c.id) !== String(f.catalogId)) return;
-      leaves.push({
+      const leaf = {
         rowKind: 'CATALOG',
         groupKey: String(v.id),
         vehicleId: v.id,
@@ -75489,6 +75652,8 @@ function collectRemindDueLeaves(filters) {
         milestoneText: marks.milestoneText,
         remindMaintText: marks.remindMaintText,
         remindPlanText: marks.remindPlanText,
+        remindPlanDate: next?.date ? String(next.date).slice(0, 10) : '',
+        nextDate: next?.date ? String(next.date).slice(0, 10) : '',
         usedKmNum: null,
         maxKmNum: null,
         usedMonthNum: null,
@@ -75504,18 +75669,20 @@ function collectRemindDueLeaves(filters) {
         isDue,
         isTrailer: !!v.isTrailer,
         searchBlob,
-      });
+      };
+      leaf.expectedDate = remindComputeExpectedDate(leaf);
+      leaf.expectedDateManual = !!(ensureRemindExpectedDateMap()[remindLeafKey(leaf)]);
+      leaf.searchBlob = [searchBlob, leaf.expectedDate].join(' ');
+      leaves.push(leaf);
     });
     tireBatteryAlertsForVehicle(v).forEach((a) => {
-      const usedKm = Number(a.usedKm) || 0;
-      const maxKm = Number(a.maxKm) || 0;
       const usedMonth = Number(a.usedMonth) || 0;
       const maxMonth = Number(a.maxMonth) || 0;
-      const kmLeft = maxKm - usedKm;
+      const monthLeft = maxMonth - usedMonth;
       const status = a.level === 'overdue' ? 'overdue' : 'dueSoon';
       const kindLabel = a.kind === 'BATTERY' ? 'Ắc quy' : 'Vỏ lốp';
       const itemLabel = (a.serial || a.name || kindLabel);
-      const milestoneText = `${kmFmt(usedKm)}/${kmFmt(maxKm)} km · ${usedMonth}/${maxMonth} th`;
+      const milestoneText = `${usedMonth}/${maxMonth} tháng`;
       const avgKm = vehicleAvgKmPerMonth(v);
       const maintClass = remindMaintClassLabel('TIRE_BATTERY', a);
       const searchBlob = [v.plate, v.type, kindLabel, a.name, a.code, a.serial, 'gắn xe', maintClass, avgKm].join(' ');
@@ -75524,7 +75691,7 @@ function collectRemindDueLeaves(filters) {
       if (f.catalogId === '__TIRE__' && a.kind !== 'TIRE') return;
       if (f.catalogId === '__BATTERY__' && a.kind !== 'BATTERY') return;
       if (f.catalogId !== 'ALL' && f.catalogId !== '__TIRE__' && f.catalogId !== '__BATTERY__') return;
-      leaves.push({
+      const leaf = {
         rowKind: 'TIRE_BATTERY',
         groupKey: String(v.id),
         vehicleId: v.id,
@@ -75544,22 +75711,28 @@ function collectRemindDueLeaves(filters) {
         milestoneText,
         remindMaintText: '—',
         remindPlanText: '—',
-        usedKmNum: usedKm,
-        maxKmNum: maxKm,
+        remindPlanDate: '',
+        nextDate: '',
+        usedKmNum: null,
+        maxKmNum: null,
         usedMonthNum: usedMonth,
         maxMonthNum: maxMonth,
-        usedKmText: kmFmt(usedKm),
-        maxKmText: kmFmt(maxKm),
+        usedKmText: '—',
+        maxKmText: '—',
         usedMonthText: String(usedMonth),
         maxMonthText: String(maxMonth),
-        kmLeft,
-        kmLeftText: kmFmt(kmLeft) + ' km',
+        kmLeft: null,
+        kmLeftText: monthLeft != null ? (monthLeft + ' th') : '—',
         status,
         statusText: status === 'overdue' ? 'Quá hạn' : 'Sắp đến hạn',
         isDue: true,
         isTrailer: !!v.isTrailer,
         searchBlob,
-      });
+      };
+      leaf.expectedDate = remindComputeExpectedDate(leaf);
+      leaf.expectedDateManual = !!(ensureRemindExpectedDateMap()[remindLeafKey(leaf)]);
+      leaf.searchBlob = [searchBlob, leaf.expectedDate].join(' ');
+      leaves.push(leaf);
     });
   });
   const rank = (s) => (s === 'overdue' ? 0 : s === 'dueSoon' ? 1 : 2);
@@ -75683,8 +75856,15 @@ function registerRemindDashboardGrid(leaves) {
       } },
     { id: 'odoText', field: 'odoNum', name: 'Số km xe', width: 100, minWidth: 88, sortable: true, cssClass: 'r', toolTip: 'Số km trên đồng hồ xe / mooc',
       formatter: (r, c, v, col, item) => `<span class="tabular-nums">${esc(item.odoText || '—')}</span>` },
-    { id: 'avgKmPerMonthText', field: 'avgKmPerMonthNum', name: 'Km TB / tháng', width: 120, minWidth: 100, sortable: true, cssClass: 'r', toolTip: 'Xe chạy trung bình 1 tháng (km)',
-      formatter: (r, c, v, col, item) => `<span class="tabular-nums text-slate-800" title="Trung bình km chạy / tháng">${esc(item.avgKmPerMonthText || '—')}</span>` },
+    { id: 'avgKmPerMonthText', field: 'avgKmPerMonthNum', name: 'Km TB / tháng', width: 132, minWidth: 110, sortable: true, cssClass: 'r sg-col-editable', headerCssClass: 'sg-col-editable', toolTip: 'Xe chạy trung bình 1 tháng (km) — bấm ✎ để sửa',
+      formatter: (r, c, v, col, item) => {
+        if (item.vehicleId == null) return '<span class="text-slate-300">—</span>';
+        const txt = item.avgKmPerMonthText || '—';
+        return `<div class="sg-cell-edit-wrap justify-end">
+          <div class="sg-cell-edit-inner tabular-nums text-slate-800" title="Trung bình km chạy / tháng">${esc(txt)}</div>
+          <button type="button" class="sg-cell-edit-btn" data-cell-pop="remind-avgKm" data-vehicle-id="${item.vehicleId}" title="Sửa km trung bình / tháng" aria-label="Sửa km trung bình / tháng">✎</button>
+        </div>`;
+      } },
     { id: 'maintClassLabel', field: 'maintClassLabel', name: 'Phân loại bảo dưỡng', width: 150, minWidth: 120, sortable: true, filterType: 'select',
       formatter: (r, c, v, col, item) => {
         if (item.__group) {
@@ -75698,16 +75878,6 @@ function registerRemindDashboardGrid(leaves) {
       } },
     { id: 'areaLabel', field: 'areaLabel', name: 'Khu vực', width: 110, minWidth: 80, sortable: true,
       formatter: (r, c, v, col, item) => esc(item.areaLabel || '—') },
-    { id: 'usedKmText', field: 'usedKmNum', name: 'Đã dùng (km)', width: 120, minWidth: 100, sortable: true, cssClass: 'r', toolTip: 'Lốp/ắc — km đã dùng',
-      formatter: (r, c, v, col, item) => {
-        if (item.__group || item.rowKind !== 'TIRE_BATTERY') return '<span class="text-slate-300">—</span>';
-        return `<span class="tabular-nums text-xs">${esc(item.usedKmText || '—')}</span>`;
-      } },
-    { id: 'maxKmText', field: 'maxKmNum', name: 'Định mức (km)', width: 120, minWidth: 100, sortable: true, cssClass: 'r', toolTip: 'Lốp/ắc — định mức km',
-      formatter: (r, c, v, col, item) => {
-        if (item.__group || item.rowKind !== 'TIRE_BATTERY') return '<span class="text-slate-300">—</span>';
-        return `<span class="tabular-nums text-xs" title="Định mức km">${esc(item.maxKmText || '—')}</span>`;
-      } },
     { id: 'usedMonthText', field: 'usedMonthNum', name: 'Đã dùng (tháng)', width: 130, minWidth: 110, sortable: true, cssClass: 'c', toolTip: 'Lốp/ắc — tháng đã dùng',
       formatter: (r, c, v, col, item) => {
         if (item.__group || item.rowKind !== 'TIRE_BATTERY') return '<span class="text-slate-300">—</span>';
@@ -75728,7 +75898,24 @@ function registerRemindDashboardGrid(leaves) {
         if (item.__group || item.rowKind !== 'CATALOG') return '<span class="text-slate-300">—</span>';
         return `<span class="text-xs tabular-nums text-sky-800" title="Mốc đến hạn — đưa vào kế hoạch khi quá hạn">${esc(item.remindPlanText || '—')}</span>`;
       } },
-    { id: 'kmLeftText', field: 'kmLeft', name: 'Còn lại (km)', width: 110, minWidth: 96, sortable: true, cssClass: 'r',
+    { id: 'expectedDate', field: 'expectedDate', name: 'Ngày dự kiến BD', width: 150, minWidth: 130, sortable: true, cssClass: 'c sg-col-editable', headerCssClass: 'sg-col-editable',
+      toolTip: 'Ngày dự kiến bảo dưỡng — danh mục ước từ km còn lại ÷ km TB/tháng; lốp/ắc theo tháng. Bấm ✎ để dời trước khi tạo kế hoạch.',
+      formatter: (r, c, v, col, item) => {
+        if (item.__group) return '<span class="text-slate-300">—</span>';
+        const d = item.expectedDate || '—';
+        const tip = item.expectedDateManual
+          ? 'Đã chỉnh tay — dùng ngày này khi đưa vào kế hoạch'
+          : (item.rowKind === 'TIRE_BATTERY'
+            ? 'Tự tính theo tháng còn lại / ngày lắp + định mức tháng'
+            : 'Tự tính từ mốc ngày hoặc km còn lại ÷ km TB/tháng');
+        const key = remindLeafKey(item);
+        return `<div class="sg-cell-edit-wrap sg-cell-edit-wrap--center justify-center">
+          <div class="sg-cell-edit-inner tabular-nums text-xs ${item.expectedDateManual ? 'text-emerald-800 font-semibold' : 'text-slate-800'}" title="${esc(tip)}">${esc(d)}</div>
+          <button type="button" class="sg-cell-edit-btn" data-cell-pop="remind-expectedDate" data-leaf-key="${esc(key)}" data-expected-current="${esc(item.expectedDate || '')}" title="Đổi ngày dự kiến bảo dưỡng" aria-label="Đổi ngày dự kiến">✎</button>
+        </div>`;
+      } },
+    { id: 'kmLeftText', field: 'kmLeft', name: 'Còn lại', width: 100, minWidth: 88, sortable: true, cssClass: 'r',
+      toolTip: 'Danh mục: km còn lại · Lốp/ắc: tháng còn lại',
       formatter: (r, c, v, col, item) => {
         if (item.__group) return '<span class="text-slate-400">—</span>';
         const cls = item.status === 'overdue' ? 'text-rose-700 font-semibold' : item.status === 'dueSoon' ? 'text-amber-700' : 'text-slate-700';
@@ -75738,16 +75925,17 @@ function registerRemindDashboardGrid(leaves) {
     { id: '_act', field: 'act', name: 'Thao tác', width: 168, minWidth: 140, sortable: false, filterable: false,
       formatter: (r, c, v, col, item) => {
         if (item.__group) {
-          return `<button type="button" class="btn btn-outline btn-xs" data-open-vehicle-catalog="${item.vehicleId}">Sửa kỳ</button>`;
+          /* Tạm ẩn nút «Sửa kỳ» */
+          return '<span class="text-slate-300">—</span>';
         }
         if (item.rowKind === 'TIRE_BATTERY') {
           return `<div class="inline-flex flex-nowrap gap-1">
             <button type="button" class="btn btn-outline btn-xs" data-open-tire-battery="1" data-tb-vid="${item.vehicleId}" data-tb-tab="${item.tbKind === 'BATTERY' ? 'BATTERY' : 'TIRE'}">Chi tiết</button>
-            <button type="button" class="btn btn-primary btn-xs" data-push-tb-row="${esc(item.tbId)}">→ KH</button>
+            <button type="button" class="btn btn-primary btn-xs" data-push-tb-row="${esc(item.tbId)}" data-expected-date="${esc(item.expectedDate || '')}">→ KH</button>
           </div>`;
         }
         return `<div class="inline-flex flex-nowrap gap-1">
-          <button type="button" class="btn btn-primary btn-xs" data-push-plan-row="${item.vehicleId}" data-cid="${item.catalogId}">→ KH</button>
+          <button type="button" class="btn btn-primary btn-xs" data-push-plan-row="${item.vehicleId}" data-cid="${item.catalogId}" data-expected-date="${esc(item.expectedDate || '')}">→ KH</button>
           <button type="button" class="btn btn-outline btn-xs" data-create-order-from-due="${item.vehicleId}" data-cid="${item.catalogId}">Tạo phiếu</button>
         </div>`;
       } },
@@ -77143,7 +77331,7 @@ function registerAssessResultsGrid(evals) {
         : leafDash },
     { id: 'plate', field: 'plate', name: 'Biển số', width: 110, minWidth: 90, sortable: true,
       formatter: (r, c, v, col, item) => vehOnly(item)
-        ? `<button type="button" class="slick-link" data-open-vehicle="${item.vehicleId}">${esc(item.plate)}</button>`
+        ? esc(item.plate || '—')
         : leafDash },
     { id: 'areaLabel', field: 'areaLabel', name: 'Khu vực', width: 120, minWidth: 90, sortable: true,
       formatter: (r, c, v, col, item) => vehOnly(item) ? esc(item.areaLabel || '—') : leafDash },
@@ -77655,7 +77843,7 @@ function catalogV2SidePanelHtml(c) {
         const st = getCatState(v.id, c.id);
         const next = st.nextKm != null ? (kmFmt(st.nextKm) + ' km') : (st.nextDate || '—');
         return `<tr class="row-h">
-          <td class="td"><button type="button" class="text-left text-blue-700 hover:underline" data-open-vehicle="${v.id}">${esc(v.plate)}</button></td>
+          <td class="td font-medium text-slate-800">${esc(v.plate)}</td>
           <td class="td text-xs text-slate-600">${esc(v.type || '—')}</td>
           <td class="td text-xs text-slate-600">${esc(formatAreaLabel?.(v.area) || v.area || '—')}</td>
           <td class="td tabular-nums text-xs">${esc(next)}</td>
@@ -78035,8 +78223,7 @@ function bindCatalogV2Panel() {
       render();
     });
     $$('[data-open-vehicle]', panel).forEach(b => b.onclick = () => {
-      view = { ...view, name: 'vehicle', vehicleId: Number(b.dataset.openVehicle), vehicleTab: 'catalog', from: 'catalog', filters: defaultFilters(), page: 1 };
-      render();
+      goVehicleDetail(b.dataset.openVehicle, { from: 'catalog' });
     });
     $$('[data-open-catalog]', panel).forEach(b => b.onclick = (e) => {
       e.stopPropagation();
@@ -80718,8 +80905,10 @@ function openAddPlanModal(vid) {
     if (!tpl) return;
     // still save as template (master) but land on vehicle plans
     closeModal();
-    view = { ...view, name: 'vehicle', vehicleId: tpl.seedVehicleId, vehicleTab: 'catalog' };
-    render();
+    if (!goVehicleDetail(tpl.seedVehicleId, { vehicleTab: 'catalog' })) {
+      view = { ...view, name: menuPlansNav(), plansTab: 'lines' };
+      render();
+    }
     toast('Đã tạo ' + tpl.items.length + ' dòng KH cho xe + lưu mẫu «' + (tpl.customName || tpl.name) + '»');
   };
 }
@@ -82397,15 +82586,13 @@ function bind() {
   });
   $$('[data-open-vehicle]').forEach(b => b.onclick = () => {
     const from = view.name === 'fleet' || isHistoryNav(view.name) || isPlansNav(view.name) ? view.name : (view.from || menuHomeNav());
-    view = { ...view, name: 'vehicle', from, vehicleId: Number(b.dataset.openVehicle), vehicleTab: 'catalog', filters: defaultFilters(), page: 1 };
-    render();
+    goVehicleDetail(b.dataset.openVehicle, { from });
   });
   $$('[data-open-vehicle-catalog]').forEach(b => {
     if (b.closest && b.closest('[data-list-slick]')) return;
     b.onclick = () => {
       const from = view.name === 'fleet' || isHistoryNav(view.name) || isPlansNav(view.name) ? view.name : (view.from || menuHomeNav());
-      view = { ...view, name: 'vehicle', from, vehicleId: Number(b.dataset.openVehicleCatalog), vehicleTab: 'catalog', filters: defaultFilters(), page: 1 };
-      render();
+      goVehicleDetail(b.dataset.openVehicleCatalog, { from });
     };
   });
   $$('[data-open-catalog]').forEach(b => b.onclick = (e) => {
@@ -82447,7 +82634,11 @@ function bind() {
       render(); return;
     }
     if (from === 'vehicle') {
-      view = { ...view, name: 'vehicle', vehicleTab: view.vehicleTab === 'catalog' ? 'orders' : (view.vehicleTab || 'orders'), orderId: null };
+      if (ALLOW_OPEN_VEHICLE_DETAIL) {
+        view = { ...view, name: 'vehicle', vehicleTab: view.vehicleTab === 'catalog' ? 'orders' : (view.vehicleTab || 'orders'), orderId: null };
+      } else {
+        view = { ...view, name: menuHomeNav(), orderId: null, from: null };
+      }
       render(); return;
     }
     if (from === 'fleet') {
@@ -82507,8 +82698,10 @@ function bind() {
     render();
   });
   $$('[data-back-cat-history]').forEach(b => b.onclick = () => {
-    view = { ...view, name: 'vehicle', vehicleTab: 'catalog', filters: defaultFilters(), page: 1 };
-    render();
+    if (!goVehicleDetail(view.vehicleId, { vehicleTab: 'catalog' })) {
+      view = { ...view, name: menuHomeNav(), filters: defaultFilters(), page: 1 };
+      render();
+    }
   });
   $$('[data-view-orders-plate]').forEach(b => b.onclick = () => {
     openOrdersByPlate(b.dataset.viewOrdersPlate, view.name === 'fleet' ? 'fleet' : (view.from || null));
@@ -82537,8 +82730,7 @@ function bind() {
     };
   });
   $$('[data-goto-plan-vehicle]').forEach(b => b.onclick = () => {
-    view = { ...view, name: 'vehicle', vehicleId: Number(b.dataset.gotoPlanVehicle), vehicleTab: 'catalog', from: 'assessment', filters: defaultFilters(), page: 1 };
-    render();
+    goVehicleDetail(b.dataset.gotoPlanVehicle, { from: 'assessment' });
   });
   $$('[data-start-work-item]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();

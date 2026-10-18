@@ -1,0 +1,1990 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>GLS · Sơ đồ luồng bảo dưỡng và sửa chữa chi tiết (bản trình diễn thứ tư)</title>
+  <style>
+    :root {
+      --ink: #0f172a; --muted: #64748b; --line: #e2e8f0;
+      --brand: #0b6e4f; --blue: #1d4ed8; --amber: #b45309;
+      --rose: #be123c; --violet: #6d28d9; --bg: #f1f5f9; --surface: #fff;
+      --pad: clamp(10px, 2vw, 16px);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; }
+    body {
+      font-family: "Segoe UI", system-ui, sans-serif; color: var(--ink);
+      background: var(--bg); display: flex; flex-direction: column; min-height: 100vh;
+    }
+    .top { flex-shrink: 0; background: #fff; border-bottom: 1px solid var(--line); padding: 10px var(--pad); }
+    .top-inner { max-width: 1560px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+    .brand { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--brand); margin-right: auto; }
+    h1 { margin: 0; font-size: clamp(1.05rem, 2.4vw, 1.22rem); width: 100%; line-height: 1.3; }
+    .lead { margin: 0; font-size: 13px; color: var(--muted); width: 100%; max-width: 110ch; line-height: 1.5; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tab {
+      border: 1px solid var(--line); background: #fff; border-radius: 999px;
+      padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; min-height: 40px;
+    }
+    .tab.on { background: #ecfdf5; border-color: #6ee7b7; color: #065f46; }
+    .links a { font-size: 12px; color: var(--brand); text-decoration: none; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; margin-left: 4px; }
+    .workspace {
+      flex: 1; min-height: 0; max-width: 1560px; width: 100%; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr; gap: 12px; padding: var(--pad);
+    }
+    @media (min-width: 1000px) {
+      .workspace { grid-template-columns: minmax(0, 1fr) minmax(380px, 0.95fr); height: calc(100vh - 150px); min-height: 520px; }
+    }
+    .flow-pane, .detail-pane {
+      background: #fff; border: 1px solid var(--line); border-radius: 14px;
+      min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .pane-head { flex-shrink: 0; padding: 12px 14px; border-bottom: 1px solid var(--line); background: #f8fafc; }
+    .pane-head h2 { margin: 0; font-size: 14px; font-weight: 700; }
+    .pane-head p { margin: 4px 0 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+    .legend span::before {
+      content: ""; display: inline-block; width: 10px; height: 10px;
+      border-radius: 3px; margin-right: 5px; vertical-align: -1px; border: 1px solid #94a3b8;
+    }
+    .legend .proc::before { background: #dbeafe; border-color: #93c5fd; }
+    .legend .dec::before { background: #fef3c7; border-color: #fcd34d; }
+    .legend .data::before { background: #ede9fe; border-color: #c4b5fd; }
+    .legend .end::before { background: #d1fae5; border-color: #6ee7b7; }
+    .legend .ext::before { background: #ffe4e6; border-color: #fda4af; }
+    .legend .master::before { background: #ecfdf5; border-color: #86efac; }
+    .legend .gap::before { background: #f1f5f9; border-color: #94a3b8; border-style: dashed; }
+    .flow-scroll { flex: 1; overflow: auto; padding: 14px 10px 28px; }
+    .flow { display: flex; flex-direction: column; align-items: center; gap: 0; max-width: 620px; margin: 0 auto; min-width: 260px; }
+    .section-label {
+      align-self: stretch; margin: 14px 0 8px; padding: 6px 10px; font-size: 11px; font-weight: 700;
+      letter-spacing: .04em; text-transform: uppercase; color: #0f513f; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px;
+    }
+    .section-label:first-child { margin-top: 0; }
+    .node {
+      width: min(100%, 440px); border: 1.5px solid var(--line); border-radius: 12px;
+      padding: 10px 12px; background: #eff6ff; cursor: pointer; text-align: left;
+      font-family: inherit; color: inherit; transition: box-shadow .15s, border-color .15s;
+    }
+    .node:hover { border-color: #60a5fa; box-shadow: 0 4px 12px rgba(15,23,42,.07); }
+    .node.on { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(37,99,235,.22); }
+    .node .k { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    .node .t { font-size: 13px; font-weight: 700; line-height: 1.35; margin-top: 2px; }
+    .node .s { font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+    .node .rel { font-size: 11px; color: #047857; margin-top: 5px; line-height: 1.4; }
+    .node.decision { background: #fffbeb; border-color: #fcd34d; }
+    .node.decision.on { border-color: var(--amber); box-shadow: 0 0 0 2px rgba(180,83,9,.18); }
+    .node.data { background: #f5f3ff; border-color: #c4b5fd; border-style: dashed; }
+    .node.end { background: #ecfdf5; border-color: #6ee7b7; }
+    .node.ext { background: #fff1f2; border-color: #fda4af; }
+    .node.master { background: #f0fdf4; border-color: #86efac; }
+    .node.gap { background: #f8fafc; border-color: #94a3b8; border-style: dashed; }
+    .arrow { display: flex; flex-direction: column; align-items: center; padding: 2px 0; color: #94a3b8; font-size: 11px; gap: 2px; }
+    .arrow .line { width: 2px; height: 12px; background: #cbd5e1; }
+    .arrow .head { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #94a3b8; }
+    .arrow .lbl {
+      font-size: 10px; font-weight: 600; color: #64748b; background: #f8fafc; border: 1px solid var(--line);
+      border-radius: 999px; padding: 2px 8px; max-width: 320px; text-align: center; line-height: 1.35;
+    }
+    .arrow.yes .lbl { color: #047857; border-color: #a7f3d0; background: #ecfdf5; }
+    .arrow.no .lbl { color: #be123c; border-color: #fecdd3; background: #fff1f2; }
+    .arrow.data-move .lbl { color: #6d28d9; border-color: #ddd6fe; background: #f5f3ff; }
+    .branch { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: min(100%, 620px); margin-top: 4px; }
+    .branch.triple { grid-template-columns: 1fr; }
+    @media (min-width: 640px) { .branch.triple { grid-template-columns: 1fr 1fr 1fr; } }
+    .branch-col {
+      display: flex; flex-direction: column; align-items: center; border: 1px dashed #e2e8f0;
+      border-radius: 12px; padding: 8px 6px 10px; background: #fafafa; gap: 0;
+    }
+    .branch-col .tag { font-size: 10px; font-weight: 700; margin-bottom: 6px; padding: 2px 8px; border-radius: 999px; text-align: center; }
+    .branch-col.yes .tag { background: #d1fae5; color: #047857; }
+    .branch-col.no .tag { background: #ffe4e6; color: #be123c; }
+    .branch-col.alt .tag { background: #e0e7ff; color: #3730a3; }
+    .branch .node { width: 100%; max-width: none; }
+    .merge-note { font-size: 11px; color: var(--muted); text-align: center; margin: 10px 0 0; max-width: 460px; line-height: 1.45; }
+    .detail-body { flex: 1; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+    .empty { margin: auto; text-align: center; color: var(--muted); font-size: 14px; padding: 24px; }
+    .title-step { margin: 0; font-size: 1.12rem; font-weight: 700; line-height: 1.35; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { font-size: 11px; font-weight: 600; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); background: #f8fafc; }
+    .chip.screen { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
+    .chip.role { background: #fef3c7; border-color: #fde68a; color: #92400e; }
+    .chip.cond { background: #fff1f2; border-color: #fecdd3; color: #9f1239; }
+    .chip.demo { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+    .chip.st-visible { background: #d1fae5; border-color: #6ee7b7; color: #065f46; }
+    .chip.st-sub { background: #e0f2fe; border-color: #7dd3fc; color: #075985; }
+    .chip.st-hidden { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+    .chip.st-disabled { background: #ffe4e6; border-color: #fda4af; color: #9f1239; }
+    .chip.st-extra { background: #ede9fe; border-color: #c4b5fd; color: #5b21b6; }
+    button.chip { cursor: pointer; font-family: inherit; }
+    button.chip.link { background: #ecfdf5; border-color: #86efac; color: #065f46; }
+    button.chip.link:hover { background: #d1fae5; }
+    .block h3 { margin: 0 0 6px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+    .block p, .block li { font-size: 13.5px; line-height: 1.6; margin: 0; color: #334155; }
+    .block ul { margin: 0; padding-left: 1.15rem; }
+    .block li { margin: 6px 0; }
+    .block ol.ui-steps { margin: 0; padding-left: 1.25rem; }
+    .block ol.ui-steps li { margin: 6px 0; font-size: 13.5px; line-height: 1.5; color: #334155; }
+    .block ol.ui-steps li strong, .block li strong { color: #0f172a; font-weight: 700; }
+    .actor-list { display: grid; gap: 6px; }
+    .actor-item { font-size: 13px; line-height: 1.5; padding: 8px 10px; border: 1px solid #fde68a; border-radius: 10px; background: #fffbeb; color: #78350f; }
+    .actor-item strong { color: #92400e; }
+    .rel-item { font-size: 13px; line-height: 1.5; padding: 8px 10px; border: 1px solid #bbf7d0; border-radius: 10px; background: #f0fdf4; }
+    .rel-item .why { color: #166534; font-weight: 600; margin-bottom: 4px; }
+    .rel-item .chip-row { margin-top: 4px; }
+    .data-flow { display: grid; gap: 6px; }
+    .data-item { display: grid; grid-template-columns: 84px 1fr; gap: 8px; font-size: 12.5px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: #fafafa; line-height: 1.5; }
+    .data-item .dir { font-weight: 700; font-size: 10px; text-transform: uppercase; color: var(--violet); padding-top: 2px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+    .btn-proto { appearance: none; border: 0; border-radius: 10px; padding: 11px 16px; font-size: 13px; font-weight: 700; font-family: inherit; cursor: pointer; background: #0b6e4f; color: #fff; }
+    .btn-proto:hover { background: #0f513f; }
+    .btn-proto.sm { padding: 6px 10px; font-size: 12px; border-radius: 8px; }
+    .btn-ghost { appearance: none; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; background: #fff; color: #334155; text-decoration: none; display: inline-flex; align-items: center; }
+    .hint-demo { font-size: 12.5px; color: #78350f; padding: 8px 10px; background: #fffbeb; border-radius: 8px; border: 1px dashed #fcd34d; line-height: 1.5; }
+    .ex-box { font-size: 12.5px; line-height: 1.55; padding: 10px 12px; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; color: #1e3a8a; }
+    .ex-box strong { color: #1e40af; }
+
+    /* Relationship section inside master tab */
+    .rel-card { width: 100%; max-width: 560px; border: 1px solid #bbf7d0; background: #f0fdf4; border-radius: 12px; padding: 10px 12px; margin: 4px 0; }
+    .rel-card .rt { font-size: 12.5px; font-weight: 700; color: #14532d; margin-bottom: 4px; line-height: 1.4; }
+    .rel-card .rd { font-size: 12px; color: #475569; margin-top: 6px; line-height: 1.45; }
+    .rel-parts { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+    .rel-parts .sep { font-size: 12px; color: #16a34a; font-weight: 700; }
+
+    /* Screen catalog */
+    .filter-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .filter-bar .chip { cursor: pointer; font-family: inherit; }
+    .filter-bar .chip.on { outline: 2px solid #0b6e4f; }
+    .search-input { width: 100%; margin-top: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; font-family: inherit; }
+    .screen-list { flex: 1; overflow: auto; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+    .screen-group { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #0f513f; margin: 8px 2px 0; }
+    .screen-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 8px; text-align: left; width: 100%; border: 1.5px solid var(--line); background: #fff; border-radius: 10px; padding: 8px 10px; cursor: pointer; font-family: inherit; color: inherit; }
+    .screen-row:hover { border-color: #60a5fa; }
+    .screen-row.on { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(37,99,235,.2); }
+    .screen-row .nm { font-size: 13px; font-weight: 700; line-height: 1.35; }
+    .screen-row .sb { grid-column: 1 / -1; font-size: 11.5px; color: var(--muted); line-height: 1.4; }
+    .screen-row.st-hidden, .screen-row.st-disabled { background: #fafafa; border-style: dashed; }
+    table.mode-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+    table.mode-table th, table.mode-table td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; line-height: 1.45; }
+    table.mode-table th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+    code.q { font-size: 11px; background: #f1f5f9; padding: 1px 5px; border-radius: 4px; word-break: break-all; }
+
+    /* Prototype modal: near full screen */
+    .proto-modal {
+      position: fixed; inset: 0; z-index: 1000; display: none; align-items: center; justify-content: center;
+      padding: max(4px, env(safe-area-inset-top)) max(4px, env(safe-area-inset-right)) max(4px, env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left));
+      background: rgba(15, 23, 42, .6);
+    }
+    .proto-modal.open { display: flex; }
+    .proto-dialog { width: 98vw; height: 96vh; background: #0f172a; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,.45); }
+    .proto-bar { flex-shrink: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; background: #1e293b; color: #e2e8f0; }
+    .proto-bar .ttl { font-size: 13px; font-weight: 700; margin-right: auto; min-width: 0; }
+    .proto-bar .url { font-size: 11px; color: #94a3b8; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; order: 5; }
+    .proto-bar .warn { font-size: 11.5px; color: #fcd34d; width: 100%; order: 6; }
+    .proto-bar button, .proto-bar a { font-size: 12px; font-weight: 600; font-family: inherit; border: 1px solid #475569; background: #334155; color: #f8fafc; border-radius: 8px; padding: 7px 10px; cursor: pointer; text-decoration: none; }
+    .proto-bar button.danger { background: #9f1239; border-color: #be123c; }
+    .proto-frame { flex: 1; min-height: 0; background: #fff; }
+    .proto-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand">GLS · Bảo dưỡng và sửa chữa</div>
+      <div class="links">
+        <a href="index.html">Trang tổng hợp bản trình diễn</a>
+        <a href="console-v4.html" target="_blank" rel="noopener">Bảng điều khiển phiên bản bốn</a>
+        <a href="../gls-bdsc-process-vs-demo-v4.md">Ghi chú đối chiếu quy trình</a>
+      </div>
+      <h1>Sơ đồ luồng chi tiết — bảo dưỡng và sửa chữa</h1>
+      <p class="lead">Mỗi dữ liệu nền (master) là một nút riêng, có danh sách master liên quan. Bấm từng bước để xem: diễn viên tham gia, điều kiện, nghiệp vụ chi tiết, chuỗi thao tác trên giao diện, luồng dữ liệu và ví dụ dữ liệu mẫu (seed). Nút «Xem prototype» mở cửa sổ gần toàn màn hình tới đúng trang, tab hoặc chế độ; không có bản xem trước nhúng sẵn.</p>
+      <div class="tabs" role="tablist">
+        <button type="button" class="tab on" data-flow="masters">1. Dữ liệu nền (master)</button>
+        <button type="button" class="tab" data-flow="overall">2. Luồng tổng thể vận hành</button>
+        <button type="button" class="tab" data-flow="maint">3. Luồng bảo dưỡng và kế hoạch</button>
+        <button type="button" class="tab" data-flow="repair">4. Luồng sửa chữa</button>
+        <button type="button" class="tab" data-flow="screens">5. Danh mục màn hình và chế độ</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <section class="flow-pane">
+      <div class="pane-head">
+        <h2 id="flowTitle">—</h2>
+        <p id="flowSub">—</p>
+        <div id="flowExtra"></div>
+      </div>
+      <div class="flow-scroll" id="flowScroll"></div>
+    </section>
+    <aside class="detail-pane">
+      <div class="pane-head">
+        <h2 id="detailHeadTitle">Chi tiết</h2>
+        <p id="detailHeadSub">Diễn viên · quan hệ · điều kiện · nghiệp vụ · thao tác · dữ liệu · mở prototype</p>
+      </div>
+      <div class="detail-body" id="detailBody">
+        <div class="empty">Chọn một mục ở khung bên trái.</div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="proto-modal" id="protoModal" aria-hidden="true">
+    <div class="proto-dialog" role="dialog" aria-modal="true" aria-labelledby="protoTitle">
+      <div class="proto-bar">
+        <div class="ttl" id="protoTitle">Prototype</div>
+        <a id="protoNewTab" href="#" target="_blank" rel="noopener">Mở tab mới</a>
+        <button type="button" id="protoReload">Tải lại</button>
+        <button type="button" class="danger" id="protoClose">Đóng</button>
+        <div class="url" id="protoUrl"></div>
+        <div class="warn" id="protoWarn" hidden></div>
+      </div>
+      <div class="proto-frame">
+        <iframe id="protoFrame" title="Prototype bảo dưỡng và sửa chữa"></iframe>
+      </div>
+    </div>
+  </div>
+
+  <script>
+(function () {
+  'use strict';
+  /* ===== Đường dẫn tệp (được thay khi đồng bộ sang thư mục trang GitHub) ===== */
+  const CONSOLE = 'console-v4.html';
+  const FILE_MOBILE_DRIVER = 'demo-github-pages/mobile-driver-repair.html';
+  const FILE_MOBILE_V3 = 'demo-github-pages/mobile-v3.html';
+  const FILE_SERI = '15-seri-vo-lop-ac-quy.html';
+
+  function demoUrl(cfg) {
+    if (cfg.file) return cfg.file + (cfg.fileQ || '');
+    const q = new URLSearchParams();
+    q.set('page', cfg.page || 'historyMaint');
+    if (cfg.scope) q.set('scope', cfg.scope);
+    if (cfg.tab) q.set('tab', cfg.tab);
+    if (cfg.mode) q.set('mode', cfg.mode);
+    if (cfg.q) q.set('q', cfg.q);
+    if (cfg.orderId) q.set('orderId', cfg.orderId);
+    if (cfg.catalogId != null) q.set('catalogId', String(cfg.catalogId));
+    if (cfg.plate) q.set('plate', cfg.plate);
+    if (cfg.vehicleId != null) q.set('vehicleId', String(cfg.vehicleId));
+    if (cfg.evalId) q.set('evalId', cfg.evalId);
+    if (cfg.evalVehicleId != null) q.set('evalVehicleId', String(cfg.evalVehicleId));
+    q.set('v', 'flow-detail');
+    return CONSOLE + '?' + q.toString();
+  }
+
+  const ROLE = {
+    tech: 'Quản lý kỹ thuật',
+    fleet: 'Quản lý xe',
+    mech: 'Kỹ thuật viên',
+    driver: 'Tài xế',
+    safety: 'Ban an toàn',
+    sys: 'Hệ thống (tác vụ chạy tự động hằng ngày)',
+    base: 'BASE (hệ thống phê duyệt)',
+    pwms: 'PWMS (hệ thống vật tư và nội dung sửa chữa)',
+    buy: 'Bộ phận mua hàng',
+    infotech: 'Bộ phận công nghệ thông tin',
+    admin: 'Quản trị hệ thống',
+    exec: 'Ban điều hành',
+  };
+  const act = (role, duty) => [role, duty];
+
+  /* ===== Danh mục màn hình và chế độ ===== */
+  const STATUS = {
+    visible: { label: 'Đang hiển thị trên menu', cls: 'st-visible' },
+    sub: { label: 'Trang con (mở từ màn hình khác)', cls: 'st-sub' },
+    hidden: { label: 'Đang ẩn khỏi menu', cls: 'st-hidden' },
+    disabled: { label: 'Đang vô hiệu hóa', cls: 'st-disabled' },
+    extra: { label: 'Bản mẫu bổ sung (tệp riêng)', cls: 'st-extra' },
+  };
+  const S = {};
+  const SCREEN_ORDER = [];
+  function scr(id, o) { S[id] = Object.assign({ id }, o); SCREEN_ORDER.push(id); }
+
+  scr('historyMaint', {
+    name: 'Bảo dưỡng', st: 'visible', group: 'Vận hành hằng ngày',
+    purpose: 'Danh sách toàn bộ phiếu bảo dưỡng (định kỳ và phát sinh). Từ đây mở chi tiết phiếu, lọc theo biển số, theo trạng thái, theo loại phiếu.',
+    modes: [
+      { l: 'Danh sách phiếu bảo dưỡng', d: 'Lưới phiếu, lọc theo trạng thái phê duyệt và trạng thái thực hiện.', cfg: { page: 'historyMaint', scope: 'MAINT' } },
+      { l: 'Lọc theo biển số 51C-29273', d: 'Ô tìm kiếm đã điền sẵn biển số mẫu.', cfg: { page: 'historyMaint', scope: 'MAINT', q: '51C-29273' } },
+      { l: 'Mở chi tiết phiếu o20', d: 'Chuyển sang trang chi tiết phiếu (xem mục «Chi tiết phiếu»).', cfg: { page: 'order', scope: 'MAINT', orderId: 'o20' } },
+    ],
+    seeds: ['Phiếu o20 · PBD-2026-2003 · loại PERIODIC (định kỳ) · xe mã 101', 'Biển số 51C-29273 và 50H-87033'],
+    masters: ['ms-catalog', 'ms-service', 'ms-material'],
+    actors: [act(ROLE.tech, 'Theo dõi toàn bộ phiếu, chốt tập phiếu cần ưu tiên'), act(ROLE.fleet, 'Đối chiếu xe nào đang nằm xưởng'), act(ROLE.mech, 'Nhận phiếu được giao')],
+    note: 'Khi cờ ẩn menu «Xe và mooc» đang bật, đường dẫn trang xe và mooc được tự chuyển về màn hình này.',
+  });
+  scr('orderDetail', {
+    name: 'Chi tiết phiếu (bảo dưỡng hoặc sửa chữa)', st: 'sub', group: 'Vận hành hằng ngày',
+    purpose: 'Trang chi tiết một phiếu: nội dung công việc, vật tư, trình phê duyệt BASE, bắt đầu và hoàn thành từng nội dung, ghi số công-tơ-mét, giờ thực hiện.',
+    modes: [
+      { l: 'Phiếu bảo dưỡng định kỳ o20', d: 'Mở bằng tham số orderId=o20.', cfg: { page: 'order', scope: 'MAINT', orderId: 'o20' } },
+      { l: 'Phiếu sửa chữa đột xuất o1', d: 'Phiếu đã được phê duyệt, sẵn sàng bắt đầu thực hiện.', cfg: { page: 'order', scope: 'REPAIR', orderId: 'o1' } },
+    ],
+    seeds: ['o20 · PBD-2026-2003 · PERIODIC (bảo dưỡng định kỳ)', 'o1 · RO-2026-1001 · INCIDENTAL (đột xuất) · APPROVED (đã phê duyệt)'],
+    masters: ['ms-repairitem', 'ms-material', 'ms-price', 'ms-barem', 'ms-service'],
+    actors: [act(ROLE.mech, 'Điền nội dung, vật tư; bắt đầu, hoàn thành'), act(ROLE.tech, 'Rà soát, đồng bộ BASE'), act(ROLE.base, 'Phê duyệt phiếu'), act(ROLE.fleet, 'Lên lịch hẹn tài xế')],
+    note: 'Đây là trang con, không có mục menu riêng; luôn mở qua danh sách Bảo dưỡng hoặc Sửa chữa.',
+  });
+  scr('reminder', {
+    name: 'Nhắc bảo dưỡng', st: 'visible', group: 'Vận hành hằng ngày',
+    purpose: 'Bảng tổng hợp hạn bảo dưỡng của từng xe theo danh mục và theo vỏ lốp, ắc quy. Hai tầng nhắc: nhắc bảo dưỡng (cảnh báo sớm) và nhắc kế hoạch (đủ điều kiện lập dự toán). Có lịch sử các lần bảo dưỡng trước đó.',
+    modes: [
+      { l: 'Tab bảng tổng hợp (dashboard)', d: 'Nhóm theo xe; cột mốc nhắc bảo dưỡng, mốc nhắc kế hoạch, số ki-lô-mét còn lại.', cfg: { page: 'reminder', scope: 'MAINT', tab: 'dashboard' } },
+      { l: 'Lọc theo biển số 51C-29273', d: 'Xem riêng các dòng của xe mẫu.', cfg: { page: 'reminder', scope: 'MAINT', tab: 'dashboard', plate: '51C-29273' } },
+      { l: 'Lịch sử các lần bảo dưỡng (nếu có dữ liệu)', d: 'Hiển thị lần thứ nhất, thứ hai… của từng danh mục khi xe đã có lịch sử.', cfg: { page: 'reminder', scope: 'MAINT', q: '51C-29273' } },
+    ],
+    seeds: ['Biển số 51C-29273 (xe mã 101)', 'Biển số 50H-87033 (xe mã 102)'],
+    masters: ['ms-catalog', 'ms-tirebattery', 'ms-settings', 'ms-fleet'],
+    actors: [act(ROLE.sys, 'Quét và tính hạn mỗi ngày'), act(ROLE.tech, 'Xem cảnh báo, đưa vào kế hoạch'), act(ROLE.fleet, 'Theo dõi xe sắp đến hạn')],
+    note: 'Trạng thái: bình thường, sắp đến hạn, quá hạn. Dòng vỏ lốp, ắc quy hiển thị chung trên bảng này.',
+  });
+  scr('plansMaint', {
+    name: 'Kế hoạch bảo dưỡng', st: 'visible', group: 'Vận hành hằng ngày',
+    purpose: 'Lập và duyệt dự toán bảo dưỡng theo kỳ: tạo dòng kế hoạch, chỉnh ngày dự toán, vật tư, trình BASE, tạo phiếu từ các dòng đã duyệt. Có tab mẫu kế hoạch.',
+    modes: [
+      { l: 'Tab dòng kế hoạch · chế độ theo dòng (LINE)', d: 'Chọn từng dòng để trình hoặc tạo phiếu.', cfg: { page: 'plansMaint', scope: 'MAINT', tab: 'lines', mode: 'LINE' } },
+      { l: 'Tab dòng kế hoạch · chế độ theo xe (VEHICLE)', d: 'Chọn cả xe để trình hoặc tạo phiếu hàng loạt.', cfg: { page: 'plansMaint', scope: 'MAINT', tab: 'lines', mode: 'VEHICLE' } },
+      { l: 'Tab mẫu kế hoạch (templates)', d: 'Quản lý mẫu và áp dụng mẫu cho nhiều xe.', cfg: { page: 'plansMaint', scope: 'MAINT', tab: 'templates' } },
+    ],
+    seeds: ['Dòng kế hoạch phát sinh từ nhắc bảo dưỡng của biển số 51C-29273'],
+    masters: ['ms-catalog', 'ms-template', 'ms-material', 'ms-price', 'ms-tirebattery'],
+    actors: [act(ROLE.tech, 'Rà soát, trình BASE, tạo phiếu'), act(ROLE.fleet, 'Xác nhận ngày đưa xe vào xưởng'), act(ROLE.base, 'Duyệt kế hoạch')],
+    note: 'Chỉ dòng đã được BASE duyệt (APPROVED) mới được tạo phiếu.',
+  });
+  scr('historyRepair', {
+    name: 'Sửa chữa', st: 'visible', group: 'Vận hành hằng ngày',
+    purpose: 'Danh sách phiếu sửa chữa (đột xuất, từ phiếu bảo dưỡng, từ đánh giá). Tạo phiếu mới, mở chi tiết, theo dõi trạng thái phê duyệt.',
+    modes: [
+      { l: 'Danh sách phiếu sửa chữa', d: 'Phạm vi scope=REPAIR.', cfg: { page: 'historyRepair', scope: 'REPAIR' } },
+      { l: 'Mở chi tiết phiếu o1', d: 'Phiếu RO-2026-1001 đã phê duyệt.', cfg: { page: 'order', scope: 'REPAIR', orderId: 'o1' } },
+      { l: 'Tạo phiếu cho biển số 51C-29273', d: 'Bấm «Tạo phiếu» rồi chọn xe.', cfg: { page: 'historyRepair', scope: 'REPAIR', plate: '51C-29273' } },
+    ],
+    seeds: ['o1 · RO-2026-1001 · INCIDENTAL (đột xuất) · APPROVED (đã phê duyệt)'],
+    masters: ['ms-repairitem', 'ms-material', 'ms-service'],
+    actors: [act(ROLE.mech, 'Tạo phiếu, điền nội dung'), act(ROLE.safety, 'Tiếp nhận sự cố từ tài xế'), act(ROLE.tech, 'Giám sát, duyệt chuyển tiếp')],
+    note: '',
+  });
+  scr('assessment', {
+    name: 'Đánh giá phương tiện định kỳ', st: 'visible', group: 'Vận hành hằng ngày',
+    purpose: 'Đánh giá tình trạng xe theo bộ tiêu chí; tab xe để tạo đợt đánh giá, tab kết quả để xem các hạng mục không đạt và tạo phiếu sửa chữa hoặc đưa vào kế hoạch.',
+    modes: [
+      { l: 'Tab xe (vehicles)', d: 'Danh sách xe cần đánh giá theo cài đặt nhắc.', cfg: { page: 'assessment', scope: 'MAINT', tab: 'vehicles' } },
+      { l: 'Tab kết quả (results)', d: 'Danh sách kết quả các đợt đánh giá.', cfg: { page: 'assessment', scope: 'MAINT', tab: 'results' } },
+      { l: 'Kết quả ev-101-20260920', d: 'Mở thẳng một đợt đánh giá mẫu ngày 20/09/2026 của xe 51C-29273.', cfg: { page: 'assessment', scope: 'MAINT', tab: 'results', evalId: 'ev-101-20260920' } },
+    ],
+    seeds: ['evalId=ev-101-20260920 (xe 51C-29273, ngày 2026-09-20)', 'Một đợt đánh giá của xe 50H-87033 ngày 2026-09-22'],
+    masters: ['ms-criteria', 'ms-system', 'ms-repairitem', 'ms-material', 'ms-settings'],
+    actors: [act(ROLE.mech, 'Thực hiện đánh giá, chấm từng tiêu chí'), act(ROLE.tech, 'Quyết định sửa ngay hay hoãn'), act(ROLE.safety, 'Nhận cảnh báo hạng mục an toàn')],
+    note: 'Đánh giá trước chuyến là mục menu riêng đang vô hiệu hóa (xem danh mục).',
+  });
+  scr('vehicleSystems', {
+    name: '1. Hệ thống xe (PWMS)', st: 'visible', group: 'Cấu hình dữ liệu nền (1 đến 9)',
+    purpose: 'Danh mục hệ thống trên xe lấy từ PWMS; có nút đồng bộ và trạng thái lần đồng bộ cuối.',
+    modes: [{ l: 'Danh sách hệ thống', d: 'Lưới hệ thống, nút đồng bộ PWMS.', cfg: { page: 'vehicleSystems', scope: 'MAINT' } }],
+    seeds: ['Mã hệ thống mẫu từ TQ-NGOAI đến RO-MOOC', 'Trạng thái đồng bộ ban đầu: IDLE (chưa chạy)'],
+    masters: ['ms-system'], actors: [act(ROLE.tech, 'Kiểm tra danh mục'), act(ROLE.pwms, 'Nguồn dữ liệu'), act(ROLE.infotech, 'Chạy và giám sát đồng bộ')],
+    note: '',
+  });
+  scr('criteria', {
+    name: '2. Tiêu chí đánh giá', st: 'visible', group: 'Cấu hình dữ liệu nền (1 đến 9)',
+    purpose: 'Quản lý nhóm tiêu chí và tiêu chí đánh giá; gắn mỗi tiêu chí với hệ thống xe, nội dung sửa chữa gợi ý và vật tư gợi ý.',
+    modes: [{ l: 'Danh sách nhóm tiêu chí', d: 'Mở nhóm để sửa tiêu chí (tham số criteriaGroupId).', cfg: { page: 'criteria', scope: 'MAINT' } }],
+    seeds: ['Bộ tiêu chí dùng cho đợt ev-101-20260920'],
+    masters: ['ms-criteria', 'ms-system', 'ms-repairitem', 'ms-material'], actors: [act(ROLE.tech, 'Khai báo, bảo trì tiêu chí'), act(ROLE.safety, 'Xác nhận tiêu chí an toàn')],
+    note: '',
+  });
+  scr('materials', {
+    name: '3. Vật tư (PWMS)', st: 'visible', group: 'Cấu hình dữ liệu nền (1 đến 9)',
+    purpose: 'Danh mục vật tư lấy từ PWMS (mã dạng VTU-342-…), đơn vị tính, đơn giá gần nhất.',
+    modes: [{ l: 'Danh sách vật tư', d: 'Tìm theo mã, tên.', cfg: { page: 'materials', scope: 'MAINT' } }],
+    seeds: ['Mã vật tư mẫu bắt đầu bằng VTU-342-'], masters: ['ms-material', 'ms-price'],
+    actors: [act(ROLE.pwms, 'Nguồn dữ liệu'), act(ROLE.buy, 'Cập nhật giá'), act(ROLE.mech, 'Chọn vật tư khi lập phiếu')], note: '',
+  });
+  scr('vehicleMaps', {
+    name: '4. Ánh xạ xe TMS ↔ PWMS', st: 'visible', group: 'Cấu hình dữ liệu nền (1 đến 9)',
+    purpose: 'Đối chiếu mã xe trong TMS với mã đối tượng trong PWMS để truy vấn lịch sử vật tư và giá theo xe.',
+    modes: [{ l: 'Danh sách ánh xạ', d: 'Trạng thái MAPPED (đã ánh xạ) hoặc chưa ánh xạ.', cfg: { page: 'vehicleMaps', scope: 'MAINT' } }],
+    seeds: ['Xe 101 · 51C-29273 → 51C29273 (MAPPED)', 'Xe 102 · 50H-87033 → 50H87033 (MAPPED)'],
+    masters: ['ms-vehiclemap', 'ms-fleet'], actors: [act(ROLE.fleet, 'Rà soát xe chưa ánh xạ'), act(ROLE.infotech, 'Chạy đồng bộ ánh xạ')], note: '',
+  });
+  scr('repairItems', {
+    name: '5. Nội dung sửa chữa (PWMS)', st: 'visible', group: 'Cấu hình dữ liệu nền (1 đến 9)',
+    purpose: 'Danh mục nội dung công việc sửa chữa theo hệ thống, dùng cho gợi ý tự điền trên phiếu và kế hoạch.',
+    modes: [{ l: 'Danh sách nội dung sửa chữa', d: 'Lọc theo hệ thống.', cfg: { page: 'repairItems', scope: 'MAINT' } }],
+    seeds: ['Nội dung gắn với hệ thống động cơ, phanh, lốp… trong dữ liệu mẫu'], masters: ['ms-repairitem', 'ms-system', 'ms-criteria', 'ms-material'],
+    actors: [act(ROLE.pwms, 'Nguồn dữ liệu'), act(ROLE.tech, 'Chuẩn hóa tên'), act(ROLE.mech, 'Chọn khi lập phiếu')], note: '',
+  });
+  scr('serviceTypes', {
+    name: '6. Loại dịch vụ', st: 'visible', group: 'Cấu hình dữ liệu nền (1 đến 9)',
+    purpose: 'Phân loại dịch vụ (bảo dưỡng định kỳ, thay thế, kiểm tra, sửa chữa đột xuất…) để gắn vào danh mục và phiếu.',
+    modes: [{ l: 'Danh sách loại dịch vụ', d: 'Thêm, sửa, ngừng sử dụng.', cfg: { page: 'serviceTypes', scope: 'MAINT' } }],
+    seeds: ['Loại dịch vụ gắn với danh mục catalogId=1'], masters: ['ms-service', 'ms-catalog'], actors: [act(ROLE.tech, 'Khai báo')], note: '',
+  });
+  scr('catalog', {
+    name: '7. Danh mục bảo dưỡng', st: 'visible', group: 'Cấu hình dữ liệu nền (1 đến 9)',
+    purpose: 'Lưới danh mục bảo dưỡng; bảng chi tiết bên phải có chu kỳ, xe đang dùng; chuột phải để gắn hàng loạt vào xe.',
+    modes: [
+      { l: 'Danh sách danh mục', d: 'SlickGrid, chọn dòng mở bảng chi tiết.', cfg: { page: 'catalog', scope: 'MAINT' } },
+      { l: 'Chi tiết danh mục catalogId=1', d: 'Thay dầu nhớt động cơ.', cfg: { page: 'catalogDetail', scope: 'MAINT', catalogId: 1 } },
+    ],
+    seeds: ['catalogId=1 · Thay dầu nhớt động cơ'], masters: ['ms-catalog', 'ms-system', 'ms-service', 'ms-material'],
+    actors: [act(ROLE.tech, 'Khai báo, gắn xe'), act(ROLE.fleet, 'Đề xuất chu kỳ theo vận hành')], note: '',
+  });
+  scr('catalogDetail', {
+    name: 'Chi tiết danh mục bảo dưỡng', st: 'sub', group: 'Cấu hình dữ liệu nền (1 đến 9)',
+    purpose: 'Trang con mở thẳng một danh mục: tab chu kỳ (các mốc), tab xe đang dùng.',
+    modes: [{ l: 'Danh mục catalogId=1', d: 'Bảng chu kỳ và xe đang dùng.', cfg: { page: 'catalogDetail', scope: 'MAINT', catalogId: 1 } }],
+    seeds: ['catalogId=1 · Thay dầu nhớt động cơ'], masters: ['ms-catalog'], actors: [act(ROLE.tech, 'Sửa chu kỳ')], note: 'Không có mục menu riêng, mở qua màn hình 7 hoặc đường dẫn sâu.',
+  });
+  scr('baremHours', {
+    name: '8. Cài đặt giờ sửa chữa kỹ thuật viên', st: 'visible', group: 'Cấu hình dữ liệu nền (1 đến 9)',
+    purpose: 'Định mức giờ (barem) cho từng nội dung công việc, làm chuẩn để so với thời gian thực tế của kỹ thuật viên.',
+    modes: [{ l: 'Bảng định mức giờ', d: 'Sửa số phút chuẩn.', cfg: { page: 'baremHours', scope: 'MAINT' } }],
+    seeds: ['Định mức mẫu cho nội dung thay dầu, thay lốp…'], masters: ['ms-barem', 'ms-repairitem'], actors: [act(ROLE.tech, 'Đặt định mức'), act(ROLE.exec, 'Phê duyệt chính sách giờ công')], note: '',
+  });
+  scr('settings', {
+    name: '9. Cài đặt nhắc đánh giá', st: 'visible', group: 'Cấu hình dữ liệu nền (1 đến 9)',
+    purpose: 'Ngưỡng nhắc: số ngày hoặc ki-lô-mét trước hạn để cảnh báo bảo dưỡng và đánh giá định kỳ.',
+    modes: [{ l: 'Trang cài đặt', d: 'Biểu mẫu ngưỡng.', cfg: { page: 'settings', scope: 'MAINT' } }],
+    seeds: ['Ngưỡng nhắc mặc định của bản trình diễn'], masters: ['ms-settings'], actors: [act(ROLE.tech, 'Chỉnh ngưỡng'), act(ROLE.exec, 'Phê duyệt chính sách')], note: '',
+  });
+  scr('pwmsHistory', {
+    name: 'Lịch sử giá / nhà cung cấp', st: 'visible', group: 'Báo cáo và tra cứu',
+    purpose: 'Tra cứu lịch sử giá và nhà cung cấp của vật tư; nguồn gợi ý đơn giá trên kế hoạch và phiếu.',
+    modes: [{ l: 'Bảng lịch sử giá', d: 'Lọc theo vật tư, nhà cung cấp.', cfg: { page: 'pwmsHistory', scope: 'MAINT' } }],
+    seeds: ['Giá mua hàng gần nhất của vật tư VTU-342-…'], masters: ['ms-price', 'ms-material'], actors: [act(ROLE.buy, 'Cập nhật giá'), act(ROLE.tech, 'Tham chiếu khi lập dự toán')], note: '',
+  });
+  scr('repairHoursReport', {
+    name: 'Bảng tổng hợp giờ sửa chữa theo kỹ thuật viên', st: 'visible', group: 'Báo cáo và tra cứu',
+    purpose: 'Báo cáo tổng hợp giờ thực tế so với định mức theo từng kỹ thuật viên cho người quản lý.',
+    modes: [{ l: 'Bảng tổng hợp', d: 'Theo kỹ thuật viên, theo kỳ.', cfg: { page: 'repairHoursReport', scope: 'MAINT' } }],
+    seeds: ['Giờ công của các phiếu o1, o20'], masters: ['ms-barem'], actors: [act(ROLE.tech, 'Đánh giá hiệu quả'), act(ROLE.exec, 'Xem tổng quan')], note: '',
+  });
+  scr('technicianWorkHours', {
+    name: 'Bảng giờ sửa chữa Kỹ Thuật Viên', st: 'visible', group: 'Báo cáo và tra cứu',
+    purpose: 'Bảng giờ cá nhân của kỹ thuật viên: từng nội dung, giờ bắt đầu, giờ hoàn thành, so với định mức.',
+    modes: [{ l: 'Bảng giờ cá nhân', d: 'Hiển thị công việc đã làm.', cfg: { page: 'technicianWorkHours', scope: 'MAINT' } }],
+    seeds: ['Giờ công trên phiếu o1'], masters: ['ms-barem'], actors: [act(ROLE.mech, 'Xem giờ của chính mình'), act(ROLE.tech, 'Đối chiếu')], note: '',
+  });
+  scr('tireBattery', {
+    name: 'Vỏ lốp / ắc quy', st: 'visible', group: 'Báo cáo và tra cứu',
+    purpose: 'Quản lý số seri vỏ lốp, ắc quy đang lắp trên xe, tuổi thọ và cảnh báo thay thế.',
+    modes: [
+      { l: 'Tab vỏ lốp (TIRE)', d: 'Số seri lốp theo xe.', cfg: { page: 'tireBattery', scope: 'MAINT', tab: 'TIRE' } },
+      { l: 'Tab ắc quy (BATTERY)', d: 'Số seri ắc quy theo xe.', cfg: { page: 'tireBattery', scope: 'MAINT', tab: 'BATTERY' } },
+    ],
+    seeds: ['Xe 51C-29273 với số seri lốp, ắc quy mẫu'], masters: ['ms-tirebattery', 'ms-fleet'], actors: [act(ROLE.fleet, 'Ghi nhận lắp, tháo'), act(ROLE.tech, 'Quyết định thay')], note: 'Bản mẫu chuyên sâu về số seri nằm ở tệp riêng (xem mục Bản mẫu bổ sung).',
+  });
+  scr('fleet', {
+    name: 'Xe và mooc', st: 'hidden', group: 'Đang ẩn hoặc vô hiệu hóa',
+    purpose: 'Danh sách xe, mooc kèm hồ sơ; nguồn để gắn danh mục, ánh xạ và xem lịch sử.',
+    modes: [{ l: 'Đường dẫn page=fleet', d: 'Khi cờ FLEET_MENU_HIDDEN=true, hệ thống tự chuyển về màn hình Bảo dưỡng.', cfg: { page: 'fleet' } }],
+    seeds: ['Xe 101 · 51C-29273', 'Xe 102 · 50H-87033'], masters: ['ms-fleet', 'ms-vehiclemap', 'ms-catalog'],
+    actors: [act(ROLE.fleet, 'Quản lý hồ sơ xe')],
+    note: 'Cờ FLEET_MENU_HIDDEN=true: mục menu bị ẩn và đường dẫn bị chuyển hướng về trang Bảo dưỡng. Nghiệp vụ vẫn cần danh sách xe trên môi trường thật.',
+    fallback: true,
+  });
+  scr('plansRepair', {
+    name: 'Kế hoạch sửa chữa', st: 'hidden', group: 'Đang ẩn hoặc vô hiệu hóa',
+    purpose: 'Lưu hạng mục sửa chữa hoãn từ đánh giá định kỳ vào dự toán tháng sau; trình BASE rồi tạo phiếu như kế hoạch bảo dưỡng.',
+    modes: [{ l: 'Trang plansRepair', d: 'Mục menu đang ẩn nhưng trang vẫn tồn tại.', cfg: { page: 'plansRepair', scope: 'REPAIR' } }],
+    seeds: ['Hạng mục không đạt trong ev-101-20260920 là nguồn tiềm năng'], masters: ['ms-repairitem', 'ms-material', 'ms-price'],
+    actors: [act(ROLE.tech, 'Chọn kỳ hoãn, trình BASE'), act(ROLE.base, 'Duyệt kế hoạch sửa chữa')],
+    note: 'Đang ẩn trên bản trình diễn; quy trình vẫn nằm trong luồng sửa chữa nguồn E.',
+  });
+  scr('vehicleDetail', {
+    name: 'Chi tiết xe (hồ sơ xe)', st: 'hidden', group: 'Đang ẩn hoặc vô hiệu hóa',
+    purpose: 'Hồ sơ xe với các tab: danh mục bảo dưỡng của xe, đánh giá, lịch sử phiếu, ghi đè mốc.',
+    modes: [
+      { l: 'Tab danh mục (catalog)', d: 'Ghi đè mốc, kilô-mét trung bình tháng.', cfg: { page: 'vehicle', scope: 'MAINT', vehicleId: 101, tab: 'catalog' } },
+      { l: 'Tab đánh giá (assessment)', d: 'Lịch sử đánh giá của xe.', cfg: { page: 'vehicle', scope: 'MAINT', vehicleId: 101, tab: 'assessment' } },
+    ],
+    seeds: ['vehicleId=101 (51C-29273)', 'vehicleId=102 (50H-87033)'], masters: ['ms-fleet', 'ms-catalog', 'ms-tirebattery'],
+    actors: [act(ROLE.fleet, 'Xem hồ sơ'), act(ROLE.tech, 'Ghi đè mốc bảo dưỡng của từng xe')],
+    note: 'ALLOW_OPEN_VEHICLE_DETAIL=false: các nút «Mở xe», «Chi tiết xe» bị ẩn. Có thể mở bằng đường dẫn sâu nhưng không nên coi là luồng chính thức của bản trình diễn.',
+  });
+  scr('dailyPlan', {
+    name: 'Kế hoạch xe - tài xế hàng ngày', st: 'disabled', group: 'Đang ẩn hoặc vô hiệu hóa',
+    purpose: 'Lịch hẹn tài xế đưa xe đi bảo dưỡng hoặc sửa chữa; tài xế xác nhận trên điện thoại.',
+    modes: [{ l: 'Không có đường dẫn (mục menu bị vô hiệu hóa, không có thuộc tính data-nav)', d: 'Mở phiếu o20 để xem ngữ cảnh xe cần hẹn.', cfg: { page: 'order', scope: 'MAINT', orderId: 'o20' } }],
+    seeds: ['Phiếu o20 và o1 cần lịch hẹn'], masters: ['ms-fleet', 'ms-user'],
+    actors: [act(ROLE.fleet, 'Lên lịch'), act(ROLE.driver, 'Xác nhận đem xe')],
+    note: 'Vô hiệu hóa: không thể nhấn trên menu. Quy trình vẫn là bước bắt buộc ngoài hệ thống thật.',
+    fallback: true,
+  });
+  scr('preTrip', {
+    name: 'Đánh giá phương tiện trước chuyến', st: 'disabled', group: 'Đang ẩn hoặc vô hiệu hóa',
+    purpose: 'Tài xế đánh giá xe đầu ngày; tiêu chí không đạt báo về Ban an toàn và quản lý kỹ thuật, có thể tạo phiếu sửa chữa.',
+    modes: [{ l: 'Không có đường dẫn (mục menu bị vô hiệu hóa)', d: 'Dùng màn hình đánh giá định kỳ hoặc bản mẫu di động để minh họa.', cfg: { page: 'assessment', scope: 'MAINT', tab: 'vehicles' } }],
+    seeds: ['Chưa có dữ liệu mẫu riêng'], masters: ['ms-criteria', 'ms-system'],
+    actors: [act(ROLE.driver, 'Chấm đánh giá'), act(ROLE.safety, 'Nhận cảnh báo'), act(ROLE.tech, 'Tiếp nhận để xử lý')],
+    note: 'Vô hiệu hóa trên bản trình diễn; vẫn giữ trong quy trình.',
+    fallback: true,
+  });
+  scr('seriProto', {
+    name: 'Bản mẫu số seri vỏ lốp và ắc quy (tệp riêng)', st: 'extra', group: 'Bản mẫu bổ sung',
+    purpose: 'Bản mẫu chuyên sâu quản lý số seri: lắp, tháo, tuổi thọ, cảnh báo.',
+    modes: [{ l: 'Mở tệp 15-seri-vo-lop-ac-quy.html', d: 'Chạy độc lập, không dùng console.', cfg: { file: FILE_SERI } }],
+    seeds: ['Dữ liệu mẫu lốp và ắc quy riêng của tệp'], masters: ['ms-tirebattery'], actors: [act(ROLE.fleet, 'Ghi nhận số seri'), act(ROLE.tech, 'Quyết định thay')], note: '',
+  });
+  scr('mobileDriver', {
+    name: 'Bản mẫu điện thoại: tài xế báo sửa chữa', st: 'extra', group: 'Bản mẫu bổ sung',
+    purpose: 'Tài xế báo sự cố, gửi mô tả, theo dõi yêu cầu sửa chữa trên điện thoại.',
+    modes: [{ l: 'Mở tệp mobile-driver-repair.html', d: 'Chạy độc lập.', cfg: { file: FILE_MOBILE_DRIVER } }],
+    seeds: ['Phiếu mẫu liên quan RO-2026-1001'], masters: ['ms-user'], actors: [act(ROLE.driver, 'Gửi báo cáo'), act(ROLE.safety, 'Tiếp nhận')], note: 'Điểm vào nguồn A của luồng sửa chữa.',
+  });
+  scr('mobileV3', {
+    name: 'Bản mẫu điện thoại phiên bản ba (tài xế, kỹ thuật viên)', st: 'extra', group: 'Bản mẫu bổ sung',
+    purpose: 'Giao diện điện thoại tổng quát: xác nhận lịch, thực hiện việc, đánh giá.',
+    modes: [{ l: 'Mở tệp mobile-v3.html', d: 'Chạy độc lập.', cfg: { file: FILE_MOBILE_V3 } }],
+    seeds: ['Dữ liệu mẫu của tệp'], masters: ['ms-user'], actors: [act(ROLE.driver, 'Dùng hằng ngày'), act(ROLE.mech, 'Nhận việc')], note: '',
+  });
+
+  /* ===== Nút (bước) và dữ liệu nền ===== */
+  const N = {};
+  function def(id, o) { N[id] = Object.assign({ id }, o); return id; }
+
+  /* ---------- Dữ liệu nền: mỗi master là một nút riêng ---------- */
+  def('ms-system', { kind: 'master', k: 'Dữ liệu nền 1', t: 'Hệ thống trên xe',
+    s: 'Các cụm lớn của xe (động cơ, phanh, lốp, điện, khung gầm, mooc…) lấy từ PWMS. Là điểm neo cho tiêu chí, nội dung sửa chữa và danh mục bảo dưỡng.',
+    screen: 'vehicleSystems', nav: { page: 'vehicleSystems', scope: 'MAINT' },
+    actors: [
+      act(ROLE.pwms, 'Là nguồn gốc dữ liệu; mỗi lần đồng bộ ghi lại thời điểm và kết quả.'),
+      act(ROLE.infotech, 'Cấu hình và giám sát việc đồng bộ từ PWMS; xử lý khi báo lỗi.'),
+      act(ROLE.tech, 'Rà soát tên và nhóm hệ thống, báo lại cho PWMS nếu thiếu cụm cần theo dõi.'),
+      act(ROLE.mech, 'Chọn hệ thống khi lập phiếu hoặc khi gắn nội dung sửa chữa.'),
+    ],
+    cond: 'Phải có trước khi khai báo tiêu chí đánh giá, nội dung sửa chữa và danh mục bảo dưỡng, vì cả ba đều tham chiếu hệ thống.',
+    biz: [
+      'Hệ thống trên xe là cách chia xe thành các cụm chức năng để mọi bộ phận gọi tên giống nhau. Ví dụ: ngoại thất, động cơ, hộp số, phanh, lốp, điện, rơ-mooc.',
+      'Dữ liệu mẫu có các mã bắt đầu từ TQ-NGOAI đến RO-MOOC. Phần mooc có nhóm hệ thống riêng nên danh mục của động cơ không áp dụng cho mooc.',
+      'Không được xóa hoặc đổi nghĩa một hệ thống đang được tiêu chí, nội dung sửa chữa hoặc danh mục tham chiếu, vì sẽ làm trống gợi ý ở các bước sau.',
+      'Trên môi trường thật, dữ liệu đồng bộ từ PWMS; bản trình diễn chỉ mô phỏng và hiển thị trạng thái đồng bộ ban đầu là chưa chạy (IDLE).',
+    ],
+    ui: [
+      'Thanh bên trái → nhóm <strong>Cấu hình</strong> → mục <strong>1. Hệ thống xe (PWMS)</strong>.',
+      'Xem lưới danh sách hệ thống; dùng ô tìm kiếm để lọc theo tên hoặc mã.',
+      'Bấm nút <strong>Đồng bộ</strong> để chạy mô phỏng; đọc trạng thái lần đồng bộ cuối.',
+      'Quay lại màn hình tiêu chí, nội dung sửa chữa, danh mục để kiểm tra mỗi mục đã gắn đúng hệ thống chưa.',
+    ],
+    data: [
+      { dir: 'Vào', text: 'Danh sách hệ thống từ PWMS.' },
+      { dir: 'Ra', text: 'Khóa hệ thống dùng cho tiêu chí, nội dung sửa chữa, danh mục bảo dưỡng.' },
+    ],
+    example: 'Hệ thống mẫu từ TQ-NGOAI đến RO-MOOC; trạng thái đồng bộ IDLE. Màn hình: vehicleSystems.' });
+
+  def('ms-criteria', { kind: 'master', k: 'Dữ liệu nền 2', t: 'Tiêu chí đánh giá',
+    s: 'Bộ tiêu chí chấm đạt hoặc không đạt khi đánh giá phương tiện. Mỗi tiêu chí thuộc một hệ thống và gợi ý nội dung sửa chữa kèm vật tư.',
+    screen: 'criteria', nav: { page: 'criteria', scope: 'MAINT' },
+    actors: [
+      act(ROLE.tech, 'Khai báo, sửa và ngừng sử dụng tiêu chí; gắn nội dung sửa chữa gợi ý.'),
+      act(ROLE.safety, 'Xác nhận tiêu chí nào thuộc nhóm an toàn để cảnh báo ngay khi không đạt.'),
+      act(ROLE.mech, 'Chấm từng tiêu chí khi đánh giá phương tiện định kỳ.'),
+      act(ROLE.driver, 'Chấm đánh giá trước chuyến (màn hình này đang vô hiệu hóa).'),
+    ],
+    cond: 'Cần có hệ thống trên xe. Muốn gợi ý sửa chữa đầy đủ thì cũng cần nội dung sửa chữa và vật tư đã khai báo.',
+    biz: [
+      'Tiêu chí được gom thành nhóm. Mỗi tiêu chí phải thuộc đúng một hệ thống để khi không đạt, hệ thống biết cụm nào cần xử lý.',
+      'Khi một tiêu chí được chấm không đạt, hệ thống gợi ý danh sách nội dung sửa chữa đã gắn và các vật tư liên quan, kèm đơn giá mua hàng gần nhất.',
+      'Tiêu chí thuộc nhóm an toàn khi không đạt phải cảnh báo Ban an toàn và quản lý kỹ thuật (nghiệp vụ đánh giá trước chuyến).',
+      'Nếu thiếu liên kết sang nội dung sửa chữa, kết quả đánh giá vẫn lưu nhưng bước tạo phiếu sẽ phải nhập tay.',
+    ],
+    ui: [
+      'Thanh bên → <strong>2. Tiêu chí đánh giá</strong>.',
+      'Chọn một nhóm tiêu chí; trong nhóm, bấm vào tiêu chí để xem hệ thống, nội dung sửa chữa và vật tư gắn kèm.',
+      'Thêm hoặc sửa liên kết; lưu.',
+      'Mở màn hình <strong>Đánh giá phương tiện định kỳ</strong> để kiểm tra gợi ý có xuất hiện khi chấm không đạt.',
+    ],
+    data: [
+      { dir: 'Vào', text: 'Hệ thống trên xe; nội dung sửa chữa; vật tư.' },
+      { dir: 'Ra', text: 'Phiếu chấm điểm đánh giá; gợi ý nội dung sửa chữa và vật tư khi không đạt.' },
+    ],
+    example: 'Bộ tiêu chí dùng cho đợt đánh giá ev-101-20260920 của xe 51C-29273.' });
+
+  def('ms-material', { kind: 'master', k: 'Dữ liệu nền 3', t: 'Vật tư (PWMS)',
+    s: 'Danh mục vật tư, phụ tùng lấy từ PWMS (mã dạng VTU-342-…) với đơn vị tính và đơn giá gần nhất.',
+    screen: 'materials', nav: { page: 'materials', scope: 'MAINT' },
+    actors: [
+      act(ROLE.pwms, 'Nguồn dữ liệu vật tư và đơn vị tính.'),
+      act(ROLE.buy, 'Cập nhật giá mua; nhà cung cấp phát sinh giá mới.'),
+      act(ROLE.tech, 'Chọn vật tư mặc định cho nội dung sửa chữa và danh mục bảo dưỡng.'),
+      act(ROLE.mech, 'Tìm và chọn vật tư (tự gợi ý) khi lập phiếu.'),
+    ],
+    cond: 'Cần có trước khi gợi ý vật tư trên kế hoạch, phiếu và đánh giá.',
+    biz: [
+      'Vật tư là nguồn cho mọi chỗ cần chọn phụ tùng: dòng kế hoạch bảo dưỡng, phiếu bảo dưỡng, phiếu sửa chữa, gợi ý sau đánh giá.',
+      'Khi chọn vật tư trên phiếu, hệ thống sao chép (chụp lại) tên, đơn vị, số lượng, đơn giá để phiếu không đổi khi danh mục đổi.',
+      'Đơn giá gợi ý lấy từ lịch sử giá mua hàng gần nhất; xem chi tiết tại mục lịch sử giá và nhà cung cấp.',
+      'Mã vật tư mẫu bắt đầu bằng VTU-342-.',
+    ],
+    ui: [
+      'Thanh bên → <strong>3. Vật tư (PWMS)</strong>.',
+      'Tìm theo mã hoặc tên; chọn một dòng để xem đơn vị và đơn giá gần nhất.',
+      'Mở <strong>Lịch sử giá / nhà cung cấp</strong> để xem biến động giá của chính vật tư đó.',
+      'Quay lại màn hình nội dung sửa chữa để xem vật tư nào đã gắn.',
+    ],
+    data: [
+      { dir: 'Vào', text: 'Vật tư, đơn vị tính từ PWMS; giá mới từ bộ phận mua hàng.' },
+      { dir: 'Ra', text: 'Lựa chọn tự gợi ý trên phiếu và kế hoạch; chụp lại vật tư vào phiếu.' },
+    ],
+    example: 'Mã vật tư mẫu dạng VTU-342-… (xem màn hình materials).' });
+
+  def('ms-vehiclemap', { kind: 'master', k: 'Dữ liệu nền 4', t: 'Ánh xạ xe giữa TMS và PWMS',
+    s: 'Bảng đối chiếu mã xe trong TMS với mã đối tượng trong PWMS để lấy đúng lịch sử vật tư và giá theo từng xe.',
+    screen: 'vehicleMaps', nav: { page: 'vehicleMaps', scope: 'MAINT' },
+    actors: [
+      act(ROLE.fleet, 'Chịu trách nhiệm danh sách xe trong TMS; báo xe mới để ánh xạ.'),
+      act(ROLE.infotech, 'Chạy đồng bộ ánh xạ, sửa các xe lệch biển số.'),
+      act(ROLE.pwms, 'Cung cấp mã đối tượng tương ứng của xe.'),
+    ],
+    cond: 'Xe phải có trong danh sách xe của TMS; sau khi ánh xạ mới dùng được dữ liệu vật tư theo xe.',
+    biz: [
+      'TMS và PWMS đặt mã xe khác nhau. Bảng ánh xạ ghép mỗi xe TMS với một đối tượng PWMS, thường dựa trên biển số.',
+      'Trạng thái MAPPED nghĩa là đã ghép thành công. Xe chưa ghép sẽ không lấy được lịch sử vật tư, nên gợi ý trên phiếu bị thiếu.',
+      'Mooc cũng cần ánh xạ nếu muốn tra lịch sử riêng của mooc.',
+    ],
+    ui: [
+      'Thanh bên → <strong>4. Ánh xạ xe TMS ↔ PWMS</strong>.',
+      'Xem hai dòng mẫu: xe 101 / 51C-29273 và xe 102 / 50H-87033, đều ở trạng thái MAPPED.',
+      'Dùng nút đồng bộ (mô phỏng) rồi đọc kết quả ở trạng thái bên trên lưới.',
+    ],
+    data: [
+      { dir: 'Vào', text: 'Danh sách xe TMS; danh sách đối tượng PWMS.' },
+      { dir: 'Ra', text: 'Bảng ghép xe; điều kiện để tra lịch sử vật tư, giá theo xe.' },
+    ],
+    example: '101 · 51C-29273 → 51C29273 · MAPPED; 102 · 50H-87033 → 50H87033 · MAPPED.' });
+
+  def('ms-repairitem', { kind: 'master', k: 'Dữ liệu nền 5', t: 'Nội dung sửa chữa (PWMS)',
+    s: 'Danh mục các công việc sửa chữa gắn với hệ thống xe; là nội dung được tự gợi ý khi lập phiếu hoặc khi tiêu chí không đạt.',
+    screen: 'repairItems', nav: { page: 'repairItems', scope: 'MAINT' },
+    actors: [
+      act(ROLE.pwms, 'Nguồn dữ liệu nội dung sửa chữa.'),
+      act(ROLE.tech, 'Chuẩn hóa tên, gắn hệ thống, liên kết vật tư thường dùng.'),
+      act(ROLE.mech, 'Chọn nội dung khi điền phiếu sửa chữa hoặc bảo dưỡng.'),
+    ],
+    cond: 'Cần có hệ thống trên xe. Để gợi ý đầy đủ khi đánh giá thì phải được tiêu chí tham chiếu.',
+    biz: [
+      'Nội dung sửa chữa mô tả đúng công việc kỹ thuật viên làm (ví dụ thay má phanh, kiểm tra hệ thống điện) và được gắn một hệ thống.',
+      'Mỗi nội dung có thể được gắn vật tư thường kèm theo. Khi tiêu chí không đạt, hệ thống đưa cả nội dung lẫn vật tư vào đề xuất.',
+      'Định mức giờ (barem) được đặt theo từng nội dung; vì vậy đổi tên hoặc gộp nội dung phải xem lại định mức.',
+    ],
+    ui: [
+      'Thanh bên → <strong>5. Nội dung sửa chữa (PWMS)</strong>.',
+      'Lọc theo hệ thống; chọn một dòng để xem vật tư và tiêu chí đang tham chiếu.',
+      'Kiểm tra mục <strong>8. Cài đặt giờ sửa chữa kỹ thuật viên</strong> xem nội dung đã có định mức chưa.',
+    ],
+    data: [
+      { dir: 'Vào', text: 'Nội dung từ PWMS; hệ thống; vật tư.' },
+      { dir: 'Ra', text: 'Tự điền dòng nội dung công việc trên phiếu; gợi ý sau đánh giá.' },
+    ],
+    example: 'Dữ liệu mẫu có nội dung gắn với động cơ, phanh, lốp.' });
+
+  def('ms-service', { kind: 'master', k: 'Dữ liệu nền 6', t: 'Loại dịch vụ',
+    s: 'Phân loại dịch vụ để gắn vào danh mục bảo dưỡng và phiếu (bảo dưỡng định kỳ, thay thế, sửa chữa đột xuất…).',
+    screen: 'serviceTypes', nav: { page: 'serviceTypes', scope: 'MAINT' },
+    actors: [
+      act(ROLE.tech, 'Khai báo và đặt tên loại dịch vụ.'),
+      act(ROLE.fleet, 'Tra cứu loại dịch vụ để phân biệt chi phí.'),
+      act(ROLE.exec, 'Xem tổng hợp theo loại dịch vụ.'),
+    ],
+    cond: 'Cần có trước khi tạo danh mục bảo dưỡng vì danh mục bắt buộc chọn loại dịch vụ.',
+    biz: [
+      'Loại dịch vụ giúp phân tích chi phí và tần suất theo nhóm (ví dụ thay dầu, kiểm tra định kỳ, sửa chữa đột xuất).',
+      'Danh mục bảo dưỡng và phiếu đều mang loại dịch vụ, nên khi đổi tên cần lưu ý ảnh hưởng đến báo cáo.',
+    ],
+    ui: [
+      'Thanh bên → <strong>6. Loại dịch vụ</strong>.',
+      'Thêm một loại mới hoặc sửa tên.',
+      'Mở danh mục catalogId=1 để thấy loại dịch vụ đã gắn.',
+    ],
+    data: [
+      { dir: 'Ra', text: 'Loại dịch vụ dùng trong danh mục bảo dưỡng và phiếu.' },
+    ],
+    example: 'Danh mục catalogId=1 (Thay dầu nhớt động cơ) có một loại dịch vụ gắn kèm.' });
+
+  def('ms-catalog', { kind: 'master', k: 'Dữ liệu nền 7', t: 'Danh mục bảo dưỡng',
+    s: 'Các hạng mục bảo dưỡng và chu kỳ (nhiều mốc ki-lô-mét, giờ, tháng, năm); gắn hệ thống, loại dịch vụ và gắn hàng loạt cho xe.',
+    screen: 'catalog', nav: { page: 'catalogDetail', scope: 'MAINT', catalogId: 1 },
+    actors: [
+      act(ROLE.tech, 'Khai báo chu kỳ, hai mốc nhắc, vật tư gợi ý; gắn vào xe.'),
+      act(ROLE.fleet, 'Phản hồi chu kỳ thực tế theo cách chạy xe.'),
+      act(ROLE.sys, 'Dùng danh mục và chu kỳ để quét và tính hạn mỗi ngày.'),
+    ],
+    cond: 'Cần hệ thống trên xe và loại dịch vụ. Muốn nhắc chính xác phải gắn danh mục vào từng xe.',
+    biz: [
+      'Mỗi danh mục có thể có nhiều mốc: một lần, lặp lại, hoặc bắt buộc thay. Mỗi mốc cho phép tính theo ki-lô-mét, giờ máy, tháng hoặc năm.',
+      'Mỗi mốc có hai mức nhắc riêng: mốc nhắc bảo dưỡng (cảnh báo sớm) và mốc nhắc kế hoạch (đủ điều kiện lập dự toán). Hai mức này không trùng nhau.',
+      'Rơ-mooc không gắn danh mục của động cơ; chỉ gắn danh mục thuộc nhóm hệ thống mooc.',
+      'Chuột phải trên lưới danh mục để gắn hàng loạt nhiều danh mục cho nhiều xe; nghiệp vụ lưu kết quả gắn theo từng xe.',
+    ],
+    ui: [
+      'Thanh bên → <strong>7. Danh mục bảo dưỡng</strong>; chọn dòng <strong>catalogId=1 Thay dầu nhớt động cơ</strong>.',
+      'Bảng chi tiết bên phải → tab <strong>Chu kỳ</strong>: thêm hoặc sửa mốc, đặt hai mốc nhắc.',
+      'Tab <strong>Xe đang dùng</strong>: xem xe nào đang gắn danh mục.',
+      'Chuột phải trên lưới → <strong>Gắn hàng loạt vào xe</strong>; chọn nhiều danh mục và xe; xác nhận.',
+    ],
+    data: [
+      { dir: 'Vào', text: 'Chính sách của hãng xe và doanh nghiệp; hệ thống; loại dịch vụ.' },
+      { dir: 'Ghi', text: 'Chu kỳ các mốc; vật tư gợi ý; danh sách danh mục theo từng xe.' },
+      { dir: 'Ra', text: 'Đầu vào cho nhắc bảo dưỡng và dòng kế hoạch.' },
+    ],
+    example: 'catalogId=1 · Thay dầu nhớt động cơ (đường dẫn sâu page=catalogDetail&catalogId=1).' });
+
+  def('ms-template', { kind: 'master', k: 'Dữ liệu nền 8', t: 'Mẫu kế hoạch bảo dưỡng',
+    s: 'Bộ hạng mục được lưu sẵn để áp dụng nhanh cho nhiều xe; nằm ở tab mẫu của màn hình Kế hoạch bảo dưỡng.',
+    screen: 'plansMaint', nav: { page: 'plansMaint', scope: 'MAINT', tab: 'templates' },
+    actors: [
+      act(ROLE.tech, 'Tạo mẫu theo gói bảo dưỡng; áp dụng mẫu cho nhóm xe.'),
+      act(ROLE.fleet, 'Đề xuất nhóm xe dùng chung mẫu.'),
+    ],
+    cond: 'Cần danh mục bảo dưỡng; mẫu chỉ là cách nhập nhanh, không thay cho điều kiện được phê duyệt.',
+    biz: [
+      'Mẫu giúp tránh tạo thủ công từng dòng cho từng xe khi cùng một gói bảo dưỡng (ví dụ gói 10.000 ki-lô-mét).',
+      'Khi áp dụng mẫu, hệ thống tạo các dòng kế hoạch với nguồn «từ mẫu», sau đó vẫn phải trình BASE.',
+    ],
+    ui: [
+      'Thanh bên → <strong>Kế hoạch bảo dưỡng</strong> → tab <strong>mẫu (templates)</strong>.',
+      'Chọn một mẫu, áp dụng cho nhiều xe, kiểm tra các dòng đã sinh ở tab dòng kế hoạch.',
+    ],
+    data: [
+      { dir: 'Vào', text: 'Danh mục bảo dưỡng; danh sách xe.' },
+      { dir: 'Ra', text: 'Dòng kế hoạch nguồn «từ mẫu».' },
+    ],
+    example: 'Mẫu trong tab templates của bản trình diễn.' });
+
+  def('ms-tirebattery', { kind: 'master', k: 'Dữ liệu nền 9', t: 'Vỏ lốp và ắc quy (số seri)',
+    s: 'Theo dõi số seri lốp, ắc quy đang lắp trên từng xe, ngày lắp và tuổi thọ để nhắc thay.',
+    screen: 'tireBattery', nav: { page: 'tireBattery', scope: 'MAINT', tab: 'TIRE' },
+    actors: [
+      act(ROLE.fleet, 'Ghi nhận lắp hoặc tháo số seri; cập nhật tình trạng.'),
+      act(ROLE.tech, 'Quyết định đưa vào kế hoạch sớm hơn hạn tự động.'),
+      act(ROLE.mech, 'Thay thực tế và ghi lại số seri mới.'),
+      act(ROLE.sys, 'Tính tuổi thọ, đưa dòng cảnh báo lên bảng nhắc.'),
+    ],
+    cond: 'Xe phải có trong danh sách xe; số seri phải được gắn với xe và ngày lắp.',
+    biz: [
+      'Mỗi số seri có định mức tuổi thọ theo tháng và ngày lắp; hệ thống tính hạn thay và hiển thị trong bảng nhắc bảo dưỡng.',
+      'Có thể chọn số seri cần thay và đưa vào kế hoạch thủ công trước khi đến hạn tự động.',
+      'Bản mẫu chuyên sâu nằm ở tệp riêng 15-seri-vo-lop-ac-quy.html.',
+    ],
+    ui: [
+      'Thanh bên → <strong>Vỏ lốp / ắc quy</strong>.',
+      'Chuyển giữa tab <strong>TIRE</strong> (lốp) và <strong>BATTERY</strong> (ắc quy).',
+      'Chọn số seri → đưa vào kế hoạch; mở tiếp màn hình Nhắc bảo dưỡng để thấy dòng tương ứng.',
+    ],
+    data: [
+      { dir: 'Vào', text: 'Số seri, ngày lắp, định mức tháng, xe.' },
+      { dir: 'Ra', text: 'Dòng cảnh báo và nguồn dòng kế hoạch vỏ lốp, ắc quy.' },
+    ],
+    example: 'Xe 51C-29273 trong dữ liệu mẫu vỏ lốp, ắc quy; bản sâu hơn: 15-seri-vo-lop-ac-quy.html.' });
+
+  def('ms-barem', { kind: 'master', k: 'Dữ liệu nền 10', t: 'Cài đặt giờ sửa chữa kỹ thuật viên (định mức giờ)',
+    s: 'Định mức thời gian chuẩn cho từng nội dung công việc để so với thời gian thực tế trên phiếu.',
+    screen: 'baremHours', nav: { page: 'baremHours', scope: 'MAINT' },
+    actors: [
+      act(ROLE.tech, 'Đặt và điều chỉnh định mức.'),
+      act(ROLE.exec, 'Phê duyệt chính sách giờ công làm chuẩn đánh giá.'),
+      act(ROLE.mech, 'Chịu đối chiếu thực tế với định mức.'),
+    ],
+    cond: 'Cần có nội dung sửa chữa. Không có định mức thì báo cáo giờ chỉ hiện giờ thực tế.',
+    biz: [
+      'Mỗi nội dung có một số phút chuẩn. Khi kỹ thuật viên bắt đầu và hoàn thành từng nội dung, hệ thống tính số phút thực tế (actualMinutes) và so với định mức.',
+      'Kết quả dùng cho bảng tổng hợp giờ và bảng giờ của kỹ thuật viên.',
+    ],
+    ui: [
+      'Thanh bên → <strong>8. Cài đặt giờ sửa chữa kỹ thuật viên</strong>.',
+      'Sửa số phút cho một nội dung; lưu.',
+      'Mở <strong>Bảng tổng hợp giờ sửa chữa theo kỹ thuật viên</strong> để thấy ảnh hưởng.',
+    ],
+    data: [
+      { dir: 'Vào', text: 'Nội dung sửa chữa.' },
+      { dir: 'Ra', text: 'Số phút chuẩn dùng để so với giờ thực tế trên phiếu.' },
+    ],
+    example: 'Định mức mẫu cho nội dung thay dầu, thay lốp… (xem màn hình baremHours).' });
+
+  def('ms-settings', { kind: 'master', k: 'Dữ liệu nền 11', t: 'Cài đặt nhắc đánh giá',
+    s: 'Các ngưỡng quyết định khi nào hiển thị nhắc bảo dưỡng và nhắc đánh giá định kỳ.',
+    screen: 'settings', nav: { page: 'settings', scope: 'MAINT' },
+    actors: [
+      act(ROLE.tech, 'Điều chỉnh ngưỡng theo thực tế vận hành.'),
+      act(ROLE.exec, 'Phê duyệt chính sách nhắc.'),
+      act(ROLE.sys, 'Đọc ngưỡng mỗi lần quét.'),
+    ],
+    cond: 'Cần có trước lần quét đầu tiên; mặc định có giá trị của bản trình diễn.',
+    biz: [
+      'Ngưỡng nhắc bảo dưỡng quyết định khi nào dòng chuyển sang «sắp đến hạn».',
+      'Ngưỡng nhắc đánh giá định kỳ quyết định khi nào xe xuất hiện ở tab xe của màn hình đánh giá.',
+    ],
+    ui: [
+      'Thanh bên → <strong>9. Cài đặt nhắc đánh giá</strong>.',
+      'Đổi ngưỡng; lưu; mở màn hình Nhắc bảo dưỡng để thấy dòng thay đổi trạng thái.',
+    ],
+    data: [
+      { dir: 'Ra', text: 'Ngưỡng dùng trong quét nhắc và danh sách xe cần đánh giá.' },
+    ],
+    example: 'Ngưỡng mặc định của bản trình diễn.' });
+
+  def('ms-price', { kind: 'master', k: 'Dữ liệu nền 12', t: 'Lịch sử giá và nhà cung cấp',
+    s: 'Lưu giá mua và nhà cung cấp theo từng vật tư; nguồn đơn giá gợi ý trên kế hoạch và phiếu.',
+    screen: 'pwmsHistory', nav: { page: 'pwmsHistory', scope: 'MAINT' },
+    actors: [
+      act(ROLE.buy, 'Phát sinh và cập nhật giá, nhà cung cấp.'),
+      act(ROLE.pwms, 'Cung cấp lịch sử.'),
+      act(ROLE.tech, 'Tham chiếu để lập dự toán.'),
+    ],
+    cond: 'Cần có vật tư; đã ánh xạ xe nếu muốn tra theo xe.',
+    biz: [
+      'Khi lập dòng kế hoạch hoặc phiếu, hệ thống lấy đơn giá mua hàng gần nhất làm gợi ý; người dùng vẫn sửa được.',
+      'Có thể xem nhiều lần mua của cùng một vật tư với nhiều nhà cung cấp để so sánh.',
+    ],
+    ui: [
+      'Thanh bên → <strong>Lịch sử giá / nhà cung cấp</strong>.',
+      'Lọc theo vật tư; xem giá, ngày, nhà cung cấp.',
+    ],
+    data: [
+      { dir: 'Vào', text: 'Giá mua hàng; nhà cung cấp.' },
+      { dir: 'Ra', text: 'Đơn giá gợi ý trên kế hoạch, phiếu, đánh giá.' },
+    ],
+    example: 'Giá mua của vật tư VTU-342-… trong dữ liệu mẫu.' });
+
+  def('ms-fleet', { kind: 'master', k: 'Dữ liệu nền 13', t: 'Danh sách xe và mooc',
+    s: 'Nguồn danh sách xe để gắn danh mục, ánh xạ PWMS, nhắc và phiếu. Menu đang ẩn trên bản trình diễn.',
+    screen: 'fleet', nav: { page: 'fleet' },
+    actors: [
+      act(ROLE.fleet, 'Quản lý hồ sơ xe, mooc, biển số.'),
+      act(ROLE.driver, 'Là người vận hành xe được phân công.'),
+      act(ROLE.tech, 'Dùng để gắn danh mục và lên lịch bảo dưỡng.'),
+    ],
+    cond: 'Phải có trước ánh xạ PWMS, gắn danh mục, nhắc bảo dưỡng và phiếu.',
+    biz: [
+      'Mỗi xe có mã, biển số, số công-tơ-mét hiện tại và loại (đầu kéo, mooc, xe tải…).',
+      'Mọi chức năng nhắc và phiếu đều dựa vào danh sách xe này; mooc không dùng danh mục của động cơ.',
+      'Xe 101 / 51C-29273 và xe 102 / 50H-87033 là hai xe mẫu.',
+    ],
+    ui: [
+      'Menu «Xe và mooc» đang ẩn (FLEET_MENU_HIDDEN=true). Dùng ô tìm kiếm trên màn hình Bảo dưỡng hoặc Nhắc bảo dưỡng với biển số mẫu.',
+      'Đường dẫn page=fleet được tự chuyển sang màn hình Bảo dưỡng.',
+    ],
+    data: [
+      { dir: 'Ra', text: 'Mã xe, biển số, loại, số công-tơ-mét cho mọi màn hình khác.' },
+    ],
+    demoNote: 'Màn hình Xe và mooc đang ẩn (FLEET_MENU_HIDDEN=true); chi tiết xe bị khóa vì ALLOW_OPEN_VEHICLE_DETAIL=false. Dữ liệu vẫn tồn tại.',
+    example: 'Xe 101 · 51C-29273; xe 102 · 50H-87033.' });
+
+  def('ms-user', { kind: 'gap', k: 'Dữ liệu nền 14 (còn thiếu)', t: 'Người dùng và vai trò',
+    s: 'Chưa có màn hình trong bản trình diễn. Cần để phân quyền tài xế, kỹ thuật viên, Ban an toàn, quản lý kỹ thuật, quản lý xe.',
+    screen: 'dailyPlan', nav: { page: 'historyMaint', scope: 'MAINT' },
+    actors: [
+      act(ROLE.admin, 'Sẽ quản lý tài khoản, phân vai trò và quyền.'),
+      act(ROLE.infotech, 'Đồng bộ danh bạ nhân sự với hệ thống chính của doanh nghiệp.'),
+      act(ROLE.driver, 'Cần gắn tài xế với xe và số điện thoại để xác nhận lịch hẹn.'),
+      act(ROLE.mech, 'Cần gắn kỹ thuật viên với tổ để tính giờ và nhận phiếu.'),
+    ],
+    cond: 'Chưa có. Ghi nhận là thiếu so với quy trình thực tế.',
+    biz: [
+      'Nhiều bước cần biết «ai»: ai là tài xế phụ trách xe, kỹ thuật viên nào nhận phiếu, ai thuộc Ban an toàn để nhận cảnh báo, ai có quyền duyệt.',
+      'Bản trình diễn chỉ lưu tên chuỗi, không có danh mục người dùng và phân quyền riêng, nên không kiểm soát được quyền xem, sửa, duyệt.',
+      'Đề xuất: bổ sung màn hình người dùng, vai trò, nhóm, và liên kết với tài xế, kỹ thuật viên.',
+    ],
+    ui: [
+      'Không có giao diện. Nút «Xem prototype» mở màn hình Bảo dưỡng để minh họa nơi đang lưu tên kỹ thuật viên trên phiếu.',
+    ],
+    data: [
+      { dir: 'Cần', text: 'Danh mục người dùng, vai trò, quyền, liên kết với tài xế và kỹ thuật viên.' },
+    ],
+    demoNote: 'Chưa có màn hình. Thiếu so với nghiệp vụ.',
+    example: 'Không có dữ liệu mẫu riêng.' });
+
+  /* ---------- Quan hệ giữa các master ---------- */
+  const RELS = [
+    { id: 'r1', label: 'Hệ thống xe ↔ Tiêu chí đánh giá', why: 'Tiêu chí thuộc hệ thống: mỗi tiêu chí phải gắn đúng một hệ thống.', parts: ['m:ms-system', 'm:ms-criteria'] },
+    { id: 'r2', label: 'Hệ thống xe ↔ Nội dung sửa chữa', why: 'Nội dung sửa chữa gắn hệ thống để lọc và gợi ý theo cụm.', parts: ['m:ms-system', 'm:ms-repairitem'] },
+    { id: 'r3', label: 'Hệ thống xe ↔ Danh mục bảo dưỡng', why: 'Danh mục bảo dưỡng gắn hệ thống để phân biệt động cơ với mooc và để lọc.', parts: ['m:ms-system', 'm:ms-catalog'] },
+    { id: 'r4', label: 'Tiêu chí đánh giá ↔ Nội dung sửa chữa ↔ Vật tư', why: 'Khi chấm tiêu chí không đạt, hệ thống gợi ý nội dung sửa chữa và vật tư kèm theo.', parts: ['m:ms-criteria', 'm:ms-repairitem', 'm:ms-material'] },
+    { id: 'r5', label: 'Vật tư ↔ Lịch sử giá và nhà cung cấp', why: 'Đơn giá gợi ý lấy từ lịch sử mua hàng gần nhất của từng vật tư.', parts: ['m:ms-material', 'm:ms-price'] },
+    { id: 'r6', label: 'Loại dịch vụ ↔ Danh mục bảo dưỡng ↔ Phiếu', why: 'Danh mục và phiếu đều mang loại dịch vụ để phân tích chi phí.', parts: ['m:ms-service', 'm:ms-catalog', 's:historyMaint'] },
+    { id: 'r7', label: 'Danh mục bảo dưỡng ↔ Xe (gắn hàng loạt) ↔ Nhắc bảo dưỡng ↔ Kế hoạch bảo dưỡng', why: 'Danh mục gắn vào xe; quét tính hạn hiển thị ở nhắc; đến mốc kế hoạch thì sinh dòng kế hoạch.', parts: ['m:ms-catalog', 'm:ms-fleet', 's:reminder', 's:plansMaint'] },
+    { id: 'r8', label: 'Mẫu kế hoạch ↔ Danh mục bảo dưỡng ↔ Kế hoạch bảo dưỡng', why: 'Mẫu gom danh mục thành gói áp dụng nhanh cho nhiều xe.', parts: ['m:ms-template', 'm:ms-catalog', 's:plansMaint'] },
+    { id: 'r9', label: 'Vỏ lốp / ắc quy ↔ Nhắc bảo dưỡng ↔ Kế hoạch bảo dưỡng', why: 'Hạn thay số seri xuất hiện trên bảng nhắc; có thể đưa thủ công vào kế hoạch.', parts: ['m:ms-tirebattery', 's:reminder', 's:plansMaint'] },
+    { id: 'r10', label: 'Cài đặt nhắc đánh giá ↔ Nhắc bảo dưỡng ↔ Đánh giá định kỳ', why: 'Ngưỡng quyết định khi nào nhắc xuất hiện và khi nào xe cần đánh giá.', parts: ['m:ms-settings', 's:reminder', 's:assessment'] },
+    { id: 'r11', label: 'Định mức giờ (barem) ↔ Phiếu (so thời gian thực tế)', why: 'Định mức là chuẩn để so với số phút thực tế khi kỹ thuật viên hoàn thành nội dung.', parts: ['m:ms-barem', 's:orderDetail', 's:repairHoursReport'] },
+    { id: 'r12', label: 'Ánh xạ xe TMS ↔ PWMS ↔ Danh sách xe', why: 'Ánh xạ ghép từng xe trong danh sách với đối tượng PWMS để lấy lịch sử vật tư.', parts: ['m:ms-vehiclemap', 'm:ms-fleet'] },
+    { id: 'r13', label: 'Nội dung sửa chữa ↔ Định mức giờ', why: 'Định mức giờ đặt theo từng nội dung sửa chữa.', parts: ['m:ms-repairitem', 'm:ms-barem'] },
+    { id: 'r14', label: '(Thiếu) Người dùng và vai trò ↔ Tài xế, Kỹ thuật viên, Ban an toàn', why: 'Chưa có màn hình; cần để phân quyền và gắn người với xe hoặc phiếu.', parts: ['m:ms-user', 'm:ms-fleet'], gap: true },
+  ];
+  function relatedOf(id) {
+    const out = [];
+    RELS.forEach((r) => {
+      const key = 'm:' + id;
+      if (!r.parts.includes(key)) return;
+      out.push({ rel: r, others: r.parts.filter((p) => p !== key) });
+    });
+    return out;
+  }
+
+  /* ---------- Luồng tổng thể vận hành ---------- */
+  def('ov-1', { kind: 'master', k: 'Tổng thể 01', t: 'Chuẩn bị đủ dữ liệu nền trước khi vận hành',
+    s: 'Hệ thống xe, tiêu chí, vật tư, ánh xạ, nội dung sửa chữa, loại dịch vụ, danh mục, mẫu, vỏ lốp ắc quy, định mức giờ, cài đặt, lịch sử giá.',
+    screen: 'vehicleSystems', nav: { page: 'vehicleSystems', scope: 'MAINT' },
+    uses: ['ms-system', 'ms-criteria', 'ms-material', 'ms-vehiclemap', 'ms-repairitem', 'ms-service', 'ms-catalog', 'ms-barem', 'ms-settings', 'ms-price', 'ms-tirebattery', 'ms-fleet'],
+    actors: [act(ROLE.tech, 'Khai báo, rà soát toàn bộ danh mục trước khi vận hành.'), act(ROLE.fleet, 'Bảo đảm danh sách xe và ánh xạ đầy đủ.'), act(ROLE.infotech, 'Chạy đồng bộ từ PWMS.'), act(ROLE.pwms, 'Cấp dữ liệu vật tư, nội dung, hệ thống.')],
+    cond: 'Chưa đủ dữ liệu nền thì nhắc, đánh giá, kế hoạch và phiếu sẽ trống hoặc gợi ý sai.',
+    biz: [
+      'Thứ tự nên làm: hệ thống xe, tiêu chí, vật tư, ánh xạ xe, nội dung sửa chữa, loại dịch vụ, danh mục bảo dưỡng, định mức giờ, cài đặt nhắc; bổ sung vỏ lốp ắc quy và lịch sử giá.',
+      'Mỗi dữ liệu nền có nút riêng ở tab 1 cùng quan hệ với dữ liệu khác để bạn kiểm tra tính nhất quán.',
+      'Trên môi trường thật, dữ liệu vật tư, hệ thống, nội dung sửa chữa đồng bộ từ PWMS; bản trình diễn mô phỏng.',
+    ],
+    ui: [
+      'Mở tab <strong>1. Dữ liệu nền (master)</strong> trên trang này.',
+      'Đi từng nút từ trên xuống; bấm «Xem prototype» để mở đúng màn hình cấu hình.',
+      'Đối chiếu mục «Quan hệ giữa các dữ liệu nền» ở cuối tab 1.',
+    ],
+    data: [{ dir: 'Ra', text: 'Nền cho nhắc, đánh giá, kế hoạch, phiếu, gợi ý dự toán.' }],
+    example: 'catalogId=1; biển số 51C-29273 và 50H-87033; hệ thống TQ-NGOAI đến RO-MOOC.' });
+
+  def('ov-2', { kind: 'proc', k: 'Tổng thể 02', t: 'Tác vụ quét hằng ngày',
+    s: 'So sánh hạn của danh mục, vỏ lốp ắc quy, số công-tơ-mét, ngưỡng nhắc với ngày quét.',
+    screen: 'reminder', nav: { page: 'reminder', scope: 'MAINT', tab: 'dashboard', plate: '51C-29273' },
+    uses: ['ms-catalog', 'ms-tirebattery', 'ms-settings', 'ms-fleet'],
+    actors: [act(ROLE.sys, 'Chạy quét theo lịch hằng ngày, tính hạn.'), act(ROLE.tech, 'Mở bảng nhắc đọc kết quả.'), act(ROLE.fleet, 'Theo dõi xe sắp đến hạn.')],
+    cond: 'Có ít nhất một danh mục đã gắn xe hoặc số seri vỏ lốp ắc quy.',
+    biz: [
+      'Mỗi ngày hệ thống tính lại hạn tiếp theo cho từng danh mục của từng xe dựa trên lần bảo dưỡng gần nhất, số công-tơ-mét và chu kỳ.',
+      'Kết quả ba trạng thái: bình thường, sắp đến hạn (đã tới mốc nhắc bảo dưỡng), quá hạn (hoặc đã tới mốc nhắc kế hoạch).',
+      'Ngày quét là ngày dự toán mặc định khi tạo dòng kế hoạch tự động.',
+    ],
+    ui: [
+      'Thanh bên → <strong>Nhắc bảo dưỡng</strong> → tab bảng tổng hợp.',
+      'Gõ biển số <strong>51C-29273</strong> vào ô tìm kiếm.',
+      'Đọc từng dòng: danh mục, mốc nhắc bảo dưỡng, mốc nhắc kế hoạch, số ki-lô-mét còn lại.',
+    ],
+    data: [
+      { dir: 'Vào', text: 'Danh mục theo xe; số seri; ngưỡng nhắc; số công-tơ-mét.' },
+      { dir: 'Ra', text: 'Trạng thái và nội dung văn bản nhắc.' },
+    ],
+    example: 'Biển số 51C-29273 (xe 101).' });
+
+  def('ov-3', { kind: 'decision', k: 'Tổng thể 03', t: 'Việc phát sinh thuộc nhóm nào?',
+    s: 'Ba cửa vào: bảo dưỡng định kỳ · sửa chữa đột xuất · sửa chữa từ đánh giá định kỳ.',
+    screen: 'reminder', nav: { page: 'reminder', scope: 'MAINT' },
+    actors: [act(ROLE.tech, 'Phân loại sự việc và chọn cửa.'), act(ROLE.safety, 'Tiếp nhận sự cố từ tài xế.'), act(ROLE.driver, 'Phát hiện và báo sự cố.')],
+    cond: 'Cửa A: đến hạn bảo dưỡng hoặc vỏ lốp, ắc quy. Cửa B: sự cố, đánh giá đầu ngày, kỹ thuật viên phát hiện, hỏng phát sinh khi đang bảo dưỡng. Cửa C: đánh giá định kỳ có hạng mục không đạt.',
+    biz: [
+      'Việc nào đến từ nhắc bảo dưỡng thì đi cửa A, đi qua kế hoạch, BASE và phiếu.',
+      'Việc phát sinh bất ngờ đi cửa B, thường sửa ngay, không cần chờ kế hoạch.',
+      'Việc phát hiện qua đánh giá định kỳ đi cửa C; có thể sửa ngay hoặc hoãn vào kế hoạch tháng sau.',
+    ],
+    data: [{ dir: 'Nhánh', text: 'A → tab 3 · B và C → tab 4.' }] });
+
+  def('ov-a', { kind: 'proc', k: 'Cửa A', t: 'Bảo dưỡng định kỳ',
+    s: 'Nhắc hai tầng → dự toán → BASE duyệt kế hoạch → phiếu (gom hoặc tách) → lịch hẹn tài xế → BASE duyệt phiếu → bắt đầu, hoàn thành → số công-tơ-mét.',
+    screen: 'plansMaint', nav: { page: 'plansMaint', scope: 'MAINT', tab: 'lines' },
+    uses: ['ms-catalog', 'ms-template', 'ms-tirebattery', 'ms-material', 'ms-price'],
+    actors: [act(ROLE.tech, 'Rà soát, trình BASE, tạo phiếu.'), act(ROLE.fleet, 'Thống nhất ngày đưa xe vào.'), act(ROLE.mech, 'Thực hiện.'), act(ROLE.driver, 'Đem xe đến xưởng.'), act(ROLE.base, 'Duyệt kế hoạch và phiếu.')],
+    cond: 'Không được tạo phiếu bảo dưỡng khi kế hoạch chưa được BASE duyệt (APPROVED).',
+    biz: ['Chi tiết 22 bước ở tab 3 «Luồng bảo dưỡng và kế hoạch».'],
+    data: [{ dir: 'Ra', text: 'Dòng kế hoạch; phiếu PERIODIC / MAINTENANCE; trạng thái chu kỳ mới.' }] });
+
+  def('ov-b', { kind: 'proc', k: 'Cửa B', t: 'Sửa chữa đột xuất',
+    s: 'Sự cố do tài xế báo · phát sinh khi đang bảo dưỡng · đánh giá đầu ngày · kỹ thuật viên tự tạo.',
+    screen: 'historyRepair', nav: { page: 'historyRepair', scope: 'REPAIR', orderId: 'o1' },
+    uses: ['ms-repairitem', 'ms-material', 'ms-service'],
+    actors: [act(ROLE.driver, 'Báo sự cố trên điện thoại.'), act(ROLE.safety, 'Tiếp nhận, đánh giá mức an toàn.'), act(ROLE.mech, 'Tạo phiếu, điền nội dung.'), act(ROLE.tech, 'Giám sát.')],
+    cond: 'Đột xuất thường sửa ngay, không đi qua kế hoạch.',
+    biz: ['Chi tiết nguồn A đến D ở tab 4 «Luồng sửa chữa».'],
+    example: 'Phiếu o1 · RO-2026-1001 · INCIDENTAL (đột xuất) · APPROVED (đã phê duyệt).',
+    data: [{ dir: 'Ra', text: 'Phiếu sửa chữa; nếu từ phiếu bảo dưỡng thì lưu liên kết.' }] });
+
+  def('ov-c', { kind: 'proc', k: 'Cửa C', t: 'Sửa chữa từ đánh giá phương tiện định kỳ',
+    s: 'Hạng mục không đạt → sửa ngay hoặc đưa vào dự toán tháng sau.',
+    screen: 'assessment', nav: { page: 'assessment', scope: 'MAINT', tab: 'results', evalId: 'ev-101-20260920' },
+    uses: ['ms-criteria', 'ms-repairitem', 'ms-material'],
+    actors: [act(ROLE.mech, 'Chấm đánh giá.'), act(ROLE.tech, 'Quyết định sửa ngay hay hoãn.'), act(ROLE.safety, 'Xem hạng mục an toàn.')],
+    cond: 'Đợt đánh giá có ít nhất một hạng mục không đạt.',
+    biz: ['Chi tiết nguồn E và các bước quyết định ở tab 4.'],
+    example: 'evalId=ev-101-20260920.',
+    data: [{ dir: 'Ra', text: 'Phiếu sửa chữa hoặc dòng kế hoạch sửa chữa tồn.' }] });
+
+  def('ov-4', { kind: 'proc', k: 'Tổng thể 04', t: 'Lịch hẹn tài xế và phê duyệt phiếu trên BASE',
+    s: 'Áp dụng chung sau khi phiếu được tạo, bất kể từ cửa nào.',
+    screen: 'orderDetail', nav: { page: 'order', scope: 'MAINT', orderId: 'o20' },
+    actors: [act(ROLE.fleet, 'Lên lịch hẹn: xe, giờ, địa điểm.'), act(ROLE.driver, 'Xác nhận đem xe.'), act(ROLE.mech, 'Đồng bộ phiếu sang BASE.'), act(ROLE.base, 'Duyệt hoặc từ chối.')],
+    cond: 'Phiếu phải được BASE duyệt (APPROVED) mới bắt đầu nội dung chính thức.',
+    biz: ['Mỗi phiếu đi qua BASE trước khi làm. Từ chối phải sửa theo ghi chú rồi đồng bộ lại.', 'Lịch hẹn tài xế chưa có màn hình trên bản trình diễn (menu vô hiệu hóa).'],
+    demoNote: 'Menu «Kế hoạch xe - tài xế hàng ngày» đang vô hiệu hóa.',
+    data: [{ dir: 'Ra', text: 'Phiếu đã duyệt; lịch hẹn đã xác nhận (mục tiêu).' }] });
+
+  def('ov-5', { kind: 'proc', k: 'Tổng thể 05', t: 'Thực hiện từng nội dung và đo giờ',
+    s: 'Bắt đầu, hoàn thành từng nội dung; so thời gian thực tế với định mức.',
+    screen: 'orderDetail', nav: { page: 'order', scope: 'MAINT', orderId: 'o20' },
+    uses: ['ms-barem'],
+    actors: [act(ROLE.mech, 'Bấm bắt đầu, hoàn thành từng nội dung.'), act(ROLE.tech, 'Theo dõi.')],
+    cond: 'Phiếu đã được BASE duyệt.',
+    biz: ['Hệ thống ghi giờ bắt đầu và hoàn thành của từng nội dung, tính số phút thực tế và so với định mức.'],
+    data: [{ dir: 'Ghi', text: 'startedAt, completedAt, actualMinutes theo nội dung.' }] });
+
+  def('ov-6', { kind: 'end', k: 'Tổng thể 06', t: 'Đóng phiếu, tính lại chu kỳ, báo cáo giờ',
+    s: 'Nhập số công-tơ-mét; hạn bảo dưỡng kế tiếp được tính lại; bảng giờ cập nhật.',
+    screen: 'repairHoursReport', nav: { page: 'repairHoursReport', scope: 'MAINT' },
+    uses: ['ms-catalog', 'ms-barem'],
+    actors: [act(ROLE.mech, 'Nhập số công-tơ-mét, hoàn thành phiếu.'), act(ROLE.sys, 'Tính lại hạn.'), act(ROLE.tech, 'Xem báo cáo giờ.')],
+    cond: 'Tất cả nội dung đã hoàn thành.',
+    biz: ['Số công-tơ-mét và ngày hoàn thành là đầu vào cho chu kỳ mới của danh mục hoặc số seri liên quan.'],
+    data: [{ dir: 'Ra', text: 'Trạng thái đã hoàn thành; hạn mới; báo cáo giờ.' }] });
+
+  def('ov-7', { kind: 'ext', k: 'Ngoài hệ thống', t: 'PWMS, bộ phận mua hàng, BASE',
+    s: 'Dữ liệu nền và giá, duyệt kế hoạch và phiếu.',
+    screen: 'pwmsHistory', nav: { page: 'pwmsHistory', scope: 'MAINT' },
+    actors: [act(ROLE.pwms, 'Cấp vật tư, nội dung, hệ thống.'), act(ROLE.buy, 'Cập nhật giá.'), act(ROLE.base, 'Duyệt kế hoạch và phiếu.')],
+    biz: ['Bản trình diễn mô phỏng việc gửi và nhận kết quả; không gọi giao diện lập trình thật.'],
+    data: [{ dir: 'Gửi', text: 'Kế hoạch hoặc phiếu.' }, { dir: 'Nhận', text: 'PENDING / APPROVED / REJECTED và mã chứng từ.' }] });
+
+  def('ov-8', { kind: 'gap', k: 'Khoảng trống', t: 'Phần thiếu hoặc đang tạm tắt trên bản trình diễn',
+    s: 'Người dùng và vai trò · lịch xe - tài xế hàng ngày · đánh giá trước chuyến · kế hoạch sửa chữa · hồ sơ xe.',
+    screen: 'dailyPlan', nav: { page: 'order', scope: 'MAINT', orderId: 'o20' },
+    uses: ['ms-user', 'ms-fleet'],
+    actors: [act(ROLE.fleet, 'Cần lịch hẹn.'), act(ROLE.driver, 'Cần đánh giá trước chuyến và xác nhận lịch.'), act(ROLE.admin, 'Cần phân quyền.')],
+    biz: ['Xem tab 5 để biết trạng thái ẩn hoặc vô hiệu hóa của từng màn hình.'],
+    demoNote: 'Tổng hợp: Xe và mooc ẩn; Kế hoạch sửa chữa ẩn; Chi tiết xe khóa; Lịch xe - tài xế và Đánh giá trước chuyến vô hiệu hóa; Người dùng và vai trò chưa có.',
+    data: [{ dir: 'Cần', text: 'Bổ sung màn hình hoặc bật lại.' }] });
+
+  /* ---------- Luồng bảo dưỡng và kế hoạch (22 bước) ---------- */
+  def('mt-01', { kind: 'master', k: 'Bảo dưỡng 01', t: 'Khai báo danh mục bảo dưỡng và nhiều mốc chu kỳ',
+    s: 'Mốc một lần, lặp lại, bắt buộc thay; hai mốc nhắc riêng: nhắc bảo dưỡng và nhắc kế hoạch.',
+    screen: 'catalogDetail', nav: { page: 'catalogDetail', scope: 'MAINT', catalogId: 1 },
+    uses: ['ms-catalog', 'ms-system', 'ms-service', 'ms-material'],
+    actors: [act(ROLE.tech, 'Khai báo, sửa chu kỳ, chọn vật tư gợi ý.'), act(ROLE.fleet, 'Góp ý chu kỳ phù hợp thực tế vận hành.')],
+    cond: 'Đã có hệ thống trên xe và loại dịch vụ.',
+    biz: [
+      'Danh mục là đơn vị bảo dưỡng nhỏ nhất (ví dụ thay dầu nhớt động cơ). Mỗi danh mục gắn một hệ thống và một loại dịch vụ.',
+      'Danh mục có thể có nhiều mốc. Ví dụ thay dầu: mỗi 10.000 ki-lô-mét hoặc 6 tháng, cái nào đến trước.',
+      'Hai mốc nhắc: «mốc nhắc bảo dưỡng» (cảnh báo sớm) và «mốc nhắc kế hoạch» (đủ điều kiện lập dự toán). Thiếu mốc nhắc kế hoạch thì khó tự đẩy vào dự toán đúng lúc.',
+      'Mốc bắt buộc thay (forceReplace) nghĩa là đến mốc phải thay, không được bỏ qua.',
+    ],
+    ui: [
+      'Vào <strong>7. Danh mục bảo dưỡng</strong> (page=catalogDetail&amp;catalogId=1).',
+      'Bấm vào dòng <strong>catalogId=1 Thay dầu nhớt động cơ</strong> → bảng chi tiết bên phải.',
+      'Tab <strong>Chu kỳ</strong>: thêm hoặc sửa mốc (ki-lô-mét, giờ, tháng, năm; lặp lại; bắt buộc thay).',
+      'Nhập riêng mốc nhắc bảo dưỡng và mốc nhắc kế hoạch.',
+    ],
+    data: [
+      { dir: 'Vào', text: 'Chính sách của hãng và doanh nghiệp.' },
+      { dir: 'Ghi', text: 'Danh sách mốc; hệ thống; loại dịch vụ.' },
+      { dir: 'Ra', text: 'Danh mục sẵn sàng gắn xe và đưa vào quét.' },
+    ],
+    example: 'catalogId=1 · Thay dầu nhớt động cơ.' });
+
+  def('mt-02', { kind: 'master', k: 'Bảo dưỡng 02', t: 'Gắn danh mục vào xe (hàng loạt hoặc theo xe)',
+    s: 'Chuột phải trên lưới danh mục; mooc không gắn danh mục động cơ.',
+    screen: 'catalog', nav: { page: 'catalog', scope: 'MAINT' },
+    uses: ['ms-catalog', 'ms-fleet'],
+    actors: [act(ROLE.tech, 'Chọn danh mục và xe, xác nhận.'), act(ROLE.fleet, 'Xác nhận danh sách xe áp dụng.')],
+    cond: 'Danh mục đã có chu kỳ; xe có trong danh sách.',
+    biz: ['Kết quả gắn được lưu theo từng xe (vehicleCatalogIds). Xe không gắn danh mục sẽ không có dòng nhắc.', 'Tab «Xe đang dùng» của bảng chi tiết giúp đối soát xe nào đã gắn.'],
+    demoNote: 'Hồ sơ xe tab danh mục khó mở vì ALLOW_OPEN_VEHICLE_DETAIL=false; dùng gắn hàng loạt trên lưới danh mục.',
+    ui: [
+      'Mở <strong>7. Danh mục bảo dưỡng</strong>.',
+      'Chuột phải dòng → <strong>Gắn hàng loạt vào xe</strong>.',
+      'Chọn nhiều danh mục và nhiều xe (ví dụ 51C-29273, 50H-87033) → xác nhận.',
+      'Chuyển sang tab <strong>Xe đang dùng</strong> kiểm tra.',
+    ],
+    data: [{ dir: 'Ghi', text: 'Tập danh mục của mỗi xe.' }, { dir: 'Ra', text: 'Xe có tập danh mục để tính hạn.' }] });
+
+  def('mt-03', { kind: 'master', k: 'Bảo dưỡng 03', t: 'Số seri vỏ lốp và ắc quy đang lắp',
+    s: 'Định mức tháng, ngày lắp, cảnh báo theo tuổi thọ.',
+    screen: 'tireBattery', nav: { page: 'tireBattery', scope: 'MAINT', tab: 'TIRE' },
+    uses: ['ms-tirebattery', 'ms-fleet'],
+    actors: [act(ROLE.fleet, 'Ghi lắp và tháo.'), act(ROLE.tech, 'Quyết định đưa vào kế hoạch sớm.'), act(ROLE.mech, 'Thay thực tế.')],
+    biz: ['Hệ thống tính hạn thay theo tuổi thọ tháng. Dòng cảnh báo xuất hiện chung trên bảng Nhắc bảo dưỡng.', 'Có thể chọn số seri và đưa vào kế hoạch thủ công.'],
+    ui: ['Thanh bên → <strong>Vỏ lốp / ắc quy</strong>.', 'Chọn tab TIRE hoặc BATTERY.', 'Chọn số seri cần thay → đưa vào kế hoạch.'],
+    example: 'Bản sâu hơn: 15-seri-vo-lop-ac-quy.html.',
+    data: [{ dir: 'Vào', text: 'Số seri, ngày lắp, định mức tháng.' }, { dir: 'Ra', text: 'Cảnh báo và nguồn dòng kế hoạch.' }] });
+
+  def('mt-04', { kind: 'gap', k: 'Bảo dưỡng 04', t: 'Ghi đè mốc hoặc ki-lô-mét trung bình theo từng xe',
+    s: 'Xe chạy nhiều hoặc ít hơn chuẩn thì hạn kế tiếp phải điều chỉnh. Giao diện đang bị khóa.',
+    screen: 'vehicleDetail', nav: { page: 'vehicle', scope: 'MAINT', vehicleId: 101, tab: 'catalog' },
+    uses: ['ms-catalog', 'ms-fleet'],
+    actors: [act(ROLE.fleet, 'Đề xuất ghi đè theo thực tế.'), act(ROLE.tech, 'Chốt ghi đè.')],
+    cond: 'Có danh mục đã gắn xe.',
+    biz: ['Ghi đè thắng chu kỳ gốc khi tính hạn.', 'Ki-lô-mét trung bình mỗi tháng của xe được dùng để ước tính ngày đến hạn.'],
+    ui: ['Mục tiêu: Chi tiết xe → tab danh mục → sửa ghi đè.', 'Bản trình diễn: kiểm tra ảnh hưởng trên màn hình Nhắc bảo dưỡng.'],
+    demoNote: 'ALLOW_OPEN_VEHICLE_DETAIL=false: nút mở hồ sơ xe bị ẩn; nghiệp vụ vẫn cần.',
+    data: [{ dir: 'Ghi', text: 'Ghi đè theo xe và danh mục.' }, { dir: 'Ảnh hưởng', text: 'Hạn tính trên bảng nhắc.' }] });
+
+  def('mt-05', { kind: 'proc', k: 'Bảo dưỡng 05', t: 'Quét và tính hạn theo từng xe',
+    s: 'Số công-tơ-mét, chu kỳ, ghi đè, số seri.',
+    screen: 'reminder', nav: { page: 'reminder', scope: 'MAINT', tab: 'dashboard', plate: '51C-29273' },
+    uses: ['ms-catalog', 'ms-tirebattery', 'ms-settings'],
+    actors: [act(ROLE.sys, 'Chạy quét và ghi kết quả.'), act(ROLE.tech, 'Đọc bảng nhắc.'), act(ROLE.fleet, 'Nắm danh sách xe sắp đến hạn.')],
+    biz: ['Hệ thống lấy lần bảo dưỡng gần nhất của từng danh mục, cộng chu kỳ, so với ngày quét và số công-tơ-mét.', 'Bảng này là hộp thư đến trước khi tạo kế hoạch.'],
+    ui: ['Mở <strong>Nhắc bảo dưỡng</strong>.', 'Tìm biển số <strong>51C-29273</strong>.', 'Đọc cột trạng thái, mốc nhắc bảo dưỡng, mốc nhắc kế hoạch, số ki-lô-mét còn lại.', 'Xem lịch sử các lần bảo dưỡng nếu có.'],
+    example: 'Biển số 51C-29273.',
+    data: [{ dir: 'Vào', text: 'Ngày quét, số công-tơ-mét, chu kỳ, ghi đè, số seri.' }, { dir: 'Ra', text: 'Bình thường, sắp đến hạn, quá hạn kèm văn bản mốc nhắc.' }] });
+
+  def('mt-06', { kind: 'decision', k: 'Bảo dưỡng 06', t: 'Đã tới ngưỡng nhắc bảo dưỡng?',
+    s: 'Cảnh báo sớm; chưa bắt buộc tạo kế hoạch.',
+    screen: 'reminder', nav: { page: 'reminder', scope: 'MAINT' },
+    uses: ['ms-settings'],
+    actors: [act(ROLE.sys, 'Đánh giá điều kiện.'), act(ROLE.tech, 'Theo dõi.')],
+    cond: 'Ngày hiện tại đã đạt mốc nhắc bảo dưỡng (trước hạn theo số ki-lô-mét hoặc ngày đặt ở mục Cài đặt) thì hiện «sắp đến hạn».',
+    biz: ['Chưa tới ngưỡng: dòng ở trạng thái bình thường, không nổi cảnh báo.', 'Đã tới: dòng chuyển sang sắp đến hạn và đi tiếp bước kiểm tra mốc kế hoạch.'],
+    ui: ['Đối chiếu ngưỡng ở <strong>9. Cài đặt nhắc đánh giá</strong>.', 'Quan sát dòng sắp đến hạn trên bảng nhắc.'],
+    data: [{ dir: 'Đọc', text: 'Ngưỡng nhắc; hạn tính được.' }] });
+
+  def('mt-07', { kind: 'end', k: 'Bảo dưỡng 07', t: 'Chỉ theo dõi trên bảng nhắc',
+    s: 'Chưa đủ điều kiện lập kế hoạch.',
+    screen: 'reminder', nav: { page: 'reminder', scope: 'MAINT' },
+    actors: [act(ROLE.tech, 'Giữ bộ lọc sắp đến hạn; chỉnh ngưỡng nếu quá sớm hoặc muộn.')],
+    biz: ['Không tạo dòng kế hoạch ở bước này; hàng nhắc chờ đến ngày quét sau.'],
+    ui: ['Giữ bộ lọc «sắp đến hạn».', 'Nếu cần, chỉnh ngưỡng ở Cài đặt.'],
+    data: [{ dir: 'Giữ', text: 'Hàng nhắc, chưa có dòng kế hoạch.' }] });
+
+  def('mt-08', { kind: 'decision', k: 'Bảo dưỡng 08', t: 'Đã tới mốc nhắc kế hoạch hoặc quá hạn?',
+    s: 'Điều kiện đưa vào dự toán (tự động hoặc thủ công).',
+    screen: 'reminder', nav: { page: 'reminder', scope: 'MAINT' },
+    actors: [act(ROLE.sys, 'Tự đẩy dòng quá hạn.'), act(ROLE.tech, 'Chủ động đưa dòng đủ điều kiện.')],
+    cond: 'Đã đạt mốc nhắc kế hoạch HOẶC trạng thái là quá hạn thì đủ điều kiện lập dự toán.',
+    biz: ['Ngày dự toán mặc định là ngày quét; người dùng sửa được trước khi trình BASE.', 'Vỏ lốp, ắc quy đi theo cách tương tự dựa trên tuổi thọ số seri.'],
+    ui: ['Chọn dòng đủ điều kiện → chuột phải hoặc nút <strong>Đưa vào kế hoạch</strong>.', 'Cơ chế tự đẩy dòng quá hạn chạy sau mỗi lần quét.'],
+    data: [{ dir: 'Vào', text: 'Dòng nhắc; ngày quét.' }, { dir: 'Ra', text: 'Ý định tạo dòng kế hoạch.' }] });
+
+  def('mt-09', { kind: 'decision', k: 'Bảo dưỡng 09', t: 'Nguồn tạo dự toán là gì?',
+    s: 'Tự động quét · thủ công từ nhắc · thủ công từ vỏ lốp ắc quy · từ mẫu.',
+    screen: 'plansMaint', nav: { page: 'plansMaint', scope: 'MAINT', tab: 'lines' },
+    uses: ['ms-catalog', 'ms-tirebattery', 'ms-template'],
+    actors: [act(ROLE.sys, 'Tự động tạo từ quét.'), act(ROLE.tech, 'Tạo thủ công hoặc áp dụng mẫu.')],
+    cond: 'Mỗi nguồn khác nhau ở cách gợi ý vật tư và lưu vết (kiểm toán).',
+    biz: ['Từ danh mục: gợi ý vật tư của danh mục.', 'Từ vỏ lốp, ắc quy: gợi ý số seri cần thay.', 'Từ mẫu: sinh nhiều dòng một lúc cho nhiều xe.', 'Nguồn tự động hay thủ công đều lưu để sau này đối soát.'],
+    ui: ['Tự động: mở Kế hoạch bảo dưỡng thấy dòng mới.', 'Thủ công từ nhắc: chọn dòng → Đưa vào kế hoạch.', 'Từ vỏ lốp, ắc quy: chọn số seri → đưa vào kế hoạch.', 'Từ mẫu: tab mẫu → áp dụng.'],
+    data: [{ dir: 'Ra', text: 'Một hoặc nhiều dòng kế hoạch ở trạng thái nháp.' }] });
+
+  def('mt-10', { kind: 'proc', k: 'Bảo dưỡng 10', t: 'Sinh dòng kế hoạch (dự toán)',
+    s: 'Gợi ý vật tư, nội dung, loại dịch vụ, hệ thống từ danh mục, lịch sử và đơn giá mua hàng gần nhất.',
+    screen: 'plansMaint', nav: { page: 'plansMaint', scope: 'MAINT', tab: 'lines', mode: 'LINE' },
+    uses: ['ms-catalog', 'ms-material', 'ms-price', 'ms-repairitem'],
+    actors: [act(ROLE.sys, 'Sinh dòng, gợi ý vật tư và giá.'), act(ROLE.tech, 'Chỉnh dòng.')],
+    biz: ['Mỗi dòng có xe, danh mục, kỳ, ngày dự toán, số lượng, đơn giá, vật tư.', 'Dòng ở trạng thái nháp, chưa trình BASE.'],
+    ui: ['Mở <strong>Kế hoạch bảo dưỡng</strong> tab dòng (mode=LINE).', 'Bấm dòng → bảng chi tiết: vật tư, đơn giá gợi ý, ghi chú, kỹ thuật viên.', 'Sửa ngày dự toán nếu khác ngày quét.'],
+    example: 'mode=LINE (chuyển sang mode=VEHICLE để chọn cả xe).',
+    data: [{ dir: 'Vào', text: 'Danh mục, lịch sử, giá.' }, { dir: 'Ghi', text: 'Dòng kế hoạch: xe, danh mục, kỳ, ngày, số lượng, đơn giá.' }] });
+
+  def('mt-11', { kind: 'proc', k: 'Bảo dưỡng 11', t: 'Rà soát và chỉnh trước khi trình',
+    s: 'Ngày, vật tư, số lượng, kỹ thuật viên, ghi chú; chọn tập dòng sẽ trình.',
+    screen: 'plansMaint', nav: { page: 'plansMaint', scope: 'MAINT', tab: 'lines' },
+    actors: [act(ROLE.tech, 'Rà soát nội dung kỹ thuật.'), act(ROLE.fleet, 'Rà soát ngày xe có thể vào xưởng.')],
+    biz: ['Người rà soát chốt đúng tập dòng, vì trình BASE theo tập đã chọn.', 'Sau khi trình, BASE nhận bản chụp (snapshot) của các dòng.'],
+    ui: ['Tick từng dòng hoặc chọn theo xe.', 'Sửa trực tiếp trên lưới hoặc bảng chi tiết.', 'Chuột phải: <strong>Trình BASE hạng mục đã chọn</strong> hoặc <strong>Trình BASE cả xe</strong>.', 'Hoặc nút <strong>Trình BASE</strong> trên thanh công cụ.'],
+    data: [{ dir: 'Sửa', text: 'Ngày dự toán, vật tư, kỹ thuật viên, ghi chú.' }, { dir: 'Ra', text: 'Tập dòng sẵn sàng trình.' }] });
+
+  def('mt-12', { kind: 'ext', k: 'Bảo dưỡng 12', t: 'Trình kế hoạch lên BASE',
+    s: 'Xin duyệt dự toán kỳ; khác với bước duyệt phiếu.',
+    screen: 'plansMaint', nav: { page: 'plansMaint', scope: 'MAINT', tab: 'lines' },
+    actors: [act(ROLE.tech, 'Trình.'), act(ROLE.fleet, 'Theo dõi trạng thái.'), act(ROLE.base, 'Nhận và xử lý.')],
+    biz: ['Dữ liệu gửi: xe, hạng mục, vật tư, tiền, kỳ, ngày dự toán.', 'Sau khi trình, bấm «Đồng bộ BASE» để cập nhật trạng thái mô phỏng.'],
+    ui: ['Thanh công cụ <strong>Trình BASE</strong>.', 'Sau đó <strong>Đồng bộ BASE</strong>.'],
+    data: [{ dir: 'Gửi', text: 'Gói kế hoạch.' }, { dir: 'Nhận', text: 'Trạng thái chờ hoặc đã đồng bộ, mã chứng từ.' }] });
+
+  def('mt-13', { kind: 'decision', k: 'Bảo dưỡng 13', t: 'BASE đã duyệt kế hoạch chưa?',
+    s: 'Chỉ khi APPROVED mới được tạo phiếu.',
+    screen: 'plansMaint', nav: { page: 'plansMaint', scope: 'MAINT', tab: 'lines' },
+    actors: [act(ROLE.base, 'Quyết định duyệt, từ chối hoặc chờ.'), act(ROLE.tech, 'Sửa khi bị từ chối.')],
+    cond: 'APPROVED → tạo phiếu. PENDING → chờ. REJECTED → sửa và trình lại.',
+    biz: ['Đọc huy hiệu phê duyệt trên nhóm hoặc dòng.', 'Bị từ chối: xem lý do, sửa vật tư hoặc ngày rồi trình lại.'],
+    ui: ['Xem huy hiệu duyệt.', 'REJECTED: đọc lý do → sửa → trình lại.'],
+    data: [{ dir: 'Đọc', text: 'Trạng thái phê duyệt của dòng.' }] });
+
+  def('mt-14', { kind: 'end', k: 'Bảo dưỡng 14', t: 'Chờ hoặc sửa rồi trình lại',
+    s: 'Chưa phát sinh phiếu bảo dưỡng.',
+    screen: 'plansMaint', nav: { page: 'plansMaint', scope: 'MAINT', tab: 'lines' },
+    actors: [act(ROLE.tech, 'Cập nhật theo ghi chú từ chối.')],
+    biz: ['Giữ nguyên dòng kế hoạch và nhật ký phê duyệt.'],
+    ui: ['Cập nhật.', 'Trình BASE lại.'],
+    data: [{ dir: 'Giữ', text: 'Dòng kế hoạch và nhật ký.' }] });
+
+  def('mt-15', { kind: 'decision', k: 'Bảo dưỡng 15', t: 'Gom thành một phiếu hay tách nhiều phiếu?',
+    s: 'Cùng xe cùng kỳ: một phiếu nhiều dòng, hoặc nhiều phiếu theo nhóm hay xưởng.',
+    screen: 'plansMaint', nav: { page: 'plansMaint', scope: 'MAINT', tab: 'lines' },
+    actors: [act(ROLE.tech, 'Quyết định cách gom.')],
+    cond: 'Gom: chọn nhiều hạng mục rồi tạo phiếu một lần. Tách: tạo phiếu nhiều lần với các tập chọn khác nhau.',
+    biz: ['Mỗi phiếu lưu danh sách mã dòng kế hoạch để đối soát hai chiều.'],
+    ui: ['Tick đúng tập dòng cùng phiếu.', 'Thanh công cụ <strong>Tạo phiếu từ đã chọn</strong> hoặc chuột phải <strong>Tạo phiếu</strong>.', 'Tách xưởng: bỏ tick, tạo lần hai với tập còn lại.'],
+    data: [{ dir: 'Vào', text: 'Dòng đã được duyệt.' }, { dir: 'Ra', text: 'Một hoặc nhiều phiếu.' }] });
+
+  def('mt-16', { kind: 'proc', k: 'Bảo dưỡng 16', t: 'Tạo phiếu bảo dưỡng từ kế hoạch',
+    s: 'Chụp nội dung và vật tư; liên kết với các dòng kế hoạch.',
+    screen: 'orderDetail', nav: { page: 'order', scope: 'MAINT', orderId: 'o20' },
+    uses: ['ms-service', 'ms-material'],
+    actors: [act(ROLE.tech, 'Tạo phiếu.'), act(ROLE.mech, 'Nhận phiếu để thực hiện.')],
+    biz: ['Phiếu ở trạng thái nháp hoặc sẵn sàng để kỹ thuật viên nhận. Loại phiếu: PERIODIC (định kỳ).'],
+    ui: ['Sau khi tạo: <strong>Bảo dưỡng</strong> → mở phiếu mới.', 'Xem phiếu mẫu <strong>o20 / PBD-2026-2003</strong>.', 'Từ kế hoạch xem liên kết phiếu và ngược lại.'],
+    example: 'o20 · PBD-2026-2003 · PERIODIC · xe 101.',
+    data: [{ dir: 'Ghi', text: 'Phiếu bảo dưỡng, danh sách dòng kế hoạch, vật tư, nội dung.' }] });
+
+  def('mt-17', { kind: 'gap', k: 'Bảo dưỡng 17', t: 'Lên lịch hẹn tài xế đem xe đến xưởng',
+    s: 'Xe, giờ hẹn, địa điểm; tài xế xác nhận.',
+    screen: 'dailyPlan', nav: { page: 'order', scope: 'MAINT', orderId: 'o20' },
+    uses: ['ms-fleet', 'ms-user'],
+    actors: [act(ROLE.fleet, 'Lập lịch.'), act(ROLE.driver, 'Xác nhận trên điện thoại.')],
+    cond: 'Phiếu đã được tạo.',
+    biz: ['Bắt buộc theo quy trình thực tế dù bản trình diễn chưa có giao diện.'],
+    demoNote: 'Menu «Kế hoạch xe - tài xế hàng ngày» đang vô hiệu hóa.',
+    ui: ['Mục tiêu: tạo lịch gắn phiếu.', 'Bản trình diễn: mở phiếu o20.'],
+    data: [{ dir: 'Vào', text: 'Mã phiếu, giờ, xưởng.' }, { dir: 'Ra', text: 'Lịch đã gửi hoặc đã xác nhận (mục tiêu).' }] });
+
+  def('mt-18', { kind: 'ext', k: 'Bảo dưỡng 18', t: 'Kỹ thuật viên đồng bộ BASE trên phiếu',
+    s: 'Duyệt phiếu, khác với trình kế hoạch.',
+    screen: 'orderDetail', nav: { page: 'order', scope: 'MAINT', orderId: 'o20' },
+    actors: [act(ROLE.mech, 'Bấm đồng bộ.'), act(ROLE.base, 'Duyệt.')],
+    biz: ['Gửi nội dung và vật tư trên phiếu.', 'Chờ APPROVED mới bắt đầu.'],
+    ui: ['Mở orderId=<strong>o20</strong>.', 'Bấm <strong>Đồng bộ BASE</strong>.', 'Theo dõi huy hiệu phê duyệt.'],
+    data: [{ dir: 'Gửi', text: 'Phiếu và nội dung.' }, { dir: 'Nhận', text: 'Trạng thái phê duyệt.' }] });
+
+  def('mt-19', { kind: 'decision', k: 'Bảo dưỡng 19', t: 'Phiếu đã được BASE duyệt chưa?',
+    s: 'Cổng cho bước bắt đầu.',
+    screen: 'orderDetail', nav: { page: 'order', scope: 'MAINT', orderId: 'o20' },
+    actors: [act(ROLE.base, 'Duyệt hoặc từ chối.'), act(ROLE.mech, 'Sửa theo ghi chú.')],
+    cond: 'approvalStatus = APPROVED → được bắt đầu; ngược lại bổ sung rồi đồng bộ lại.',
+    biz: ['Từ chối: xem nhật ký, sửa nội dung hoặc vật tư.'],
+    ui: ['Đọc huy hiệu và nhật ký duyệt.', 'Từ chối: sửa → Đồng bộ lại.'],
+    data: [{ dir: 'Đọc', text: 'Trạng thái và nhật ký duyệt.' }] });
+
+  def('mt-20', { kind: 'proc', k: 'Bảo dưỡng 20', t: 'Thực hiện: bắt đầu và hoàn thành từng nội dung',
+    s: 'Ghi giờ; so với định mức.',
+    screen: 'orderDetail', nav: { page: 'order', scope: 'MAINT', orderId: 'o20' },
+    uses: ['ms-barem'],
+    actors: [act(ROLE.mech, 'Thực hiện và bấm.'), act(ROLE.tech, 'Giám sát.')],
+    biz: ['Với từng nội dung: bắt đầu → làm → hoàn thành.', 'Phát sinh hỏng thêm: tạo phiếu sửa chữa từ phiếu bảo dưỡng.'],
+    ui: ['Bấm <strong>Bắt đầu</strong>.', 'Làm xong → <strong>Hoàn thành</strong>.', 'Xem số phút thực tế so với định mức.'],
+    data: [{ dir: 'Ghi', text: 'Giờ bắt đầu, hoàn thành, số phút thực tế.' }] });
+
+  def('mt-21', { kind: 'proc', k: 'Bảo dưỡng 21', t: 'Nhập số công-tơ-mét và đóng phiếu',
+    s: 'Số công-tơ-mét và ngày hoàn thành là đầu vào chu kỳ mới.',
+    screen: 'orderDetail', nav: { page: 'order', scope: 'MAINT', orderId: 'o20' },
+    actors: [act(ROLE.mech, 'Nhập và đóng phiếu.')],
+    biz: ['Thiếu số công-tơ-mét thì tính lại hạn sai.', 'Phiếu chuyển sang COMPLETED (hoàn thành).'],
+    ui: ['Nhập số công-tơ-mét.', 'Đánh dấu hoàn thành.'],
+    data: [{ dir: 'Ghi', text: 'Số công-tơ-mét, ngày hoàn thành, trạng thái.' }, { dir: 'Kích hoạt', text: 'Tính lại hạn tiếp theo.' }] });
+
+  def('mt-22', { kind: 'end', k: 'Bảo dưỡng 22', t: 'Chu kỳ mới và báo cáo giờ kỹ thuật viên',
+    s: 'Nhắc bảo dưỡng nhảy hạn; báo cáo giờ cập nhật.',
+    screen: 'reminder', nav: { page: 'reminder', scope: 'MAINT', tab: 'dashboard' },
+    uses: ['ms-catalog', 'ms-barem'],
+    actors: [act(ROLE.sys, 'Tính chu kỳ mới.'), act(ROLE.tech, 'Xem báo cáo.'), act(ROLE.mech, 'Xem giờ của mình.')],
+    biz: ['Lịch sử các lần bảo dưỡng tăng thêm một lần.'],
+    ui: ['Mở lại Nhắc bảo dưỡng.', 'Mở Bảng tổng hợp giờ và Bảng giờ sửa chữa Kỹ Thuật Viên.'],
+    data: [{ dir: 'Ra', text: 'Chu kỳ mới; lịch sử; chỉ số giờ.' }] });
+
+  /* ---------- Luồng sửa chữa ---------- */
+  def('rp-00', { kind: 'data', k: 'Sửa chữa 00', t: 'Năm nguồn vào sửa chữa',
+    s: 'A tài xế báo sự cố · B từ phiếu bảo dưỡng · C đánh giá đầu ngày · D kỹ thuật viên tự tạo · E đánh giá định kỳ.',
+    screen: 'historyRepair', nav: { page: 'historyRepair', scope: 'REPAIR' },
+    actors: [act(ROLE.driver, 'Nguồn A, C.'), act(ROLE.safety, 'Nguồn A, C.'), act(ROLE.mech, 'Nguồn B, D, E.'), act(ROLE.tech, 'Nguồn E và quyết định hoãn.')],
+    biz: ['Nguồn quyết định biểu mẫu, quyền và việc có được hoãn vào kế hoạch hay không.', 'Nguồn A đến D thường sửa ngay. Nguồn E có thể hoãn.'],
+    ui: ['Bấm từng bước nguồn bên dưới.'],
+    data: [{ dir: 'Ra', text: 'Nguồn của phiếu: sự cố (INCIDENT), từ phiếu bảo dưỡng (FROM_MAINT), trước chuyến (PRE_TRIP), kỹ thuật viên tạo, đánh giá định kỳ (PERIODIC_EVAL).' }] });
+
+  def('rp-a', { kind: 'proc', k: 'Nguồn A', t: 'Tài xế báo sự cố, Ban an toàn tiếp nhận, tạo phiếu',
+    s: 'An toàn trước; tạo yêu cầu gắn với xe.',
+    screen: 'mobileDriver', nav: { file: FILE_MOBILE_DRIVER },
+    actors: [act(ROLE.driver, 'Gửi mô tả sự cố, ảnh.'), act(ROLE.safety, 'Tiếp nhận, đánh giá mức an toàn, quyết định dừng xe.'), act(ROLE.mech, 'Tạo phiếu và xử lý.')],
+    biz: ['Tài xế báo sự cố trên điện thoại kèm biển số, mô tả và thời điểm.', 'Ban an toàn tiếp nhận để quyết định cho xe tiếp tục hay dừng.', 'Sau đó kỹ thuật viên tạo phiếu sửa chữa nguồn INCIDENT.', 'Bản trình diễn chưa có màn riêng cho Ban an toàn.'],
+    ui: ['«Xem prototype» mở bản mẫu điện thoại.', 'Trong console: phiếu <strong>o1 / RO-2026-1001</strong> thể hiện kết quả.'],
+    example: 'Bản mẫu điện thoại riêng; console orderId=o1.',
+    data: [{ dir: 'Vào', text: 'Biển số, mô tả, ảnh, thời điểm.' }, { dir: 'Ra', text: 'Phiếu sửa chữa nguồn INCIDENT.' }] });
+
+  def('rp-b', { kind: 'proc', k: 'Nguồn B', t: 'Đang bảo dưỡng phát sinh hỏng, tạo phiếu sửa chữa từ phiếu bảo dưỡng',
+    s: 'Kế thừa xe, kỹ thuật viên và liên kết với phiếu bảo dưỡng.',
+    screen: 'orderDetail', nav: { page: 'order', scope: 'MAINT', orderId: 'o20' },
+    actors: [act(ROLE.mech, 'Phát hiện và tạo phiếu.'), act(ROLE.tech, 'Theo dõi.')],
+    biz: ['Phiếu sửa chữa mới giữ liên kết với phiếu bảo dưỡng gốc để truy vết.', 'Hạng mục không thuộc bảo dưỡng được chuyển sang phiếu mới.'],
+    ui: ['Mở phiếu bảo dưỡng, ví dụ <strong>o20</strong>.', 'Chọn <strong>Tạo phiếu sửa chữa</strong> hoặc chuyển hạng mục.', 'Mở danh sách Sửa chữa kiểm tra liên kết.'],
+    data: [{ dir: 'Vào', text: 'Mã phiếu bảo dưỡng, xe, kỹ thuật viên.' }, { dir: 'Ra', text: 'Phiếu sửa chữa có liên kết.' }] });
+
+  def('rp-c', { kind: 'gap', k: 'Nguồn C', t: 'Đánh giá xe đầu ngày: tiêu chí không đạt',
+    s: 'Cảnh báo cho quản lý kỹ thuật và Ban an toàn.',
+    screen: 'preTrip', nav: { page: 'assessment', scope: 'MAINT', tab: 'vehicles' },
+    uses: ['ms-criteria'],
+    actors: [act(ROLE.driver, 'Chấm đánh giá đầu ngày.'), act(ROLE.safety, 'Nhận cảnh báo an toàn.'), act(ROLE.tech, 'Nhận cảnh báo kỹ thuật, tạo phiếu.')],
+    biz: ['Tài xế chấm đánh giá trước chuyến; tiêu chí không đạt phát cảnh báo tới Ban an toàn và quản lý kỹ thuật.', 'Cần tạo phiếu sửa chữa nếu ảnh hưởng vận hành.'],
+    demoNote: 'Menu «Đánh giá phương tiện trước chuyến» đang vô hiệu hóa. Dùng đánh giá định kỳ để minh họa.',
+    ui: ['Mục tiêu: tài xế gửi đánh giá → hộp thư cảnh báo → tạo phiếu.', 'Bản trình diễn: dùng màn hình Đánh giá phương tiện định kỳ.'],
+    data: [{ dir: 'Vào', text: 'Đánh giá trước chuyến có hạng mục không đạt.' }, { dir: 'Ra', text: 'Cảnh báo; có thể tạo phiếu.' }] });
+
+  def('rp-d', { kind: 'proc', k: 'Nguồn D', t: 'Kỹ thuật viên chủ động tạo phiếu sửa chữa',
+    s: 'Phát hiện hỏng khi kiểm tra hoặc làm việc tại xưởng.',
+    screen: 'historyRepair', nav: { page: 'historyRepair', scope: 'REPAIR', plate: '51C-29273' },
+    actors: [act(ROLE.mech, 'Tạo phiếu.'), act(ROLE.tech, 'Giám sát.')],
+    biz: ['Phiếu ghi nguồn là kỹ thuật viên tạo.'],
+    ui: ['Thanh bên → <strong>Sửa chữa</strong> → <strong>Tạo phiếu</strong>.', 'Chọn xe 51C-29273.', 'Lưu nháp rồi mở chi tiết.'],
+    data: [{ dir: 'Vào', text: 'Xe, mô tả hỏng.' }, { dir: 'Ra', text: 'Phiếu nguồn kỹ thuật viên.' }] });
+
+  def('rp-e', { kind: 'proc', k: 'Nguồn E', t: 'Đánh giá định kỳ có hạng mục không đạt',
+    s: 'Hệ thống, nội dung sửa chữa và vật tư gợi ý đã có từ tiêu chí.',
+    screen: 'assessment', nav: { page: 'assessment', scope: 'MAINT', tab: 'results', evalId: 'ev-101-20260920' },
+    uses: ['ms-criteria', 'ms-repairitem', 'ms-material', 'ms-system'],
+    actors: [act(ROLE.mech, 'Chấm đánh giá.'), act(ROLE.tech, 'Chọn hạng mục để tạo phiếu hoặc hoãn.'), act(ROLE.safety, 'Xem hạng mục an toàn.')],
+    biz: ['Mỗi hạng mục không đạt hiện sẵn nội dung và vật tư gợi ý.', 'Người quản lý quyết định sửa ngay hoặc hoãn.'],
+    ui: ['Mở <strong>Đánh giá phương tiện định kỳ</strong> → tab kết quả.', 'Mở đường dẫn sâu evalId=<strong>ev-101-20260920</strong>.', 'Chọn hạng mục không đạt → xem gợi ý.', 'Chuột phải: <strong>Tạo phiếu sửa chữa (cả hạng mục lỗi)</strong>.'],
+    example: 'evalId=ev-101-20260920 (xe 51C-29273).',
+    data: [{ dir: 'Vào', text: 'Kết quả đánh giá; liên kết tiêu chí.' }, { dir: 'Ra', text: 'Ứng viên phiếu hoặc kế hoạch sửa chữa.' }] });
+
+  def('rp-10', { kind: 'decision', k: 'Sửa chữa 10', t: 'Sửa ngay hay đưa vào kế hoạch sửa chữa?',
+    s: 'Chủ yếu sau đánh giá định kỳ; đột xuất thường sửa ngay.',
+    screen: 'assessment', nav: { page: 'assessment', scope: 'MAINT', tab: 'results' },
+    actors: [act(ROLE.tech, 'Quyết định.'), act(ROLE.safety, 'Có thể yêu cầu sửa ngay.')],
+    cond: 'Khẩn cấp, an toàn, đột xuất → CREATE_ORDER (tạo phiếu ngay). Có thể hoãn → DEFER_TO_PLAN (dự toán tháng sau hoặc ngày khác ngày đánh giá).',
+    biz: ['Nguồn A đến D hầu như luôn đi nhánh sửa ngay.'],
+    ui: ['Sửa ngay: tạo phiếu từ hạng mục chọn.', 'Hoãn: đưa vào kế hoạch sửa chữa (menu đang ẩn).'],
+    data: [{ dir: 'Nhánh', text: 'CREATE_ORDER hoặc DEFER_TO_PLAN.' }] });
+
+  def('rp-11', { kind: 'gap', k: 'Sửa chữa 11', t: 'Hoãn: đưa hạng mục vào dự toán hoặc kế hoạch tháng sau',
+    s: 'Không bắt buộc sửa cùng ngày đánh giá.',
+    screen: 'plansRepair', nav: { page: 'plansRepair', scope: 'REPAIR' },
+    uses: ['ms-repairitem', 'ms-material', 'ms-price'],
+    actors: [act(ROLE.tech, 'Chọn kỳ, ngày dự kiến.'), act(ROLE.fleet, 'Đồng ý ngày xe vào.')],
+    biz: ['Ngày dự toán khác ngày đánh giá.', 'Giai đoạn này chưa tạo phiếu; là dư nợ sửa chữa.'],
+    demoNote: 'Kế hoạch sửa chữa đang ẩn trên bản trình diễn; quy trình vẫn thuộc nghiệp vụ.',
+    ui: ['Mục tiêu: chọn kỳ → lưu dòng kế hoạch sửa chữa từ mã hạng mục đánh giá.', 'Bản trình diễn: xem hạng mục nguồn ở màn hình đánh giá.'],
+    data: [{ dir: 'Ghi', text: 'Dòng kế hoạch sửa chữa.' }, { dir: 'Ra', text: 'Dư nợ, chưa tạo phiếu.' }] });
+
+  def('rp-12', { kind: 'gap', k: 'Sửa chữa 12', t: 'Tới kỳ: trình BASE kế hoạch sửa chữa rồi tạo phiếu',
+    s: 'Tương tự kế hoạch bảo dưỡng.',
+    screen: 'plansRepair', nav: { page: 'plansRepair', scope: 'REPAIR' },
+    actors: [act(ROLE.tech, 'Trình.'), act(ROLE.base, 'Duyệt.')],
+    biz: ['Sau khi được duyệt, tạo phiếu và đi như nhánh sửa ngay.'],
+    demoNote: 'Màn hình đang ẩn.',
+    ui: ['Mục tiêu: trình BASE → chờ duyệt → Tạo phiếu.'],
+    data: [{ dir: 'Ra', text: 'Phiếu sửa chữa.' }] });
+
+  def('rp-20', { kind: 'proc', k: 'Sửa chữa 20', t: 'Tạo phiếu sửa chữa nháp',
+    s: 'Xe hoặc mooc, thời điểm, người tạo, nguồn.',
+    screen: 'historyRepair', nav: { page: 'historyRepair', scope: 'REPAIR', orderId: 'o1' },
+    actors: [act(ROLE.mech, 'Tạo.'), act(ROLE.safety, 'Có thể tạo yêu cầu.'), act(ROLE.tech, 'Có thể tạo.')],
+    biz: ['Phiếu nháp ghi nguồn, người tạo, thời điểm.'],
+    ui: ['Bấm tạo phiếu → mở chi tiết.', 'Xem phiếu mẫu <strong>o1</strong>.'],
+    data: [{ dir: 'Ghi', text: 'Phiếu sửa chữa: xe, nguồn, người tạo, thời điểm.' }] });
+
+  def('rp-21', { kind: 'proc', k: 'Sửa chữa 21', t: 'Kỹ thuật viên điền nội dung công việc và vật tư',
+    s: 'Tự gợi ý nội dung; đơn giá mua hàng gần nhất.',
+    screen: 'orderDetail', nav: { page: 'order', scope: 'REPAIR', orderId: 'o1' },
+    uses: ['ms-repairitem', 'ms-material', 'ms-price', 'ms-service'],
+    actors: [act(ROLE.mech, 'Điền.'), act(ROLE.tech, 'Rà soát.')],
+    biz: ['Nếu nguồn là đánh giá, nội dung và vật tư đã được gợi ý theo tiêu chí.', 'Chọn thêm loại dịch vụ và hệ thống nếu thiếu.'],
+    ui: ['Mở order <strong>o1</strong>.', 'Thêm dòng nội dung (tự gợi ý).', 'Thêm vật tư; đơn giá gợi ý từ lịch sử mua hàng.', 'Chọn loại dịch vụ và hệ thống.'],
+    data: [{ dir: 'Vào', text: 'Nội dung, vật tư, giá.' }, { dir: 'Ghi', text: 'Nội dung và vật tư (chụp lại).' }] });
+
+  def('rp-30', { kind: 'ext', k: 'Sửa chữa 30', t: 'Đồng bộ BASE xin duyệt phiếu sửa chữa',
+    s: 'Bắt buộc trước khi thực hiện.',
+    screen: 'orderDetail', nav: { page: 'order', scope: 'REPAIR', orderId: 'o1' },
+    actors: [act(ROLE.mech, 'Đồng bộ.'), act(ROLE.base, 'Duyệt.')],
+    biz: ['Thiếu nội dung hoặc vật tư dễ bị từ chối.'],
+    ui: ['Bấm <strong>Đồng bộ BASE</strong>.', 'Chờ APPROVED.'],
+    data: [{ dir: 'Gửi', text: 'Phiếu sửa chữa.' }, { dir: 'Nhận', text: 'Trạng thái duyệt.' }] });
+
+  def('rp-31', { kind: 'decision', k: 'Sửa chữa 31', t: 'BASE đã duyệt phiếu sửa chữa chưa?',
+    s: 'Cổng cho lịch tài xế và bước bắt đầu.',
+    screen: 'orderDetail', nav: { page: 'order', scope: 'REPAIR', orderId: 'o1' },
+    actors: [act(ROLE.base, 'Duyệt.'), act(ROLE.mech, 'Chỉnh khi bị từ chối.')],
+    cond: 'APPROVED → lịch và bắt đầu; PENDING hoặc REJECTED → bổ sung rồi đồng bộ lại.',
+    biz: ['Phiếu mẫu o1 đã APPROVED nên có thể bắt đầu ngay.'],
+    ui: ['Đọc huy hiệu và nhật ký.', 'REJECTED: sửa → đồng bộ lại.'],
+    example: 'o1 approvalStatus = APPROVED (seed).',
+    data: [{ dir: 'Đọc', text: 'Trạng thái duyệt và nhật ký.' }] });
+
+  def('rp-32', { kind: 'end', k: 'Sửa chữa 32', t: 'Chờ duyệt hoặc chỉnh sửa phiếu',
+    s: 'Chưa được phép làm.',
+    screen: 'orderDetail', nav: { page: 'order', scope: 'REPAIR', orderId: 'o1' },
+    actors: [act(ROLE.mech, 'Chỉnh nội dung.')],
+    biz: ['Không bắt đầu nội dung chính thức.'],
+    ui: ['Giữ nháp thay đổi.'],
+    data: [{ dir: 'Giữ', text: 'Phiếu và thay đổi nháp.' }] });
+
+  def('rp-40', { kind: 'gap', k: 'Sửa chữa 40', t: 'Lên lịch hẹn tài xế',
+    s: 'Xe, giờ, địa điểm; tài xế xác nhận.',
+    screen: 'dailyPlan', nav: { page: 'order', scope: 'REPAIR', orderId: 'o1' },
+    uses: ['ms-fleet', 'ms-user'],
+    actors: [act(ROLE.fleet, 'Lập lịch.'), act(ROLE.driver, 'Xác nhận.')],
+    biz: ['Giống bước lịch hẹn của bảo dưỡng.'],
+    demoNote: 'Menu kế hoạch tài xế đang vô hiệu hóa.',
+    ui: ['Mục tiêu: gắn lịch vào phiếu đã duyệt.'],
+    data: [{ dir: 'Ra', text: 'Lịch đã xác nhận (mục tiêu).' }] });
+
+  def('rp-50', { kind: 'proc', k: 'Sửa chữa 50', t: 'Bắt đầu và hoàn thành từng nội dung, so với định mức giờ',
+    s: 'Đo hiệu quả kỹ thuật viên.',
+    screen: 'orderDetail', nav: { page: 'order', scope: 'REPAIR', orderId: 'o1' },
+    uses: ['ms-barem'],
+    actors: [act(ROLE.mech, 'Làm.'), act(ROLE.tech, 'Theo dõi.')],
+    biz: ['Số phút thực tế so với định mức để báo cáo hiệu quả.'],
+    ui: ['Trên phiếu o1: Bắt đầu → Hoàn thành từng nội dung.', 'Xem thêm Bảng giờ sửa chữa Kỹ Thuật Viên và Bảng tổng hợp giờ.'],
+    data: [{ dir: 'Ghi', text: 'Số phút thực tế theo nội dung.' }, { dir: 'Ra', text: 'Báo cáo giờ.' }] });
+
+  def('rp-60', { kind: 'end', k: 'Sửa chữa 60', t: 'Đóng phiếu và cập nhật lịch sử xe',
+    s: 'Phục vụ gợi ý lần sau.',
+    screen: 'historyRepair', nav: { page: 'historyRepair', scope: 'REPAIR', orderId: 'o1' },
+    actors: [act(ROLE.mech, 'Hoàn thành phiếu.'), act(ROLE.sys, 'Cập nhật lịch sử.')],
+    biz: ['Lịch sử, chi phí và chỉ số hiệu quả được dùng để gợi ý lần sau.'],
+    ui: ['Đánh dấu phiếu hoàn thành.', 'Tìm theo biển số để đối soát.'],
+    data: [{ dir: 'Ra', text: 'Lịch sử, chi phí, chỉ số.' }] });
+
+  /* ---------- Bổ sung diễn giải nghiệp vụ chi tiết cho các bước ---------- */
+  const MORE = {
+    'mt-07': ['Dòng chỉ theo dõi vẫn nằm trong bảng nhắc và tiếp tục được tính lại mỗi ngày quét; không mất dữ liệu.', 'Quản lý kỹ thuật có thể ghi chú lý do trì hoãn trong buổi họp xe, nhưng bản trình diễn chưa có ô ghi chú riêng cho dòng nhắc.'],
+    'mt-09': ['Nguồn tạo dự toán ảnh hưởng đến cách hệ thống chọn vật tư: danh mục dùng vật tư gợi ý của danh mục, vỏ lốp và ắc quy dùng số seri cần thay, mẫu dùng bộ vật tư của mẫu.', 'Mỗi dòng giữ lại nguồn tạo để quản lý kỹ thuật sau này biết dòng do tác vụ tự động hay do con người đẩy vào.'],
+    'mt-12': ['Bước này chỉ xin duyệt dự toán (tiền, vật tư, ngày), chưa phải xin phép làm việc; việc xin phép làm thực tế diễn ra ở bước đồng bộ phiếu.', 'Người trình nên kiểm tra lại đơn giá gợi ý so với lịch sử giá của bộ phận mua hàng để giảm khả năng bị từ chối.'],
+    'mt-13': ['Mỗi dòng có thể có trạng thái khác nhau; quản lý kỹ thuật chỉ tạo phiếu cho những dòng đã được duyệt, các dòng còn lại tiếp tục chờ.', 'Lý do từ chối do BASE trả về được lưu trong nhật ký để người trình sửa đúng chỗ.'],
+    'mt-15': ['Gom một phiếu phù hợp khi cùng xe, cùng xưởng, cùng ngày; tách nhiều phiếu phù hợp khi cần chia công việc cho nhiều xưởng hoặc nhiều tổ kỹ thuật viên.', 'Dù gom hay tách, mỗi phiếu đều giữ danh sách dòng kế hoạch nguồn để khi đóng phiếu, hệ thống biết dòng nào đã hoàn thành.'],
+    'mt-16': ['Phiếu sao chép nội dung và vật tư tại thời điểm tạo, nên nếu danh mục hoặc giá đổi sau đó thì phiếu cũ không bị ảnh hưởng.', 'Loại phiếu bảo dưỡng định kỳ khác phiếu bảo dưỡng phát sinh; phiếu mẫu o20 thuộc loại PERIODIC (định kỳ).'],
+    'mt-20': ['Số phút thực tế được tính từ giờ bắt đầu đến giờ hoàn thành của từng nội dung; nếu kỹ thuật viên quên bấm sẽ làm sai báo cáo giờ.', 'Nếu phát hiện hỏng ngoài phạm vi bảo dưỡng, kỹ thuật viên tạo phiếu sửa chữa liên kết (nguồn B của luồng sửa chữa) thay vì thêm lẫn vào phiếu bảo dưỡng.'],
+    'mt-21': ['Số công-tơ-mét phải nhập khi hoàn thành vì đó là mốc để tính lần bảo dưỡng kế tiếp theo ki-lô-mét.', 'Hệ thống cập nhật lịch sử các lần bảo dưỡng của danh mục (lần thứ nhất, thứ hai…) ngay khi phiếu hoàn thành.'],
+    'rp-20': ['Phiếu nháp chưa gửi BASE nên còn sửa tự do; sau khi đồng bộ, mọi thay đổi nên đi kèm ghi chú để người duyệt hiểu.', 'Nếu nguồn là phiếu bảo dưỡng hoặc đánh giá, hệ thống điền sẵn xe và nội dung gợi ý để giảm nhập tay.'],
+    'rp-21': ['Nội dung công việc nên viết đủ cụ thể (cụm hỏng, hiện tượng, cách xử lý) vì đây là cơ sở BASE duyệt và cơ sở để so giờ với định mức.', 'Vật tư chọn từ danh mục PWMS; nếu không có sẵn thì liên hệ bộ phận mua hàng để bổ sung trước khi trình.'],
+    'rp-30': ['BASE có thể duyệt, từ chối hoặc yêu cầu bổ sung. Nếu bị từ chối, phiếu quay về trạng thái chỉnh sửa và mọi thao tác bắt đầu bị khóa.', 'Mã chứng từ do BASE trả về được lưu để đối soát với bộ phận mua hàng và kế toán.'],
+    'rp-50': ['Cách tính giờ giống bảo dưỡng: từ giờ bắt đầu đến giờ hoàn thành của từng nội dung, so với định mức của nội dung đó.', 'Kết quả hiển thị trên Bảng giờ sửa chữa Kỹ Thuật Viên cho cá nhân và trên Bảng tổng hợp giờ cho quản lý.'],
+    'rp-60': ['Phiếu đóng cập nhật lịch sử sửa chữa của xe để lần sau người lập phiếu thấy xe từng hỏng gì và thay vật tư nào.', 'Nếu phiếu liên kết với phiếu bảo dưỡng, việc đóng phiếu sửa chữa không tự đóng phiếu bảo dưỡng; hai phiếu đóng độc lập.'],
+    'rp-b': ['Khi chuyển hạng mục sang phiếu sửa chữa, phiếu bảo dưỡng vẫn giữ phần việc bảo dưỡng còn lại và tiếp tục chạy.'],
+    'rp-d': ['Kỹ thuật viên chỉ nên tự tạo khi phát hiện hỏng trong lúc kiểm tra hoặc làm việc tại xưởng và chưa có báo cáo từ tài xế.', 'Phiếu do kỹ thuật viên tạo vẫn phải qua BASE duyệt như mọi phiếu khác.'],
+    'rp-e': ['Khi hạng mục thuộc nhóm an toàn, Ban an toàn có thể yêu cầu sửa ngay dù quản lý kỹ thuật muốn hoãn.', 'Nên chọn cả hạng mục lỗi trong một phiếu để tránh đưa xe vào xưởng nhiều lần.'],
+    'rp-10': ['Tiêu chí quyết định: mức an toàn, ảnh hưởng đến chuyến chạy, thời gian chờ vật tư, ngân sách tháng hiện tại.', 'Hoãn nghĩa là chấp nhận rủi ro có kiểm soát; cần ghi lại người quyết định và ngày dự kiến sửa.'],
+    'ov-4': ['Lịch hẹn giúp tránh xe vào xưởng khi chưa có thợ hoặc vật tư; tài xế xác nhận để quản lý xe biết xe chắc chắn có mặt.'],
+    'ov-5': ['Chỉ nội dung nào đã bấm hoàn thành mới được tính vào báo cáo giờ; nội dung chưa hoàn thành hiển thị là đang làm.'],
+    'ov-6': ['Với phiếu bảo dưỡng định kỳ, bước này kích hoạt tính lại chu kỳ; với phiếu sửa chữa, bước này cập nhật lịch sử xe và chi phí.'],
+  };
+  Object.keys(MORE).forEach((id) => { if (N[id]) N[id].biz = (N[id].biz || []).concat(MORE[id]); });
+
+  /* ===== Hàm dựng giao diện ===== */
+  function el(tag, cls, html) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (html != null) n.innerHTML = html;
+    return n;
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function sec(parent, text) { parent.appendChild(el('div', 'section-label', esc(text))); }
+  function arrEl(label, dataMove, tone) {
+    const a = el('div', 'arrow' + (dataMove ? ' data-move' : '') + (tone === 'yes' ? ' yes' : '') + (tone === 'no' ? ' no' : ''));
+    a.appendChild(el('div', 'line'));
+    if (label) a.appendChild(el('div', 'lbl', esc(label)));
+    a.appendChild(el('div', 'head'));
+    return a;
+  }
+  function arr(parent, label, dataMove) { parent.appendChild(arrEl(label, dataMove)); }
+
+  let currentFlow = 'masters';
+  let selectedId = null;
+  let selectedScreen = null;
+  let screenFilter = 'all';
+  let screenQuery = '';
+
+  const flowScroll = document.getElementById('flowScroll');
+  const detailBody = document.getElementById('detailBody');
+  const flowTitle = document.getElementById('flowTitle');
+  const flowSub = document.getElementById('flowSub');
+  const flowExtra = document.getElementById('flowExtra');
+  const detailHeadTitle = document.getElementById('detailHeadTitle');
+  const detailHeadSub = document.getElementById('detailHeadSub');
+  const protoModal = document.getElementById('protoModal');
+  const protoFrame = document.getElementById('protoFrame');
+  const protoTitle = document.getElementById('protoTitle');
+  const protoUrl = document.getElementById('protoUrl');
+  const protoWarn = document.getElementById('protoWarn');
+  const protoNewTab = document.getElementById('protoNewTab');
+
+  function btn(id) {
+    const d = N[id];
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'node ' + (d.kind || 'proc') + (selectedId === id ? ' on' : '');
+    b.dataset.nodeId = id;
+    let relLine = '';
+    if (currentFlow === 'masters') {
+      const names = [];
+      relatedOf(id).forEach((x) => x.others.forEach((p) => {
+        if (p.startsWith('m:')) { const n = N[p.slice(2)]; if (n && !names.includes(n.t)) names.push(n.t); }
+      }));
+      if (names.length) relLine = '<div class="rel">Liên quan: ' + esc(names.join(' · ')) + '</div>';
+    }
+    b.innerHTML = '<div class="k">' + esc(d.k) + '</div><div class="t">' + esc(d.t) + '</div>'
+      + (d.s ? '<div class="s">' + esc(d.s) + '</div>' : '') + relLine;
+    b.addEventListener('click', () => selectNode(id));
+    return b;
+  }
+  function add(parent, id) { parent.appendChild(btn(id)); }
+  function branch2(parent, cfg) {
+    const br = el('div', 'branch');
+    const yes = el('div', 'branch-col yes');
+    yes.appendChild(el('div', 'tag', esc(cfg.yesTag || 'Có')));
+    if (cfg.yesArrow) yes.appendChild(arrEl(cfg.yesArrow, true, 'yes'));
+    (cfg.yesIds || []).forEach((id) => yes.appendChild(btn(id)));
+    const no = el('div', 'branch-col no');
+    no.appendChild(el('div', 'tag', esc(cfg.noTag || 'Không')));
+    if (cfg.noArrow) no.appendChild(arrEl(cfg.noArrow, false, 'no'));
+    (cfg.noIds || []).forEach((id) => no.appendChild(btn(id)));
+    if (!(cfg.noIds || []).length && !cfg.noArrow) no.appendChild(el('p', 'merge-note', 'Không tạo việc mới'));
+    br.appendChild(yes); br.appendChild(no);
+    parent.appendChild(br);
+  }
+
+  const LEGEND = '<div class="legend"><span class="master">Dữ liệu nền</span><span class="proc">Bước xử lý</span><span class="dec">Điều kiện rẽ nhánh</span><span class="data">Gói dữ liệu</span><span class="ext">Hệ thống bên ngoài</span><span class="end">Kết thúc hoặc chờ</span><span class="gap">Đang ẩn, vô hiệu hóa hoặc còn thiếu</span></div>';
+
+  /* ===== Định nghĩa các tab ===== */
+  const FLOWS = {
+    masters: {
+      title: '1. Dữ liệu nền (master): mỗi dữ liệu là một nút riêng',
+      sub: 'Bấm một nút để xem diễn viên, quan hệ với master khác, nghiệp vụ, thao tác trên giao diện. Cuối trang có mục «Quan hệ giữa các dữ liệu nền».',
+      legend: true,
+      build() {
+        const f = el('div', 'flow');
+        sec(f, 'A. Cấu trúc kỹ thuật của xe (nguồn PWMS)');
+        add(f, 'ms-system'); arr(f, 'Tiêu chí thuộc hệ thống', true);
+        add(f, 'ms-criteria'); arr(f, 'Không đạt thì gợi ý nội dung sửa chữa', true);
+        add(f, 'ms-repairitem'); arr(f, 'Kèm vật tư gợi ý', true);
+        add(f, 'ms-material'); arr(f, 'Đơn giá gợi ý', true);
+        add(f, 'ms-price');
+        sec(f, 'B. Dịch vụ và bảo dưỡng');
+        add(f, 'ms-service'); arr(f, 'Danh mục mang loại dịch vụ', true);
+        add(f, 'ms-catalog'); arr(f, 'Gom thành gói', true);
+        add(f, 'ms-template'); arr(f, '');
+        add(f, 'ms-tirebattery');
+        sec(f, 'C. Xe và ánh xạ');
+        add(f, 'ms-fleet'); arr(f, 'Ghép với PWMS', true);
+        add(f, 'ms-vehiclemap');
+        sec(f, 'D. Cài đặt và định mức');
+        add(f, 'ms-settings'); arr(f, '');
+        add(f, 'ms-barem');
+        sec(f, 'E. Phần còn thiếu');
+        add(f, 'ms-user');
+        sec(f, 'F. Quan hệ giữa các dữ liệu nền');
+        RELS.forEach((r) => {
+          const c = el('div', 'rel-card');
+          c.appendChild(el('div', 'rt', esc(r.label)));
+          const parts = el('div', 'rel-parts');
+          r.parts.forEach((p, i) => {
+            if (i) parts.appendChild(el('span', 'sep', '↔'));
+            parts.appendChild(partChip(p));
+          });
+          c.appendChild(parts);
+          c.appendChild(el('div', 'rd', esc(r.why) + (r.gap ? ' (Ghi nhận còn thiếu.)' : '')));
+          f.appendChild(c);
+        });
+        return f;
+      },
+    },
+    overall: {
+      title: '2. Luồng tổng thể vận hành',
+      sub: 'Dữ liệu nền → quét hằng ngày → ba cửa vào → lịch hẹn và phê duyệt chung → thực hiện → đóng phiếu.',
+      legend: true,
+      build() {
+        const f = el('div', 'flow');
+        sec(f, 'A. Nền tảng');
+        add(f, 'ov-1');
+        sec(f, 'B. Phát hiện việc');
+        arr(f, 'Mỗi ngày vận hành', true);
+        add(f, 'ov-2'); arr(f, 'Phân loại sự việc');
+        add(f, 'ov-3');
+        const br = el('div', 'branch triple');
+        [['ov-a', 'A · Bảo dưỡng định kỳ', 'yes'], ['ov-b', 'B · Sửa chữa đột xuất', 'no'], ['ov-c', 'C · Sửa chữa từ đánh giá định kỳ', 'alt']].forEach(([id, tag, cls]) => {
+          const c = el('div', 'branch-col ' + cls);
+          c.appendChild(el('div', 'tag', tag));
+          c.appendChild(btn(id));
+          br.appendChild(c);
+        });
+        f.appendChild(br);
+        f.appendChild(el('p', 'merge-note', 'Chi tiết cửa A ở tab 3; cửa B và C ở tab 4. Ba cửa hội tụ ở lớp thực hiện chung bên dưới.'));
+        sec(f, 'C. Thực hiện chung');
+        arr(f, 'Sau khi có phiếu', true);
+        add(f, 'ov-4'); arr(f, 'Được duyệt');
+        add(f, 'ov-5'); arr(f, 'Hoàn thành', true);
+        add(f, 'ov-6');
+        sec(f, 'D. Hệ thống bên ngoài và khoảng trống');
+        add(f, 'ov-7'); arr(f, '');
+        add(f, 'ov-8');
+        return f;
+      },
+    },
+    maint: {
+      title: '3. Luồng bảo dưỡng và kế hoạch (22 bước)',
+      sub: 'Dữ liệu bảo dưỡng → nhắc hai tầng → dự toán → BASE duyệt kế hoạch → phiếu → lịch hẹn → BASE duyệt phiếu → thực hiện → số công-tơ-mét.',
+      legend: true,
+      build() {
+        const f = el('div', 'flow');
+        sec(f, 'A. Dữ liệu bảo dưỡng và vỏ lốp, ắc quy');
+        add(f, 'mt-01'); arr(f, 'Gắn vào xe', true);
+        add(f, 'mt-02'); arr(f, '');
+        add(f, 'mt-03'); arr(f, 'Tuỳ từng xe');
+        add(f, 'mt-04');
+        sec(f, 'B. Nhắc hai tầng');
+        arr(f, 'Mỗi ngày vận hành', true);
+        add(f, 'mt-05'); arr(f, '');
+        add(f, 'mt-06');
+        branch2(f, { yesTag: 'Đã tới nhắc bảo dưỡng', yesArrow: 'Cảnh báo sớm', yesIds: ['mt-07'], noTag: 'Chưa tới', noArrow: 'Yên lặng trên bảng nhắc', noIds: [] });
+        f.appendChild(el('p', 'merge-note', 'Dù mới ở mức nhắc bảo dưỡng hay chưa, hệ thống vẫn kiểm tra mốc nhắc kế hoạch và quá hạn ở bước sau.'));
+        add(f, 'mt-08');
+        branch2(f, { yesTag: 'Đủ điều kiện lập kế hoạch', yesArrow: 'Tạo dự toán', yesIds: ['mt-09'], noTag: 'Chưa tới mốc kế hoạch', noArrow: 'Ở lại theo dõi', noIds: [] });
+        sec(f, 'C. Dự toán và trình BASE');
+        arr(f, 'Tự động, thủ công, vỏ lốp ắc quy hoặc mẫu', true);
+        add(f, 'mt-10'); arr(f, 'Rà soát');
+        add(f, 'mt-11'); arr(f, 'Gửi');
+        add(f, 'mt-12'); arr(f, '');
+        add(f, 'mt-13');
+        branch2(f, { yesTag: 'Kế hoạch đã duyệt', yesArrow: 'Được tạo phiếu', yesIds: ['mt-15'], noTag: 'Chờ hoặc từ chối', noArrow: 'Không tạo phiếu', noIds: ['mt-14'] });
+        sec(f, 'D. Phiếu bảo dưỡng và thực hiện');
+        add(f, 'mt-16'); arr(f, 'Hẹn tài xế (mục tiêu)');
+        add(f, 'mt-17'); arr(f, 'Đồng bộ');
+        add(f, 'mt-18'); arr(f, '');
+        add(f, 'mt-19');
+        branch2(f, { yesTag: 'Phiếu đã duyệt', yesArrow: 'Kỹ thuật viên làm', yesIds: ['mt-20'], noTag: 'Chưa duyệt', noArrow: 'Sửa phiếu', noIds: [] });
+        arr(f, 'Ghi giờ so với định mức', true);
+        add(f, 'mt-21'); arr(f, 'Tính lại hạn', true);
+        add(f, 'mt-22');
+        return f;
+      },
+    },
+    repair: {
+      title: '4. Luồng sửa chữa (năm nguồn và nhánh hoãn)',
+      sub: 'Năm nguồn → sửa ngay hoặc hoãn vào kế hoạch → điền nội dung và vật tư → BASE → lịch hẹn → thực hiện → đóng.',
+      legend: true,
+      build() {
+        const f = el('div', 'flow');
+        sec(f, 'A. Nguồn vào');
+        add(f, 'rp-00');
+        const br = el('div', 'branch');
+        br.style.gridTemplateColumns = '1fr';
+        const col = el('div', 'branch-col alt');
+        col.appendChild(el('div', 'tag', 'Chọn đúng nguồn (bấm từng bước)'));
+        ['rp-a', 'rp-b', 'rp-c', 'rp-d', 'rp-e'].forEach((id) => { col.appendChild(btn(id)); col.appendChild(arrEl('', false)); });
+        br.appendChild(col);
+        f.appendChild(br);
+        sec(f, 'B. Quyết định thời điểm sửa');
+        add(f, 'rp-10');
+        branch2(f, { yesTag: 'Sửa ngay', yesArrow: 'Tạo phiếu', yesIds: ['rp-20'], noTag: 'Hoãn vào kế hoạch', noArrow: 'Không sửa cùng ngày đánh giá', noIds: ['rp-11', 'rp-12'] });
+        f.appendChild(el('p', 'merge-note', 'Nguồn đột xuất A đến D hầu như luôn đi nhánh «Sửa ngay». Nhánh hoãn chủ yếu từ nguồn E; khi tới kỳ sẽ quay về tạo phiếu.'));
+        sec(f, 'C. Chuẩn bị phiếu và BASE');
+        arr(f, 'Sau khi có phiếu nháp', true);
+        add(f, 'rp-21'); arr(f, 'Trình duyệt');
+        add(f, 'rp-30'); arr(f, '');
+        add(f, 'rp-31');
+        branch2(f, { yesTag: 'Đã duyệt', yesArrow: 'Lịch hẹn và làm', yesIds: ['rp-40'], noTag: 'Chưa duyệt hoặc từ chối', noArrow: 'Chỉnh sửa', noIds: ['rp-32'] });
+        sec(f, 'D. Thực hiện và đóng');
+        arr(f, 'Tài xế xác nhận (mục tiêu)');
+        add(f, 'rp-50'); arr(f, 'Đóng phiếu', true);
+        add(f, 'rp-60');
+        return f;
+      },
+    },
+    screens: {
+      title: '5. Danh mục màn hình và chế độ',
+      sub: 'Liệt kê toàn bộ màn hình của bảng điều khiển phiên bản bốn, kể cả màn hình đang ẩn hoặc vô hiệu hóa, cùng chế độ, tab, đường dẫn sâu, dữ liệu mẫu.',
+      legend: false,
+      build() { return buildScreenList(); },
+    },
+  };
+
+  /* ===== Tab danh mục màn hình ===== */
+  function screenSummary() {
+    const c = { visible: 0, sub: 0, hidden: 0, disabled: 0, extra: 0 };
+    SCREEN_ORDER.forEach((id) => { c[S[id].st]++; });
+    return c;
+  }
+  function filterBarHtml() {
+    const c = screenSummary();
+    return '<div class="chip-row" style="margin-top:6px"><span class="chip">Tổng cộng ' + SCREEN_ORDER.length + ' màn hình</span>'
+      + '<span class="chip st-visible">' + c.visible + ' hiển thị</span>'
+      + '<span class="chip st-sub">' + c.sub + ' trang con</span>'
+      + '<span class="chip st-hidden">' + c.hidden + ' đang ẩn</span>'
+      + '<span class="chip st-disabled">' + c.disabled + ' vô hiệu hóa</span>'
+      + '<span class="chip st-extra">' + c.extra + ' bản mẫu bổ sung</span></div>';
+  }
+  function setupScreenFilter() {
+    flowExtra.innerHTML = filterBarHtml();
+    const bar = el('div', 'filter-bar');
+    [['all', 'Tất cả'], ['visible', 'Hiển thị'], ['sub', 'Trang con'], ['hidden', 'Đang ẩn'], ['disabled', 'Vô hiệu hóa'], ['extra', 'Bản mẫu bổ sung']].forEach(([k, lbl]) => {
+      const b = el('button', 'chip' + (screenFilter === k ? ' on' : ''), esc(lbl));
+      b.type = 'button';
+      b.addEventListener('click', () => { screenFilter = k; setupScreenFilter(); refreshScreenList(); });
+      bar.appendChild(b);
+    });
+    flowExtra.appendChild(bar);
+    const inp = document.createElement('input');
+    inp.type = 'search'; inp.className = 'search-input'; inp.placeholder = 'Tìm theo tên, khóa điều hướng, biển số, mã dữ liệu mẫu…';
+    inp.value = screenQuery;
+    inp.addEventListener('input', () => { screenQuery = inp.value; refreshScreenList(); });
+    flowExtra.appendChild(inp);
+  }
+  function screenMatches(s) {
+    if (screenFilter !== 'all' && s.st !== screenFilter) return false;
+    const q = screenQuery.trim().toLowerCase();
+    if (!q) return true;
+    const hay = [s.name, s.id, s.group, s.purpose, (s.seeds || []).join(' '), (s.modes || []).map((m) => m.l).join(' ')].join(' ').toLowerCase();
+    return hay.includes(q);
+  }
+  let screenListEl = null;
+  function buildScreenList() {
+    screenListEl = el('div', 'screen-list');
+    fillScreenList();
+    return screenListEl;
+  }
+  function fillScreenList() {
+    screenListEl.innerHTML = '';
+    let lastGroup = null; let n = 0;
+    SCREEN_ORDER.forEach((id) => {
+      const s = S[id];
+      if (!screenMatches(s)) return;
+      n++;
+      if (s.group !== lastGroup) { screenListEl.appendChild(el('div', 'screen-group', esc(s.group))); lastGroup = s.group; }
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'screen-row ' + STATUS[s.st].cls.replace('st-', 'st-') + (selectedScreen === id ? ' on' : '');
+      b.dataset.screenId = id;
+      b.innerHTML = '<div class="nm">' + esc(s.name) + '</div><span class="chip ' + STATUS[s.st].cls + '">' + esc(STATUS[s.st].label) + '</span>'
+        + '<div class="sb">' + esc(s.modes.length + ' chế độ · khóa: ' + s.id) + '</div>';
+      b.addEventListener('click', () => selectScreen(id));
+      screenListEl.appendChild(b);
+    });
+    if (!n) screenListEl.appendChild(el('div', 'empty', 'Không có màn hình phù hợp bộ lọc.'));
+  }
+  function refreshScreenList() { if (screenListEl) fillScreenList(); }
+
+  /* ===== Điều hướng và hiển thị ===== */
+  function renderFlow(key) {
+    currentFlow = key;
+    selectedId = null;
+    const flow = FLOWS[key];
+    flowTitle.textContent = flow.title;
+    flowSub.textContent = flow.sub;
+    flowExtra.innerHTML = '';
+    if (flow.legend) flowExtra.innerHTML = LEGEND;
+    flowScroll.innerHTML = '';
+    flowScroll.appendChild(flow.build());
+    if (key === 'screens') {
+      setupScreenFilter();
+      detailHeadTitle.textContent = 'Chi tiết màn hình';
+      detailHeadSub.textContent = 'Trạng thái · chế độ · đường dẫn sâu · dữ liệu mẫu · Xem prototype';
+      if (!selectedScreen) selectedScreen = SCREEN_ORDER[0];
+      selectScreen(selectedScreen);
+    } else {
+      detailHeadTitle.textContent = 'Chi tiết bước';
+      detailHeadSub.textContent = 'Diễn viên · quan hệ · điều kiện · nghiệp vụ · thao tác · dữ liệu · mở prototype';
+      detailBody.innerHTML = '<div class="empty">Chọn một nút ở khung bên trái.</div>';
+    }
+    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.getAttribute('data-flow') === key));
+  }
+
+  function goMaster(id) {
+    if (currentFlow !== 'masters') renderFlow('masters');
+    selectNode(id, true);
+  }
+  function goScreen(id) {
+    selectedScreen = id;
+    if (currentFlow !== 'screens') renderFlow('screens'); else selectScreen(id);
+    const row = flowScroll.querySelector('[data-screen-id="' + id + '"]');
+    if (row) row.scrollIntoView({ block: 'center' });
+  }
+  function partChip(p) {
+    const [type, id] = p.split(':');
+    const b = el('button', 'chip link');
+    b.type = 'button';
+    if (type === 'm') { b.textContent = N[id] ? N[id].t : id; b.addEventListener('click', () => goMaster(id)); }
+    else { b.textContent = (S[id] ? S[id].name : id) + ' (màn hình)'; b.addEventListener('click', () => goScreen(id)); }
+    return b;
+  }
+  function masterChip(id) { return partChip('m:' + id); }
+
+  function queryChip(cfg) {
+    if (!cfg) return '—';
+    if (cfg.file) return 'tệp=' + cfg.file;
+    const parts = [];
+    ['page', 'scope', 'tab', 'mode', 'orderId', 'catalogId', 'plate', 'vehicleId', 'evalId'].forEach((k) => { if (cfg[k] != null && cfg[k] !== '') parts.push(k + '=' + cfg[k]); });
+    return parts.join('&') || '—';
+  }
+  function block(title, node) {
+    const b = el('div', 'block');
+    b.appendChild(el('h3', '', esc(title)));
+    b.appendChild(node);
+    return b;
+  }
+  function listBlock(title, items, ordered) {
+    const l = document.createElement(ordered ? 'ol' : 'ul');
+    if (ordered) l.className = 'ui-steps';
+    items.forEach((x) => { const li = document.createElement('li'); li.innerHTML = x; l.appendChild(li); });
+    return block(title, l);
+  }
+  function actorsBlock(actors) {
+    const w = el('div', 'actor-list');
+    actors.forEach(([role, duty]) => w.appendChild(el('div', 'actor-item', '<strong>' + esc(role) + '</strong> — ' + esc(duty))));
+    return block('Diễn viên tham gia', w);
+  }
+  function dataBlock(data) {
+    const df = el('div', 'data-flow');
+    data.forEach((x) => {
+      const row = el('div', 'data-item');
+      row.innerHTML = '<div class="dir">' + esc(x.dir) + '</div><div>' + esc(x.text) + '</div>';
+      df.appendChild(row);
+    });
+    return block('Luồng dữ liệu', df);
+  }
+  function warnFor(screenId) {
+    const s = S[screenId];
+    if (!s) return '';
+    if (s.st === 'hidden') return 'Màn hình «' + s.name + '» đang ẩn khỏi menu. Cửa sổ dưới đây có thể được chuyển về trang gần nhất.';
+    if (s.st === 'disabled') return 'Màn hình «' + s.name + '» đang vô hiệu hóa. Cửa sổ dưới đây chỉ hiển thị trang gần nhất để minh họa ngữ cảnh.';
+    return '';
+  }
+
+  function selectNode(id, scrollIntoView) {
+    selectedId = id;
+    flowScroll.querySelectorAll('.node').forEach((n) => n.classList.toggle('on', n.dataset.nodeId === id));
+    if (scrollIntoView) {
+      const n = flowScroll.querySelector('[data-node-id="' + id + '"]');
+      if (n) n.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    const d = N[id];
+    if (!d) return;
+    const url = demoUrl(d.nav || {});
+    detailBody.innerHTML = '';
+    detailBody.appendChild(el('h2', 'title-step', esc(d.t)));
+    const chips = el('div', 'chip-row');
+    chips.innerHTML = '<span class="chip">' + esc(d.k) + '</span>'
+      + (d.screen && S[d.screen] ? '<span class="chip screen">Màn hình: ' + esc(S[d.screen].name) + '</span><span class="chip ' + STATUS[S[d.screen].st].cls + '">' + esc(STATUS[S[d.screen].st].label) + '</span>' : '')
+      + (d.cond ? '<span class="chip cond">Có điều kiện</span>' : '')
+      + '<span class="chip demo">' + esc(queryChip(d.nav)) + '</span>';
+    detailBody.appendChild(chips);
+
+    if (d.s) detailBody.appendChild(el('p', '', esc(d.s)));
+    if (d.actors && d.actors.length) detailBody.appendChild(actorsBlock(d.actors));
+
+    /* Quan hệ master */
+    if (d.kind === 'master' || d.kind === 'gap') {
+      const rels = relatedOf(id);
+      if (rels.length) {
+        const w = el('div', 'actor-list');
+        rels.forEach((x) => {
+          const it = el('div', 'rel-item');
+          it.appendChild(el('div', 'why', esc(x.rel.label)));
+          it.appendChild(el('div', '', esc(x.rel.why)));
+          const row = el('div', 'chip-row');
+          x.others.forEach((p) => row.appendChild(partChip(p)));
+          it.appendChild(row);
+          w.appendChild(it);
+        });
+        detailBody.appendChild(block('Quan hệ với master khác', w));
+      }
+    }
+    if (d.uses && d.uses.length) {
+      const row = el('div', 'chip-row');
+      d.uses.forEach((m) => row.appendChild(masterChip(m)));
+      detailBody.appendChild(block('Dữ liệu nền được dùng ở bước này (bấm để xem)', row));
+    }
+    if (d.cond) detailBody.appendChild(block('Điều kiện', el('p', '', esc(d.cond))));
+    if (d.biz && d.biz.length) detailBody.appendChild(listBlock('Nghiệp vụ chi tiết', d.biz.map(esc), false));
+    if (d.ui && d.ui.length) detailBody.appendChild(listBlock('Chuỗi thao tác trên giao diện', d.ui, true));
+    if (d.data && d.data.length) detailBody.appendChild(dataBlock(d.data));
+    if (d.example) detailBody.appendChild(el('div', 'ex-box', '<strong>Ví dụ seed:</strong> ' + esc(d.example)));
+    if (d.demoNote) detailBody.appendChild(el('div', 'hint-demo', '<strong>Ghi chú bản trình diễn:</strong> ' + esc(d.demoNote)));
+
+    const actions = el('div', 'actions');
+    const openBtn = el('button', 'btn-proto', 'Xem prototype');
+    openBtn.type = 'button';
+    openBtn.addEventListener('click', () => openProto(d.k + ' · ' + d.t, url, warnFor(d.screen)));
+    actions.appendChild(openBtn);
+    const a = el('a', 'btn-ghost', 'Mở tab mới');
+    a.href = url; a.target = '_blank'; a.rel = 'noopener';
+    actions.appendChild(a);
+    if (d.screen && S[d.screen]) {
+      const g = el('button', 'btn-ghost', 'Xem trong danh mục màn hình');
+      g.type = 'button';
+      g.addEventListener('click', () => goScreen(d.screen));
+      actions.appendChild(g);
+    }
+    detailBody.appendChild(actions);
+  }
+
+  function selectScreen(id) {
+    selectedScreen = id;
+    if (screenListEl) screenListEl.querySelectorAll('.screen-row').forEach((n) => n.classList.toggle('on', n.dataset.screenId === id));
+    const s = S[id];
+    if (!s) return;
+    detailBody.innerHTML = '';
+    detailBody.appendChild(el('h2', 'title-step', esc(s.name)));
+    const chips = el('div', 'chip-row');
+    chips.innerHTML = '<span class="chip ' + STATUS[s.st].cls + '">' + esc(STATUS[s.st].label) + '</span>'
+      + '<span class="chip">' + esc(s.group) + '</span>'
+      + '<span class="chip demo">khóa điều hướng: ' + esc(s.id) + '</span>';
+    detailBody.appendChild(chips);
+    detailBody.appendChild(block('Mục đích', el('p', '', esc(s.purpose))));
+    if (s.note) detailBody.appendChild(el('div', 'hint-demo', '<strong>Ghi chú ẩn, vô hiệu hóa hoặc giới hạn:</strong> ' + esc(s.note)));
+    if (s.fallback) detailBody.appendChild(el('div', 'hint-demo', 'Màn hình này không mở trực tiếp được; nút «Xem» dùng trang gần nhất để minh họa ngữ cảnh.'));
+
+    /* Bảng chế độ */
+    const tbl = document.createElement('table');
+    tbl.className = 'mode-table';
+    tbl.innerHTML = '<thead><tr><th>Chế độ hoặc tab</th><th>Đường dẫn sâu</th><th></th></tr></thead>';
+    const tb = document.createElement('tbody');
+    s.modes.forEach((m) => {
+      const url = demoUrl(m.cfg);
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td><strong>' + esc(m.l) + '</strong><br>' + esc(m.d) + '</td><td><code class="q">' + esc(queryChip(m.cfg)) + '</code></td><td></td>';
+      const b = el('button', 'btn-proto sm', 'Xem prototype');
+      b.type = 'button';
+      b.addEventListener('click', () => openProto(s.name + ' · ' + m.l, url, warnFor(s.id)));
+      tr.lastChild.appendChild(b);
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);
+    detailBody.appendChild(block('Các chế độ, tab và đường dẫn sâu', tbl));
+
+    if (s.seeds && s.seeds.length) detailBody.appendChild(listBlock('Ví dụ dữ liệu mẫu (seed)', s.seeds.map(esc), false));
+    if (s.masters && s.masters.length) {
+      const row = el('div', 'chip-row');
+      s.masters.forEach((m) => row.appendChild(masterChip(m)));
+      detailBody.appendChild(block('Master liên quan (bấm để xem)', row));
+    }
+    if (s.actors && s.actors.length) detailBody.appendChild(actorsBlock(s.actors));
+
+    const mainUrl = demoUrl(s.modes[0].cfg);
+    const actions = el('div', 'actions');
+    const openBtn = el('button', 'btn-proto', 'Xem prototype');
+    openBtn.type = 'button';
+    openBtn.addEventListener('click', () => openProto(s.name, mainUrl, warnFor(s.id)));
+    actions.appendChild(openBtn);
+    const a = el('a', 'btn-ghost', 'Mở tab mới');
+    a.href = mainUrl; a.target = '_blank'; a.rel = 'noopener';
+    actions.appendChild(a);
+    detailBody.appendChild(actions);
+  }
+
+  function openProto(title, url, warn) {
+    protoTitle.textContent = title;
+    protoUrl.textContent = url;
+    protoNewTab.href = url;
+    protoWarn.hidden = !warn;
+    protoWarn.textContent = warn || '';
+    protoFrame.src = url;
+    protoModal.classList.add('open');
+    protoModal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeProto() {
+    protoModal.classList.remove('open');
+    protoModal.setAttribute('aria-hidden', 'true');
+    protoFrame.src = 'about:blank';
+    document.body.style.overflow = '';
+  }
+  document.getElementById('protoClose').onclick = closeProto;
+  document.getElementById('protoReload').onclick = () => {
+    if (protoNewTab.href && protoNewTab.href !== '#') protoFrame.src = protoNewTab.href;
+  };
+  protoModal.addEventListener('click', (e) => { if (e.target === protoModal) closeProto(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && protoModal.classList.contains('open')) closeProto(); });
+
+  document.querySelectorAll('.tab').forEach((t) => {
+    t.addEventListener('click', () => renderFlow(t.getAttribute('data-flow')));
+  });
+
+  renderFlow('masters');
+  selectNode('ms-system');
+})();
+  </script>
+</body>
+</html>
