@@ -81617,7 +81617,9 @@ function openEvalModal(vid) {
   const saveEval = (formStatus, postActionOverride) => {
     const fd = new FormData($('#evalForm'));
     const periodExempt = !!fd.get('periodExempt');
-    if (periodExempt && !String(fd.get('periodExemptReason') || '').trim()) {
+    const isDraft = formStatus === 'DRAFT';
+    /* Lưu nháp: không validate — cho phép thiếu dòng SC / VT / lý do miễn kỳ */
+    if (!isDraft && periodExempt && !String(fd.get('periodExemptReason') || '').trim()) {
       toast('Miễn kỳ: bắt buộc nhập lý do');
       return;
     }
@@ -81630,7 +81632,7 @@ function openEvalModal(vid) {
     let invalidMsg = '';
     if (!periodExempt) {
       const saveList = activeChecklist();
-      if (!v?.isTrailer && $('#evalIncludeTrailer')?.checked && !String(fd.get('trailerNumber') || '').trim()) {
+      if (!isDraft && !v?.isTrailer && $('#evalIncludeTrailer')?.checked && !String(fd.get('trailerNumber') || '').trim()) {
         toast('Đánh giá kèm rơ mooc: nhập biển số rơ mooc');
         $('#evalTrailerNumber')?.focus();
         return;
@@ -81651,7 +81653,7 @@ function openEvalModal(vid) {
             position: state[it.id].position || '',
           };
           if (val === 'repair') {
-            if (!state[it.id].repairs.length) {
+            if (!isDraft && !state[it.id].repairs.length) {
               invalidMsg = `Hạng mục “${it.label}” chọn SC nhưng chưa thêm dòng sửa`;
               return;
             }
@@ -81660,19 +81662,21 @@ function openEvalModal(vid) {
             });
           }
           if (val === 'replace') {
-            if (!state[it.id].materials.length) {
+            if (!isDraft && !state[it.id].materials.length) {
               invalidMsg = `Hạng mục “${it.label}” chọn Thay nhưng chưa chọn vật tư`;
               return;
             }
-            workItems.push({ system: g.group, content: `Thay VT · ${it.label}`, service: 'Thay thế', kind: 'REPAIR', performer: fd.get('inspector'), hours: null, fromCheck: it.label });
-            state[it.id].materials.forEach(m => {
-              materialsOut.push({
-                source: m.source || 'PWMS', code: m.code, name: m.name, qty: m.qty, uom: m.uom || 'Cái', price: 0,
-                serial: m.serial || state[it.id].serial || '',
-                unitId: m.unitId || state[it.id].unitId || null,
-                position: m.position || state[it.id].position || '',
+            if (state[it.id].materials.length) {
+              workItems.push({ system: g.group, content: `Thay VT · ${it.label}`, service: 'Thay thế', kind: 'REPAIR', performer: fd.get('inspector'), hours: null, fromCheck: it.label });
+              state[it.id].materials.forEach(m => {
+                materialsOut.push({
+                  source: m.source || 'PWMS', code: m.code, name: m.name, qty: m.qty, uom: m.uom || 'Cái', price: 0,
+                  serial: m.serial || state[it.id].serial || '',
+                  unitId: m.unitId || state[it.id].unitId || null,
+                  position: m.position || state[it.id].position || '',
+                });
               });
-            });
+            }
           }
         }
       }));
