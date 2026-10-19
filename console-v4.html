@@ -66800,6 +66800,8 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
   let selectedMat = null; /* 1 vật tư / dòng */
   let mode = 'catalog'; /* catalog | manual */
   const dirty = { vendor: false, unitPrice: false, uom: false, workKind: false, costKind: false, nhom: false, content: false, materials: false, vat: false };
+  /* Giá trị vừa auto-fill từ VT — dùng để clear đúng khi xóa VT (không đụng field user đã sửa) */
+  const autoFromMat = { vendor: null, uom: null, unitPrice: null, vat: null, costKind: null, nhom: null };
   const markDirty = (key) => { dirty[key] = true; };
   window._addPlanSelectedMats = () => (selectedMat ? [selectedMat] : []);
   const setSelectValue = (el, value) => {
@@ -66813,6 +66815,38 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
       el.appendChild(opt);
       el.value = v0;
     } else el.value = '';
+  };
+  const fieldStillAuto = (key, current) => {
+    if (dirty[key]) return false;
+    if (autoFromMat[key] == null) return false;
+    return String(current ?? '') === String(autoFromMat[key] ?? '');
+  };
+  const clearMaterialDerivedFields = () => {
+    if (fieldStillAuto('vendor', $('#addPlanVendor')?.value)) setSelectValue($('#addPlanVendor'), '');
+    if (fieldStillAuto('costKind', $('#addPlanCostKind')?.value)) setSelectValue($('#addPlanCostKind'), '');
+    if (fieldStillAuto('nhom', $('#addPlanNhom')?.value)) setSelectValue($('#addPlanNhom'), '');
+    if (fieldStillAuto('uom', $('#addPlanUom')?.value)) setSelectValue($('#addPlanUom'), 'Lần');
+    if (fieldStillAuto('unitPrice', $('#addPlanUnitPrice')?.value)) {
+      const el = $('#addPlanUnitPrice');
+      if (el) el.value = '';
+    }
+    if (fieldStillAuto('vat', $('#addPlanVat')?.value)) {
+      const el = $('#addPlanVat');
+      if (el) el.value = '8';
+    }
+    Object.keys(autoFromMat).forEach((k) => { autoFromMat[k] = null; });
+    const hint = $('#addPlanFillHint');
+    if (hint) hint.textContent = 'Chọn hệ thống → loại dịch vụ → tick danh mục / chọn VT để tự điền';
+  };
+  const clearSelectedMaterial = () => {
+    const had = !!selectedMat;
+    selectedMat = null;
+    dirty.materials = true;
+    const matInp = $('#addPlanMat');
+    if (matInp && String(matInp.value || '').trim()) {
+      /* giữ text đang gõ nếu user đang search; chỉ clear value khi clear hẳn */
+    }
+    if (had || Object.values(autoFromMat).some((v) => v != null)) clearMaterialDerivedFields();
   };
   const refreshServiceTypeOptions = (keepId) => {
     const sysId = $('#addPlanSystem')?.value || '';
@@ -66873,31 +66907,41 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
       qty: 1,
     };
     dirty.materials = true;
+    Object.keys(autoFromMat).forEach((k) => { autoFromMat[k] = null; });
     if ((force || !dirty.vendor) && full.supplier) {
       setSelectValue($('#addPlanVendor'), full.supplier);
       dirty.vendor = false;
+      autoFromMat.vendor = full.supplier;
     }
     if ((force || !dirty.uom) && (full.uom || raw.uom)) {
-      setSelectValue($('#addPlanUom'), full.uom || raw.uom);
+      const u = full.uom || raw.uom;
+      setSelectValue($('#addPlanUom'), u);
       dirty.uom = false;
+      autoFromMat.uom = u;
     }
     if ((force || !dirty.unitPrice) && full.refPrice != null) {
+      const price = String(Number(full.refPrice) || 0);
       const el = $('#addPlanUnitPrice');
-      if (el) el.value = String(Number(full.refPrice) || 0);
+      if (el) el.value = price;
       dirty.unitPrice = false;
+      autoFromMat.unitPrice = price;
     }
     if ((force || !dirty.vat) && full.vat != null) {
+      const vat = String(Number(full.vat) || 8);
       const el = $('#addPlanVat');
-      if (el) el.value = String(Number(full.vat) || 8);
+      if (el) el.value = vat;
       dirty.vat = false;
+      autoFromMat.vat = vat;
     }
-    if ((force || !dirty.costKind)) {
+    if (force || !dirty.costKind) {
       setSelectValue($('#addPlanCostKind'), 'Tiền Vật Tư');
       dirty.costKind = false;
+      autoFromMat.costKind = 'Tiền Vật Tư';
     }
     if ((force || !dirty.nhom) && full.nhom) {
       setSelectValue($('#addPlanNhom'), full.nhom);
       dirty.nhom = false;
+      autoFromMat.nhom = full.nhom;
     }
     /* Gợi ý hệ thống từ heThong vật tư nếu chưa chọn */
     if (!$('#addPlanSystem')?.value && full.heThong) {
@@ -67162,7 +67206,16 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
     dirty.workKind = true;
     if ($('#addPlanWorkKind')) $('#addPlanWorkKind').dataset.touched = '1';
   });
-  $('#addPlanContent')?.addEventListener('input', () => markDirty('content'));
+  $('#addPlanContent')?.addEventListener('input', () => {
+    markDirty('content');
+    const raw = String($('#addPlanContent')?.value || '').trim();
+    /* Xóa nội dung → bỏ VT gợi ý kèm field auto-fill */
+    if (!raw) {
+      const matInp = $('#addPlanMat');
+      if (matInp) matInp.value = '';
+      clearSelectedMaterial();
+    }
+  });
   $('#addPlanVendor')?.addEventListener('change', () => markDirty('vendor'));
   $('#addPlanUnitPrice')?.addEventListener('input', () => markDirty('unitPrice'));
   $('#addPlanVat')?.addEventListener('input', () => markDirty('vat'));
@@ -67184,7 +67237,7 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
           renderList();
         }
       }
-      if (!dirty.materials && !selectedMat) {
+      if (!dirty.materials || !selectedMat) {
         const sug = suggestMaterialsForPlanLine(o.name, $('#addPlanSystem')?.value, o.system)[0];
         if (sug) fillFromMaterial(sug, { force: false });
       }
@@ -67209,14 +67262,14 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
   $('#addPlanMat')?.addEventListener('input', () => {
     const raw = String($('#addPlanMat')?.value || '').trim();
     if (!raw) {
-      selectedMat = null;
-      dirty.materials = true;
+      clearSelectedMaterial();
       return;
     }
-    /* Đang gõ lại khác giá trị đã chọn → bỏ liên kết VT cũ */
+    /* Đang gõ lại khác giá trị đã chọn → bỏ liên kết VT + clear field auto */
     if (selectedMat && raw !== matInputLabel(selectedMat) && raw !== selectedMat.name) {
       selectedMat = null;
       dirty.materials = true;
+      clearMaterialDerivedFields();
     }
   });
   const modalRoot = $('#modalRoot');
