@@ -72925,21 +72925,6 @@ function absorbDriverInbox() {
     return 0;
   }
 }
-/** Cộng tháng vào ngày YYYY-MM-DD (local) — tháng 12 → năm + 1; clamp ngày cuối tháng. */
-function addMonthsToDateKey(dateKey, months) {
-  const base = String(dateKey || '').slice(0, 10);
-  const todayFallback = (typeof todayDateKey === 'function' ? todayDateKey() : new Date().toISOString().slice(0, 10));
-  const src = /^\d{4}-\d{2}-\d{2}$/.test(base) ? base : todayFallback;
-  const [y, m, d] = src.split('-').map(Number);
-  const targetMonthStart = new Date(y, (m - 1) + Number(months || 0), 1);
-  const lastDay = new Date(targetMonthStart.getFullYear(), targetMonthStart.getMonth() + 1, 0).getDate();
-  const day = Math.min(d, lastDay);
-  const result = new Date(targetMonthStart.getFullYear(), targetMonthStart.getMonth(), day);
-  const yy = result.getFullYear();
-  const mm = String(result.getMonth() + 1).padStart(2, '0');
-  const dd = String(result.getDate()).padStart(2, '0');
-  return yy + '-' + mm + '-' + dd;
-}
 function openSchedulePlanModal(opts) {
   const title = opts?.title || 'Đưa vào kế hoạch';
   const subtitle = opts?.subtitle || 'Chọn tháng này, tháng sau, hoặc chỉ định ngày cụ thể.';
