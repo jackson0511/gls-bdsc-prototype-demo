@@ -11807,7 +11807,7 @@ const DEFAULT = {
     "revision": 1,
     "cost": 360000,
     "catalogId": null,
-    "content": "[DEMO] Chỉ KTV ghi · không có dòng XK/SN · không cần đồng bộ MH",
+    "content": "[DEMO] Chỉ KTV ghi · vẫn bắt buộc đồng bộ mua hàng",
     "createdAt": "2026-09-29",
     "startedAt": "2026-09-29 10:00",
     "materialRequestedAt": null,
@@ -11845,10 +11845,10 @@ const DEFAULT = {
       "note": ""
     },
     "purchaseSync": {
-      "status": "NA",
+      "status": "NONE",
       "lastSyncedAt": null,
       "issueDocCode": null,
-      "note": "Không có dòng Xuất kho / Sửa ngoài"
+      "note": "Chờ đồng bộ mua hàng (phiếu chỉ KTV ghi)"
     },
     "baseSync": {
       "status": "NONE",
@@ -11862,7 +11862,7 @@ const DEFAULT = {
       { "at": "2026-09-29 09:35", "action": "SUBMIT", "by": "Nguyễn Văn Kỹ thuật", "note": "" },
       { "at": "2026-09-29 09:50", "action": "APPROVE", "by": "Trần Quản lý", "note": "" },
       { "at": "2026-09-29 10:00", "action": "START", "by": "Nguyễn Văn Kỹ thuật", "note": "startedAt" },
-      { "at": "2026-09-29 11:30", "action": "COMPLETE", "by": "Nguyễn Văn Kỹ thuật", "note": "repairCompletedAt · không gửi MH" }
+      { "at": "2026-09-29 11:30", "action": "COMPLETE", "by": "Nguyễn Văn Kỹ thuật", "note": "repairCompletedAt · còn chờ ĐB MH" }
     ]
   },
   {
@@ -64378,6 +64378,31 @@ function truncatePwmsSiteName(name, maxLen) {
   const n = maxLen || 22;
   return s.length > n ? s.slice(0, n) : s;
 }
+/** Số lượng tối thiểu theo ĐVT / loại VT (toi_thieu PWMS) — không mặc định luôn 1. */
+function defaultToiThieuForMaterial(m) {
+  const uom = String(m?.uom || '').toLowerCase();
+  const blob = `${m?.name || ''} ${m?.code || ''}`.toLowerCase();
+  const h = hashStr(m?.code || m?.id || m?.name);
+  if (/lít|lit/.test(uom) || /nhớt|nhot|dầu nhớt|dau nhot|delo|15w/.test(blob)) {
+    if (/hộp số|hop so|truyền động|truyen dong/.test(blob)) return 8;
+    if (/thủy lực|thuy luc|trợ lực|tro luc/.test(blob)) return 2;
+    return 18; /* dầu động cơ thường theo can 18L */
+  }
+  if (/kg/.test(uom) || /mỡ|mo bo|grease|multifak/.test(blob)) return h % 2 === 0 ? 1 : 5;
+  if (/bộ|bo\b/.test(uom) || /đôi|doi/.test(uom)) return 1;
+  if (/lọc|loc |filter|phin/.test(blob)) return 1;
+  if (/lốp|lop |tire|ắc quy|ac quy|acquy|battery/.test(blob)) return 1;
+  const picks = [1, 1, 1, 2, 2, 4, 5, 6, 10, 12];
+  return picks[h % picks.length];
+}
+/** SL mặc định khi chọn VT từ danh mục = toi_thieu (tối thiểu 1). */
+function materialMinQty(m) {
+  if (!m) return 1;
+  const full = (m.id != null && typeof materialById === 'function' ? materialById(m.id) : null) || m;
+  if (full && !full.localOnly) enrichMaterialPwmsFields(full, false);
+  const n = Number(full?.toiThieu ?? full?.minQty ?? m?.toiThieu ?? m?.minQty);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
 function enrichMaterialPwmsFields(m, force) {
   if (!m || m.localOnly) return m;
   const h = hashStr(m.code || m.id || m.name);
@@ -64401,7 +64426,7 @@ function enrichMaterialPwmsFields(m, force) {
     m.seri = /lốp|lop|tire|ắc quy|ac quy|acquy|battery|vỏ lốp/.test(blob);
   }
   if (force || m.hinhAnh == null) m.hinhAnh = '';
-  if (force || m.toiThieu == null) m.toiThieu = 1;
+  if (force || m.toiThieu == null) m.toiThieu = defaultToiThieuForMaterial(m);
   if (force || m.apDung == null) m.apDung = true;
   // Mẫu định mức kép cho lốp/ắc (hiển thị màn Vỏ lốp / ắc quy)
   const blob = `${m.name || ''} ${m.code || ''}`.toLowerCase();
@@ -64712,6 +64737,8 @@ function materialMasterOptions() {
     supplier: m.supplier || '',
     warehouse: m.warehouse || '',
     stockQty: m.stockQty,
+    toiThieu: materialMinQty(m),
+    minQty: materialMinQty(m),
     source: 'master',
   }));
 }
@@ -64723,11 +64750,25 @@ function hideAllAcDropdowns() {
   $$('.ac-dropdown').forEach(d => d.classList.add('hidden'));
 }
 /** Creatable autocomplete (Fleet-like): chọn từ master hoặc + Tạo mới → chỉ lưu nội bộ.
- *  opts.isSelected(o) — nếu true thì ẩn khỏi dropdown (đã chọn dạng chip / multi-select). */
+ *  opts.isSelected(o) — nếu true thì ẩn khỏi dropdown (đã chọn dạng chip / multi-select).
+ *  opts.fixed — dropdown position:fixed (dùng trong bảng overflow). */
 function bindCreatableAc(input, dd, opts) {
   if (!input || !dd || input.dataset.acBound) return;
   input.dataset.acBound = '1';
   const isSelected = typeof opts.isSelected === 'function' ? opts.isSelected : () => false;
+  const placeFixed = () => {
+    if (!opts.fixed) return;
+    const r = input.getBoundingClientRect();
+    const w = Math.max(r.width, 280);
+    let left = r.left;
+    if (left + w > window.innerWidth - 8) left = Math.max(8, window.innerWidth - w - 8);
+    dd.style.position = 'fixed';
+    dd.style.left = left + 'px';
+    dd.style.top = (r.bottom + 2) + 'px';
+    dd.style.width = w + 'px';
+    dd.style.right = 'auto';
+    dd.style.zIndex = '80';
+  };
   const render = () => {
     const raw = input.value.trim();
     const q = raw.toLowerCase();
@@ -64747,11 +64788,20 @@ function bindCreatableAc(input, dd, opts) {
       const alreadyPicked = isSelected({ id: raw, name: raw, code: raw });
       if (!exists && !alreadyPicked) html += `<button type="button" class="ac-opt create" data-create="1">+ Tạo mới (chỉ lưu nội bộ): “${esc(raw)}”</button>`;
     }
-    if (!html) html = '<div class="px-3 py-2 text-xs text-slate-400">Không còn mục nào · đã chọn hết hoặc không khớp</div>';
+    if (!html) {
+      html = raw
+        ? (canCreate
+          ? '<div class="px-3 py-2 text-xs text-slate-400">Không khớp — dùng «+ Tạo mới» / Enter để nhập tên vừa gõ</div>'
+          : '<div class="px-3 py-2 text-xs text-slate-400">Không có mục khớp</div>')
+        : '<div class="px-3 py-2 text-xs text-slate-400">Gõ để tìm gợi ý</div>';
+    }
     dd.innerHTML = html;
+    placeFixed();
     dd.classList.remove('hidden');
     dd.querySelectorAll('[data-pick]').forEach(b => {
-      b.onclick = () => {
+      b.onclick = (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
         const o = (opts.getOptions() || []).find(x => String(x.id) === String(b.dataset.pick));
         if (!o) return;
         opts.onPick(o);
@@ -64759,7 +64809,9 @@ function bindCreatableAc(input, dd, opts) {
       };
     });
     dd.querySelectorAll('[data-create]').forEach(b => {
-      b.onclick = () => {
+      b.onclick = (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
         const created = opts.onCreate(raw);
         if (created) opts.onPick(created);
         hideAllAcDropdowns();
@@ -64768,7 +64820,19 @@ function bindCreatableAc(input, dd, opts) {
   };
   input.addEventListener('focus', render);
   input.addEventListener('input', () => { opts.onInput?.(); render(); });
-  input.addEventListener('keydown', (e) => { if (e.key === 'Escape') hideAllAcDropdowns(); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') hideAllAcDropdowns();
+    if (e.key === 'Enter' && opts.onEnter) {
+      e.preventDefault();
+      opts.onEnter(input.value.trim());
+      hideAllAcDropdowns();
+    }
+  });
+  if (opts.fixed && !dd.dataset.acScrollBound) {
+    dd.dataset.acScrollBound = '1';
+    window.addEventListener('scroll', () => { if (!dd.classList.contains('hidden')) placeFixed(); }, true);
+    window.addEventListener('resize', () => { if (!dd.classList.contains('hidden')) placeFixed(); });
+  }
 }
 /* ===== Cell pick popover — UX giống chọn tài xế trucking order/actual ===== */
 function cellPopBtnHtml(label, attrs) {
@@ -65003,7 +65067,7 @@ function planMaterialsList(p) {
     return p.materialIds.map((id) => {
       const m = materialById(id);
       if (!m) return null;
-      return { id: m.id, code: m.code || '', name: m.name || '', uom: m.uom || 'Cái', qty: 1 };
+      return { id: m.id, code: m.code || '', name: m.name || '', uom: m.uom || 'Cái', qty: materialMinQty(m) };
     }).filter(Boolean);
   }
   return [];
@@ -65102,7 +65166,8 @@ function suggestMaterialsForPlanLine(pOrService, systemId, systemName) {
     code: best.m.code || '',
     name: best.m.name || '',
     uom: best.m.uom || 'Cái',
-    qty: 1,
+    qty: materialMinQty(best.m),
+    toiThieu: materialMinQty(best.m),
   }];
 }
 function contentOptionsForPlanSystem(systemId, systemName) {
@@ -66727,7 +66792,8 @@ function readAddPlanFormExtras() {
     : '';
   const stId = String($('#addPlanServiceType')?.value || '').trim();
   const st = stId && typeof serviceTypeById === 'function' ? serviceTypeById(stId) : null;
-  const qty = Math.max(1, Number($('#addPlanQty')?.value) || 1);
+  const matMinQ = selectedMat ? materialMinQty(selectedMat) : 1;
+  const qty = Math.max(matMinQ, Number($('#addPlanQty')?.value) || matMinQ);
   const unitPriceRaw = $('#addPlanUnitPrice')?.value;
   const unitPrice = unitPriceRaw === '' || unitPriceRaw == null ? null : Math.max(0, Number(unitPriceRaw) || 0);
   const vat = Math.max(0, Number($('#addPlanVat')?.value));
@@ -66912,11 +66978,16 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
   const checked = new Set();
   let selectedMat = null; /* 1 vật tư / dòng */
   let mode = 'catalog'; /* catalog | manual */
-  const dirty = { vendor: false, unitPrice: false, uom: false, workKind: false, costKind: false, nhom: false, content: false, materials: false, vat: false };
+  const dirty = { vendor: false, unitPrice: false, uom: false, workKind: false, costKind: false, nhom: false, content: false, materials: false, vat: false, qty: false };
   /* Giá trị vừa auto-fill từ VT — dùng để clear đúng khi xóa VT (không đụng field user đã sửa) */
-  const autoFromMat = { vendor: null, uom: null, unitPrice: null, vat: null, costKind: null, nhom: null };
+  const autoFromMat = { vendor: null, uom: null, unitPrice: null, vat: null, costKind: null, nhom: null, qty: null };
   const markDirty = (key) => { dirty[key] = true; };
-  window._addPlanSelectedMats = () => (selectedMat ? [selectedMat] : []);
+  window._addPlanSelectedMats = () => {
+    if (!selectedMat) return [];
+    const minQ = materialMinQty(selectedMat);
+    const q = Math.max(minQ, Number($('#addPlanQty')?.value) || minQ);
+    return [{ ...selectedMat, qty: q, toiThieu: minQ }];
+  };
   const setSelectValue = (el, value) => {
     if (!el) return;
     const v0 = String(value || '');
@@ -66946,6 +67017,10 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
     if (fieldStillAuto('vat', $('#addPlanVat')?.value)) {
       const el = $('#addPlanVat');
       if (el) el.value = '8';
+    }
+    if (fieldStillAuto('qty', $('#addPlanQty')?.value)) {
+      const el = $('#addPlanQty');
+      if (el) { el.value = '1'; el.min = '1'; el.title = ''; }
     }
     Object.keys(autoFromMat).forEach((k) => { autoFromMat[k] = null; });
     const hint = $('#addPlanFillHint');
@@ -67017,7 +67092,8 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
       code: full.code || raw.code || '',
       name: full.name || raw.name || '',
       uom: full.uom || raw.uom || 'Cái',
-      qty: 1,
+      qty: materialMinQty(full),
+      toiThieu: materialMinQty(full),
     };
     dirty.materials = true;
     Object.keys(autoFromMat).forEach((k) => { autoFromMat[k] = null; });
@@ -67055,6 +67131,15 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
       setSelectValue($('#addPlanNhom'), full.nhom);
       dirty.nhom = false;
       autoFromMat.nhom = full.nhom;
+    }
+    const mq = materialMinQty(full);
+    const qtyEl = $('#addPlanQty');
+    if (qtyEl && (force || !dirty.qty)) {
+      qtyEl.value = String(mq);
+      qtyEl.min = String(mq);
+      qtyEl.title = 'Số lượng tối thiểu (toi_thieu): ' + mq;
+      dirty.qty = false;
+      autoFromMat.qty = String(mq);
     }
     /* Gợi ý hệ thống từ heThong vật tư nếu chưa chọn */
     if (!$('#addPlanSystem')?.value && full.heThong) {
@@ -67364,13 +67449,23 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
   bindCreatableAc($('#addPlanMat'), $('#addPlanMatDd'), {
     getOptions: getMatAcOptions,
     allowCreate: true,
-    format: (o) => `${esc(o.code || '')} · ${esc(o.name)}${o.supplier ? ` <span class="sub">· ${esc(o.supplier)}</span>` : ''}`,
+    format: (o) => `${esc(o.code || '')} · ${esc(o.name)} · SL min ${materialMinQty(o)}${o.supplier ? ` <span class="sub">· ${esc(o.supplier)}</span>` : ''}`,
     onPick: (o) => fillFromMaterial(o, { force: true }),
     onCreate: (name) => {
       const item = persistLocalMaterial(name);
       toast('Đã tạo vật tư mới · chỉ nội bộ TMS');
       return item;
     },
+  });
+  $('#addPlanQty')?.addEventListener('input', () => {
+    markDirty('qty');
+    const minQ = selectedMat ? materialMinQty(selectedMat) : 1;
+    const el = $('#addPlanQty');
+    if (el && Number(el.value) < minQ) {
+      el.value = String(minQ);
+      toast('SL tối thiểu của VT là ' + minQ);
+    }
+    if (selectedMat && el) selectedMat.qty = Math.max(minQ, Number(el.value) || minQ);
   });
   $('#addPlanMat')?.addEventListener('input', () => {
     const raw = String($('#addPlanMat')?.value || '').trim();
@@ -72568,8 +72663,13 @@ function materialSourceChip(m) {
   if (src === 'EXTERNAL') return '<span class="chip bg-violet-100 text-violet-800">Sửa ngoài</span>';
   return '<span class="chip bg-emerald-100 text-emerald-800">Xuất kho</span>';
 }
+/** Có dòng XK / sửa ngoài — dùng cho làm mới tồn / giá tạm từ kho (không quyết định có cần ĐB MH). */
 function orderHasPurchaseMaterials(o) {
   return (o.materials || []).some(m => m.source === 'PWMS' || m.source === 'EXTERNAL');
+}
+/** Mọi phiếu đều phải đồng bộ mua hàng (kể cả chỉ KTV ghi / không có VT). */
+function orderNeedsPurchaseSync(o) {
+  return !!o;
 }
 function materialsSummary(list) {
   if (!list?.length) return '(không có)';
@@ -72714,23 +72814,23 @@ function approvalActionColor(a) {
 }
 function ensurePurchaseSync(o) {
   if (!o) return o;
-  const hasPwms = orderHasPurchaseMaterials(o);
   if (!o.purchaseSync) {
-    if (!hasPwms) {
-      o.purchaseSync = { status: 'NA', lastSyncedAt: null, issueDocCode: null, note: 'Không có dòng xuất kho / sửa ngoài' };
-    } else {
-      const synced = o.status === 'COMPLETED' && (o.approvalLog || []).some(e => e.action === 'SYNC');
-      o.purchaseSync = synced
-        ? {
-            status: 'SYNCED',
-            lastSyncedAt: (o.date || o.createdAt || '') + ' 15:30',
-            issueDocCode: 'XK-' + String(o.code || '').replace(/^RO-/, ''),
-            note: 'Đã lấy đơn giá / phiếu xuất từ mua hàng',
-          }
-        : { status: 'NONE', lastSyncedAt: null, issueDocCode: null, note: '' };
-    }
-  } else if (!hasPwms && o.purchaseSync.status !== 'NA') {
-    o.purchaseSync.status = 'NA';
+    const synced = (o.approvalLog || []).some(e => e.action === 'SYNC')
+      || (o.status === 'COMPLETED' && (o.approvalLog || []).some(e => e.action === 'SYNC'));
+    o.purchaseSync = synced
+      ? {
+          status: 'SYNCED',
+          lastSyncedAt: (o.date || o.createdAt || '') + ' 15:30',
+          issueDocCode: 'XK-' + String(o.code || '').replace(/^RO-/, ''),
+          note: 'Đã lấy đơn giá / chứng từ từ mua hàng',
+        }
+      : { status: 'NONE', lastSyncedAt: null, issueDocCode: null, note: '' };
+  } else if (o.purchaseSync.status === 'NA') {
+    // Rule mới: không còn «không cần ĐB MH» — migrate seed / localStorage cũ
+    o.purchaseSync.status = 'NONE';
+    o.purchaseSync.note = o.purchaseSync.note && /không có dòng/i.test(o.purchaseSync.note)
+      ? ''
+      : (o.purchaseSync.note || '');
   }
   return o;
 }
@@ -72741,7 +72841,7 @@ function purchaseSyncBadge(ps) {
     SYNCING: ['border-sky-400 bg-sky-50 text-sky-800', 'Đang đồng bộ…'],
     SYNCED: ['border-emerald-400 bg-emerald-50 text-emerald-800', 'Đã đồng bộ mua hàng'],
     FAILED: ['border-rose-400 bg-rose-50 text-rose-800', 'Đồng bộ lỗi'],
-    NA: ['border-slate-200 bg-slate-50 text-slate-500', 'Không có VT kho mua hàng'],
+    NA: ['border-amber-200 bg-amber-50 text-amber-800', 'Chưa đồng bộ mua hàng'],
   };
   const [cls, label] = map[s] || map.NONE;
   return `<span class="badge ${cls}">${label}</span>`;
@@ -72791,7 +72891,7 @@ function buildOrderTimeline(o) {
   ensurePurchaseSync(o);
   const log = [...(o.approvalLog || [])];
   const ap = o.approvalStatus || 'DRAFT';
-  const hasPwms = orderHasPurchaseMaterials(o);
+  const needsMh = orderNeedsPurchaseSync(o);
   const syncSt = o.purchaseSync?.status || 'NONE';
 
   if (!log.some(e => e.action === 'CREATE')) {
@@ -72828,12 +72928,12 @@ function buildOrderTimeline(o) {
     pushF('SUBMIT', 'KTV nộp phiếu để quản lý duyệt');
     pushF('APPROVE', 'Quản lý duyệt hoặc từ chối');
     pushF('START', 'Bắt đầu thực hiện trên xưởng');
-    if (hasPwms) pushF('SYNC', 'Lấy giá / phiếu xuất từ mua hàng');
+    if (needsMh) pushF('SYNC', 'Đồng bộ mua hàng (mọi phiếu)');
     pushF('COMPLETE', 'Khóa phiếu sau khi xong việc');
   } else if (ap === 'PENDING_APPROVAL') {
     pushF('APPROVE', 'Quản lý duyệt hoặc từ chối');
     pushF('START', 'Bắt đầu thực hiện trên xưởng');
-    if (hasPwms) pushF('SYNC', 'Lấy giá / phiếu xuất từ mua hàng');
+    if (needsMh) pushF('SYNC', 'Đồng bộ mua hàng (mọi phiếu)');
     pushF('COMPLETE', 'Khóa phiếu sau khi xong việc');
   } else if (ap === 'REJECTED') {
     const last = log[log.length - 1];
@@ -72842,24 +72942,29 @@ function buildOrderTimeline(o) {
     }
     pushF('APPROVE', 'Chờ duyệt lại');
     pushF('START', 'Bắt đầu thực hiện trên xưởng');
-    if (hasPwms) pushF('SYNC', 'Lấy giá / phiếu xuất từ mua hàng');
+    if (needsMh) pushF('SYNC', 'Đồng bộ mua hàng (mọi phiếu)');
     pushF('COMPLETE', 'Khóa phiếu sau khi xong việc');
   } else if (ap === 'APPROVED') {
     if (o.status === 'NOT_STARTED') {
       pushF('START', 'Bắt đầu thực hiện trên xưởng');
-      if (hasPwms) pushF('SYNC', 'Lấy giá / phiếu xuất từ mua hàng');
+      if (needsMh) pushF('SYNC', 'Đồng bộ mua hàng (mọi phiếu)');
       pushF('COMPLETE', 'Khóa phiếu khi đủ hạng mục HT');
     } else if (o.status === 'IN_PROGRESS') {
-      if (hasPwms && syncSt !== 'SYNCED') {
+      if (needsMh && syncSt !== 'SYNCED') {
         if (syncSt === 'SYNCING') {
-          future.push({ kind: 'current', action: 'SYNC', label: 'Đang đồng bộ mua hàng…', at: null, by: null, note: 'Đang lấy đơn giá và phiếu xuất kho' });
+          future.push({ kind: 'current', action: 'SYNC', label: 'Đang đồng bộ mua hàng…', at: null, by: null, note: 'Đang lấy đơn giá / chứng từ mua hàng' });
         } else {
-          pushF('SYNC', 'Bấm «Đồng bộ mua hàng» để lấy giá / phiếu xuất');
+          pushF('SYNC', 'Bấm «Đồng bộ mua hàng» (bắt buộc mọi phiếu)');
         }
       }
       pushF('COMPLETE', 'Hoàn thành từng hạng mục (đủ thì phiếu tự HT)');
+    } else if (o.status === 'COMPLETED' && needsMh && syncSt !== 'SYNCED') {
+      if (syncSt === 'SYNCING') {
+        future.push({ kind: 'current', action: 'SYNC', label: 'Đang đồng bộ mua hàng…', at: null, by: null, note: 'Đang lấy đơn giá / chứng từ mua hàng' });
+      } else {
+        pushF('SYNC', 'Phiếu đã HT · vẫn cần đồng bộ mua hàng');
+      }
     }
-    // COMPLETED → không còn bước tương lai
   }
 
   // đánh dấu current = bước todo đầu tiên, hoặc sự kiện cuối nếu không còn todo
@@ -72874,7 +72979,7 @@ function buildOrderTimeline(o) {
 function canSyncPurchase(o) {
   ensureOrderApproval(o);
   ensurePurchaseSync(o);
-  if (!orderHasPurchaseMaterials(o)) return false;
+  if (!orderNeedsPurchaseSync(o)) return false;
   if (o.approvalStatus !== 'APPROVED') return false;
   return o.status === 'IN_PROGRESS' || o.status === 'COMPLETED';
 }
@@ -74770,7 +74875,13 @@ function orderPlannedMaterialsTable(o) {
       return `<tr class="row-h bg-amber-50/50 border-b border-amber-100" data-mat-draft-row="${o.id}:${idx}">
         <td class="td"><span class="chip bg-amber-100 text-amber-900">Nháp</span></td>
         <td class="td"><input type="text" class="form-control !py-1 !text-xs font-mono w-24" data-mat-draft-field="code" data-oid="${o.id}" data-idx="${idx}" placeholder="Mã" value="${esc(m.code || '')}" /></td>
-        <td class="td"><input type="text" class="form-control !py-1 !text-sm w-full min-w-[10rem]" data-mat-draft-field="name" data-oid="${o.id}" data-idx="${idx}" placeholder="Tên vật tư *" value="${esc(m.name || '')}" /></td>
+        <td class="td min-w-[14rem]">
+          <div class="ac-wrap">
+            <input type="search" class="form-control !py-1 !text-sm w-full min-w-[10rem]" data-mat-draft-field="name" data-mat-draft-name-ac="${o.id}:${idx}" data-oid="${o.id}" data-idx="${idx}" placeholder="Tên vật tư *" value="${esc(m.name || '')}" autocomplete="off" />
+            <input type="hidden" data-mat-draft-field="materialId" value="${esc(m.materialId || '')}" />
+            <div class="ac-dropdown hidden" data-mat-draft-name-dd="${o.id}:${idx}"></div>
+          </div>
+        </td>
         <td class="td text-right"><input type="number" min="0" step="0.01" class="form-control !py-1 !text-sm w-20 text-right ml-auto" data-mat-draft-field="qty" data-oid="${o.id}" data-idx="${idx}" value="${m.qty ?? 1}" /></td>
         <td class="td"><input type="text" class="form-control !py-1 !text-sm w-16" data-mat-draft-field="uom" data-oid="${o.id}" data-idx="${idx}" value="${esc(m.uom || 'Cái')}" /></td>
         <td class="td text-right"><input type="number" min="0" class="form-control !py-1 !text-sm w-28 text-right ml-auto" data-mat-draft-field="price" data-oid="${o.id}" data-idx="${idx}" value="${m.price ?? 0}" /></td>
@@ -74803,7 +74914,7 @@ function orderPlannedMaterialsTable(o) {
         <td colspan="${colN}" class="td py-2 text-center">
           <button type="button" data-add-mat-row="${o.id}" class="text-sm font-medium text-blue-700 hover:underline">+ Thêm dòng vật tư</button>
           <span class="mx-2 text-slate-300">·</span>
-          <button type="button" data-add-material="${o.id}" class="text-sm text-slate-600 hover:underline">Mở form đầy đủ (kho / autocomplete)</button>
+          <button type="button" data-add-material="${o.id}" class="text-sm text-slate-600 hover:underline">Mở form đầy đủ</button>
         </td>
       </tr>`
     : '';
@@ -74853,7 +74964,93 @@ function appendDraftMaterialRow(orderId) {
   });
   if (typeof save === 'function') save({ quiet: true });
   render();
+  requestAnimationFrame(() => {
+    const el = document.querySelector(`[data-mat-draft-name-ac^="${CSS.escape(String(orderId))}:"]`)
+      || document.querySelector('[data-mat-draft-name-ac]');
+    el?.focus();
+  });
 }
+function applyDraftMaterialPick(root, o) {
+  if (!root) return;
+  const set = (field, v) => {
+    const el = root.querySelector(`[data-mat-draft-field="${field}"]`);
+    if (el) el.value = v == null ? '' : String(v);
+  };
+  if (!o) {
+    set('materialId', '');
+    return;
+  }
+  if (o.source === 'local') {
+    set('materialId', '');
+    set('code', o.code || '');
+    set('name', o.name || '');
+    set('uom', o.uom || 'Cái');
+    set('qty', materialMinQty(o));
+    return;
+  }
+  const mq = materialMinQty(o);
+  set('materialId', o.id || '');
+  set('code', o.code || '');
+  set('name', o.name || '');
+  set('uom', o.uom || 'Cái');
+  set('qty', mq);
+  set('price', o.refPrice ?? 0);
+  set('vat', o.vat ?? 8);
+  set('supplier', [o.supplier, o.warehouse].filter(Boolean).join(' · ') || o.supplier || '');
+}
+
+function bindDraftMaterialNameAutocomplete() {
+  $$('[data-mat-draft-name-ac]').forEach((input) => {
+    const key = input.getAttribute('data-mat-draft-name-ac');
+    const dd = document.querySelector(`[data-mat-draft-name-dd="${key}"]`);
+    if (!input || !dd) return;
+    const root = input.closest('[data-mat-draft-row]');
+    const clearCatalogLink = () => {
+      const hid = root?.querySelector('[data-mat-draft-field="materialId"]');
+      if (hid) hid.value = '';
+    };
+    bindCreatableAc(input, dd, {
+      fixed: true,
+      allowCreate: true,
+      getOptions: () => [...materialLocalOptions(), ...materialMasterOptions()],
+      format: (o) => o.source === 'local'
+        ? `${esc(o.name)} <span class="local-tag">nội bộ</span>`
+        : `${esc(o.code || '—')} · ${esc(o.name)} · SL min ${materialMinQty(o)}${o.stockQty != null ? ` · tồn ${o.stockQty}` : ''}`,
+      onPick: (o) => {
+        applyDraftMaterialPick(root, o);
+        input.focus();
+      },
+      onCreate: (name) => {
+        const item = persistLocalMaterial(name);
+        applyDraftMaterialPick(root, { ...item, source: 'local' });
+        toast('Đã thêm tên vật tư mới (không có trong danh mục)');
+        return null;
+      },
+      onInput: clearCatalogLink,
+      onEnter: (raw) => {
+        if (!raw) return;
+        const opts = [...materialLocalOptions(), ...materialMasterOptions()];
+        const hit = opts.find(o =>
+          (o.name || '').toLowerCase() === raw.toLowerCase()
+          || (o.code || '').toLowerCase() === raw.toLowerCase()
+        );
+        if (hit) applyDraftMaterialPick(root, hit);
+        else {
+          const item = persistLocalMaterial(raw);
+          applyDraftMaterialPick(root, { ...item, source: 'local' });
+          toast('Đã thêm tên vật tư mới (không có trong danh mục)');
+        }
+      },
+    });
+  });
+  if (!document.body.dataset.matDraftAcOutside) {
+    document.body.dataset.matDraftAcOutside = '1';
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.ac-wrap')) hideAllAcDropdowns();
+    });
+  }
+}
+
 function saveDraftMaterialRow(orderId, idx) {
   const o = DB.orders.find(x => x.id === orderId);
   if (!o || !canEditOrderDetail(o)) return;
@@ -74870,27 +75067,41 @@ function saveDraftMaterialRow(orderId, idx) {
   const price = Number(val('price') || 0);
   const vat = Number(val('vat') ?? 8);
   const supplierRaw = val('supplier');
+  const code = val('code') || null;
+  const materialId = val('materialId') || null;
   const before = orderSnapshot(o);
+  const sourceHint = materialId ? 'PWMS' : 'TECHNICIAN';
+  if (sourceHint === 'TECHNICIAN'
+    && !materialLocalOptions().some(x => (x.name || '').toLowerCase() === name.toLowerCase())
+    && !materialMasterOptions().some(x => (x.name || '').toLowerCase() === name.toLowerCase())) {
+    persistLocalMaterial(name);
+  }
+  const ful = resolveMaterialFulfillment({ sourceHint, code, qty: qty > 0 ? qty : 1, name });
+  const supplierParts = supplierRaw ? supplierRaw.split('·').map(s => s.trim()).filter(Boolean) : [];
   Object.assign(m, {
     _draft: false,
-    code: val('code') || null,
+    materialId: materialId || null,
+    code,
     name,
     qty: qty > 0 ? qty : 1,
     uom: val('uom') || 'Cái',
     price,
     vat: Number.isFinite(vat) ? vat : 8,
-    supplier: supplierRaw || null,
-    warehouse: null,
-    source: 'TECHNICIAN',
-    fulfillment: 'TECHNICIAN',
-    fulfillmentNote: 'Nhập tay trên bảng',
-    priceKind: 'MANUAL',
-    localOnly: true,
+    supplier: supplierParts[0] || supplierRaw || null,
+    warehouse: ful.source === 'PWMS'
+      ? (supplierParts[1] || null)
+      : (ful.source === 'EXTERNAL' ? (supplierParts[1] || 'Sửa ngoài / nhà cung cấp') : null),
+    source: ful.source,
+    fulfillment: ful.fulfillment,
+    fulfillmentNote: ful.reason || 'Nhập trên bảng',
+    priceKind: ful.source === 'TECHNICIAN' ? 'MANUAL' : 'REF',
+    localOnly: ful.source === 'TECHNICIAN',
+    stockAtSelect: ful.stockQty,
   });
   delete m._draft;
-  if (!materialLocalOptions().some(x => (x.name || '').toLowerCase() === name.toLowerCase())
-    && !materialMasterOptions().some(x => (x.name || '').toLowerCase() === name.toLowerCase())) {
-    persistLocalMaterial(name);
+  if (o.purchaseSync && orderNeedsPurchaseSync(o) && o.purchaseSync.status === 'SYNCED') {
+    o.purchaseSync.status = 'NONE';
+    o.purchaseSync.note = 'Có thay đổi vật tư · cần đồng bộ lại mua hàng';
   }
   logOrderEdit(o, before, 'Thêm vật tư (dòng bảng)');
   toast('Đã lưu dòng vật tư');
@@ -74941,6 +75152,7 @@ function pageOrder() {
   const ap = o.approvalStatus || 'DRAFT';
   const ps = o.purchaseSync || { status: 'NONE' };
   const hasPwms = orderHasPurchaseMaterials(o);
+  const needsMh = orderNeedsPurchaseSync(o);
   const pendingDiff = (o.pendingChanges && o.pendingChanges.length)
     ? o.pendingChanges
     : (o.lastSubmitted ? diffOrderFields(o.lastSubmitted, orderSnapshot(o)) : []);
@@ -74972,19 +75184,19 @@ function pageOrder() {
   } else if (ap === 'APPROVED' && o.status === 'NOT_STARTED') {
     actionBtns.push(`<button data-start-order="${o.id}" class="btn btn-outline">Bắt đầu thực hiện</button>`);
   } else if (ap === 'APPROVED' && o.status === 'IN_PROGRESS') {
-    if (hasPwms) {
+    if (needsMh) {
       if (ps.status === 'SYNCING') {
-        actionBtns.push(`<button class="btn btn-outline" disabled>Đang đồng bộ từ PWMS…</button>`);
+        actionBtns.push(`<button class="btn btn-outline" disabled>Đang đồng bộ mua hàng…</button>`);
       } else {
-        actionBtns.push(`<button data-sync-purchase="${o.id}" class="btn btn-outline !border-sky-400 !bg-sky-50 text-sky-900">${ps.status === 'SYNCED' ? 'Đồng bộ lại từ PWMS' : 'Đồng bộ từ PWMS'}</button>`);
+        actionBtns.push(`<button data-sync-purchase="${o.id}" class="btn btn-outline !border-sky-400 !bg-sky-50 text-sky-900">${ps.status === 'SYNCED' ? 'Đồng bộ lại mua hàng' : 'Đồng bộ mua hàng'}</button>`);
       }
     }
     if (allWorkItemsDone(o)) {
       actionBtns.push(`<button type="button" data-complete-order-odo="${o.id}" class="btn btn-emerald">Hoàn thành phiếu · nhập Odo</button>`);
     }
   } else if (ap === 'APPROVED' && o.status === 'COMPLETED') {
-    if (hasPwms && ps.status !== 'SYNCED') {
-      actionBtns.push(`<button data-sync-purchase="${o.id}" class="btn btn-outline !border-sky-400 !bg-sky-50 text-sky-900">Đồng bộ từ PWMS</button>`);
+    if (needsMh && ps.status !== 'SYNCED') {
+      actionBtns.push(`<button data-sync-purchase="${o.id}" class="btn btn-outline !border-sky-400 !bg-sky-50 text-sky-900">Đồng bộ mua hàng</button>`);
     }
   }
 
@@ -75009,31 +75221,25 @@ function pageOrder() {
   }[ap] || '';
 
   const syncBanner = (() => {
-    if (!hasPwms) {
-      return `<div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
-        Không có dòng xuất kho / sửa ngoài trong cụm dự kiến · không tạo cụm mua hàng. Hạng mục / kỹ thuật viên ghi giữ ở cụm dự kiến.
-      </div>`;
-    }
     if (ps.status === 'SYNCING') {
       return `<div class="rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
         <span class="font-semibold">Đang đồng bộ với mua hàng…</span><br/>
-        Đang lấy đơn giá mới nhất và mã phiếu xuất kho. Vui lòng chờ (bản xem thử ~1–2 giây).
+        Đang lấy đơn giá / chứng từ theo mã phiếu (xuất kho · sửa ngoài · KTV ghi). Vui lòng chờ (bản xem thử ~1–2 giây).
       </div>`;
     }
     if (ps.status === 'SYNCED') {
       return `<div class="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
         <span class="font-semibold">Đã đồng bộ mua hàng</span> · ${purchaseSyncBadge(ps)}<br/>
-        Phiếu xuất: <strong>${esc(ps.issueDocCode || '—')}</strong>
+        Chứng từ: <strong>${esc(ps.issueDocCode || ps.externalDocCode || '—')}</strong>
         · Lúc: <strong>${esc(ps.lastSyncedAt || '—')}</strong><br/>
-        <span class="text-xs">${esc(ps.note || 'Đã kéo dữ liệu mua hàng theo mã phiếu (xuất kho / sửa ngoài) · dòng kỹ thuật viên ghi không bị ghi đè')}</span>
+        <span class="text-xs">${esc(ps.note || 'Đã kéo dữ liệu mua hàng theo mã phiếu · cụm dự kiến giữ nguyên')}</span>
       </div>`;
     }
-    // BEFORE sync
     const lockHint = ap !== 'APPROVED'
-      ? 'Chỉ đồng bộ sau khi phiếu đã được duyệt và bắt đầu thực hiện.'
+      ? 'Mọi phiếu đều phải đồng bộ mua hàng — chỉ sau khi đã duyệt và bắt đầu thực hiện.'
       : o.status === 'NOT_STARTED'
-        ? 'Bấm «Bắt đầu thực hiện» trước, rồi đồng bộ mua hàng.'
-        : 'Đơn giá đang là <strong>giá tạm</strong>. Sau khi MH nhập theo mã phiếu, bấm «Đồng bộ mua hàng» để kéo giá / chứng từ (xuất kho hoặc sửa ngoài).';
+        ? 'Bấm «Bắt đầu thực hiện» trước, rồi đồng bộ mua hàng (bắt buộc).'
+        : 'Mọi phiếu đều phải đồng bộ mua hàng. Đơn giá đang là <strong>giá tạm</strong> — bấm «Đồng bộ mua hàng» để kéo giá / chứng từ (xuất kho · sửa ngoài · KTV ghi).';
     return `<div class="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950">
       <div class="mb-1 flex flex-wrap items-center gap-2">
         <span class="font-semibold">Trước khi đồng bộ</span> ${purchaseSyncBadge(ps)}
@@ -75082,7 +75288,7 @@ function pageOrder() {
           <button data-open-order="o33" class="text-blue-600 hover:underline">Xuất kho · chờ ĐB MH</button>,
           <button data-open-order="o34" class="text-blue-600 hover:underline">Sửa ngoài · chờ MH</button>,
           <button data-open-order="o35" class="text-blue-600 hover:underline">Mix XK+SN+KTV · đủ 4 mốc</button>,
-          <button data-open-order="o36" class="text-blue-600 hover:underline">Chỉ KTV</button>,
+          <button data-open-order="o36" class="text-blue-600 hover:underline">Chỉ KTV · vẫn ĐB MH</button>,
           <button data-open-order="o37" class="text-blue-600 hover:underline">Đã gửi MH · chưa bắt đầu</button>,
           <button data-open-order="o38" class="text-blue-600 hover:underline">Nháp · tồn→hình thức</button>
         </div>
@@ -75249,7 +75455,7 @@ function pageOrder() {
               <div class="text-[11px] text-slate-500">Tạm tính: <strong class="tabular-nums text-slate-800">${money(sumMaterialLines(plannedMaterials(o).filter(m => !m._draft)))}</strong></div>
             </div>
             <div class="rounded-md border border-amber-200 bg-white/70 px-3 py-2 text-xs text-slate-700 leading-relaxed">
-              Chọn kho đủ tồn → <strong>Xuất kho</strong>; thiếu/không có → <strong>Sửa ngoài</strong>; nhập tay → <strong>Kỹ thuật viên ghi</strong> (thêm dòng trên bảng hoặc form đầy đủ).
+              KTV nhập tên vật tư tự do (bảng hoặc form). Có trong danh mục thì gợi ý / điền sẵn; không có thì lưu nội bộ. Hình thức XK / SN / ghi tay hệ thống gợi ý sau — không cần chọn.
             </div>
             ${orderPlannedMaterialsTable(o)}
           </div>
@@ -75259,18 +75465,18 @@ function pageOrder() {
           <div class="border-b border-sky-200 bg-sky-50/70 px-5 py-3 flex flex-wrap items-center justify-between gap-2">
             <div>
               <div class="font-semibold text-sm text-sky-950">Cụm mua hàng · đồng bộ theo mã phiếu</div>
-              <p class="text-[11px] text-sky-900/80">Dữ liệu mua hàng (xuất kho / mua ngoài) gắn <strong>${esc(o.code)}</strong> — chỉ xuất hiện sau «Đồng bộ mua hàng».</p>
+              <p class="text-[11px] text-sky-900/80">Dữ liệu mua hàng (xuất kho / mua ngoài / KTV ghi) gắn <strong>${esc(o.code)}</strong> — bắt buộc đồng bộ mọi phiếu; chỉ có dữ liệu sau «Đồng bộ mua hàng».</p>
             </div>
             <div class="flex flex-wrap gap-2 items-center">
-              ${hasPwms && canSyncPurchase(o) && ps.status !== 'SYNCING'
-                ? `<button data-sync-purchase="${o.id}" class="btn btn-outline btn-sm !border-sky-500 !bg-white text-sky-900">${ps.status === 'SYNCED' ? 'Đồng bộ lại từ PWMS' : 'Đồng bộ từ PWMS'}</button>`
+              ${needsMh && canSyncPurchase(o) && ps.status !== 'SYNCING'
+                ? `<button data-sync-purchase="${o.id}" class="btn btn-outline btn-sm !border-sky-500 !bg-white text-sky-900">${ps.status === 'SYNCED' ? 'Đồng bộ lại mua hàng' : 'Đồng bộ mua hàng'}</button>`
                 : ps.status === 'SYNCING' ? `<span class="text-xs font-medium text-sky-700">Đang đồng bộ…</span>` : ''}
-              ${ps.status === 'SYNCED' ? `<span class="chip bg-emerald-100 text-emerald-800">Đã có cụm mua hàng</span>` : hasPwms ? `<span class="chip bg-amber-100 text-amber-800">Chưa đồng bộ</span>` : `<span class="chip bg-slate-100 text-slate-600">Không cần mua hàng</span>`}
+              ${ps.status === 'SYNCED' ? `<span class="chip bg-emerald-100 text-emerald-800">Đã có cụm mua hàng</span>` : `<span class="chip bg-amber-100 text-amber-800">Chưa đồng bộ</span>`}
             </div>
           </div>
           <div class="space-y-3 px-5 py-3">${syncBanner}
             <div class="rounded-md border border-sky-200 bg-white/80 px-3 py-2 text-xs text-slate-700 leading-relaxed">
-              TMS chỉ <strong>kéo</strong> dữ liệu từ PWMS / mua hàng theo mã phiếu (giá, nhà cung cấp, chứng từ, ngày cấp). Không gửi phiếu hay vòng đời ngược sang PWMS. Cụm dự kiến phía trên giữ nguyên để đối chiếu.
+              TMS chỉ <strong>kéo</strong> dữ liệu từ PWMS / mua hàng theo mã phiếu (giá, nhà cung cấp, chứng từ, ngày cấp) — gồm cả dòng kỹ thuật viên ghi. Không gửi phiếu hay vòng đời ngược sang PWMS. Cụm dự kiến phía trên giữ nguyên để đối chiếu.
             </div>
           </div>
           <div class="overflow-x-auto border-t border-sky-100">
@@ -75294,11 +75500,9 @@ function pageOrder() {
                   <td class="td text-xs font-mono">${esc(m.purchaseDocCode || '—')}${m.purchaseOrderRef ? `<div class="text-[10px] text-slate-500">Phiếu ${esc(m.purchaseOrderRef)}</div>` : ''}</td>
                   <td class="td text-xs tabular-nums">${fmtStampVi(m.issuedAt)}</td>
                 </tr>`).join('') : `<tr><td colspan="9" class="px-5 py-8 text-center text-slate-400">${
-                  !hasPwms
-                    ? 'Phiếu chỉ có kỹ thuật viên ghi / không có dòng xuất kho · sửa ngoài · không có cụm mua hàng'
-                    : ps.status === 'SYNCED'
-                      ? 'Đã đồng bộ nhưng chưa có dòng MH'
-                      : 'Chưa đồng bộ — cụm mua hàng trống'
+                  ps.status === 'SYNCED'
+                    ? 'Đã đồng bộ nhưng chưa có dòng MH'
+                    : 'Chưa đồng bộ — cụm mua hàng trống (mọi phiếu đều phải đồng bộ)'
                 }</td></tr>`}</tbody>
             </table>
           </div>
@@ -81836,7 +82040,7 @@ function openCreateOrderFromDueCatalog(vid, cid) {
 }
 
 function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId) {
-  const createState = { pwmsMats: [], ktvMats: [], workItems: [], contentTouched: false };
+  const createState = { mats: [], workItems: [], contentTouched: false };
   const lockedId = prefVehicleId != null && prefVehicleId !== '' ? Number(prefVehicleId) : null;
   const locked = Number.isFinite(lockedId);
   const prefVeh = locked ? vehicleById(lockedId) : DB.vehicles[0];
@@ -81893,21 +82097,13 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
         <input name="technicianName" type="text" placeholder="Nhập tên KTV (có thể bổ sung sau)" list="createTechList" />
         <datalist id="createTechList">${(typeof DEMO_TECHNICIANS !== 'undefined' ? DEMO_TECHNICIANS : []).map(t => `<option value="${esc(t.name || t)}"></option>`).join('')}</datalist>
       </label>
-      <div class="rounded border border-emerald-200 bg-emerald-50/40 p-3 space-y-2">
-        <div class="text-xs font-semibold text-emerald-800">Vật tư từ kho (master)</div>
+      <div class="rounded border border-slate-200 bg-slate-50/50 p-3 space-y-2">
+        <div class="text-xs font-semibold text-slate-800">Vật tư <span class="field-hint font-normal">nhập tự do · có trong danh mục thì gợi ý, không có thì tạo mới</span></div>
         <div class="ac-wrap">
-          <input id="orderPwmsMat" type="search" autocomplete="off" placeholder="Tìm mã / tên vật tư kho…" />
-          <div class="ac-dropdown hidden" id="orderPwmsMatDd"></div>
+          <input id="orderMat" type="search" autocomplete="off" placeholder="Gõ tên / mã vật tư…" />
+          <div class="ac-dropdown hidden" id="orderMatDd"></div>
         </div>
-        <div class="mat-chips" id="orderPwmsChips"></div>
-      </div>
-      <div class="rounded border border-amber-200 bg-amber-50/40 p-3 space-y-2">
-        <div class="text-xs font-semibold text-amber-800">Vật tư ghi tay / mua ngoài — nhập mới chỉ lưu nội bộ</div>
-        <div class="ac-wrap">
-          <input id="orderKtvMat" type="search" autocomplete="off" placeholder="Tìm hoặc nhập tên vật tư mới…" />
-          <div class="ac-dropdown hidden" id="orderKtvMatDd"></div>
-        </div>
-        <div class="mat-chips" id="orderKtvChips"></div>
+        <div class="mat-chips" id="orderMatChips"></div>
       </div>
       <div class="flex justify-end gap-2 pt-2">
         <button type="button" data-close class="btn btn-outline">Hủy</button>
@@ -81984,17 +82180,11 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
     window._evalOrderSeedItemIds = null;
   }
   const renderMatChips = () => {
-    const pwms = $('#orderPwmsChips'), ktv = $('#orderKtvChips');
-    if (pwms) {
-      pwms.innerHTML = createState.pwmsMats.map((m, i) =>
-        `<span class="ac-chip">${esc(m.code ? m.code + ' · ' : '')}${esc(m.name)} <button type="button" data-rm-pwms="${i}">×</button></span>`).join('');
-      pwms.querySelectorAll('[data-rm-pwms]').forEach(b => b.onclick = () => { createState.pwmsMats.splice(+b.dataset.rmPwms, 1); renderMatChips(); });
-    }
-    if (ktv) {
-      ktv.innerHTML = createState.ktvMats.map((m, i) =>
-        `<span class="ac-chip">${esc(m.name)}${m.localOnly ? ' <span class="local-tag">nội bộ</span>' : ''} <button type="button" data-rm-ktv="${i}">×</button></span>`).join('');
-      ktv.querySelectorAll('[data-rm-ktv]').forEach(b => b.onclick = () => { createState.ktvMats.splice(+b.dataset.rmKtv, 1); renderMatChips(); });
-    }
+    const box = $('#orderMatChips');
+    if (!box) return;
+    box.innerHTML = createState.mats.map((m, i) =>
+      `<span class="ac-chip">${esc(m.code ? m.code + ' · ' : '')}${esc(m.name)}${m.qty > 1 ? ' ×' + m.qty : ''}${m.localOnly ? ' <span class="local-tag">nội bộ</span>' : ''} <button type="button" data-rm-mat="${i}">×</button></span>`).join('');
+    box.querySelectorAll('[data-rm-mat]').forEach(b => b.onclick = () => { createState.mats.splice(+b.dataset.rmMat, 1); renderMatChips(); });
   };
   renderWorkItems();
 
@@ -82027,45 +82217,87 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
       return item;
     },
   });
-  bindCreatableAc($('#orderPwmsMat'), $('#orderPwmsMatDd'), {
-    getOptions: materialMasterOptions,
-    allowCreate: false,
-    format: o => `${esc(o.code || '')} · ${esc(o.name)}`,
-    isSelected: o => createState.pwmsMats.some(x =>
-      (o.id && x.id && String(x.id) === String(o.id)) ||
-      (o.code && x.code && String(x.code) === String(o.code))
-    ),
-    onPick: o => {
-      if (!createState.pwmsMats.some(x => x.id === o.id)) {
-        createState.pwmsMats.push({ id: o.id, code: o.code, name: o.name, qty: 1, uom: o.uom || 'Cái', price: 0, source: 'PWMS' });
-      }
-      $('#orderPwmsMat').value = '';
-      renderMatChips();
-    },
-    onCreate: () => null,
-  });
-  bindCreatableAc($('#orderKtvMat'), $('#orderKtvMatDd'), {
+  bindCreatableAc($('#orderMat'), $('#orderMatDd'), {
     getOptions: () => [...materialLocalOptions(), ...materialMasterOptions()],
-    format: o => o.code ? `${esc(o.code)} · ${esc(o.name)}` : esc(o.name),
-    isSelected: o => createState.ktvMats.some(x =>
+    allowCreate: true,
+    format: o => o.source === 'local'
+      ? `${esc(o.name)} <span class="local-tag">nội bộ</span>`
+      : `${esc(o.code || '—')} · ${esc(o.name)} · SL min ${materialMinQty(o)}${o.stockQty != null ? ` · tồn ${o.stockQty}` : ''}`,
+    isSelected: o => createState.mats.some(x =>
       (o.id && x.id && String(x.id) === String(o.id)) ||
+      (o.code && x.code && String(x.code) === String(o.code)) ||
       (x.name && o.name && x.name.toLowerCase() === String(o.name).toLowerCase())
     ),
     onPick: o => {
-      if (!createState.ktvMats.some(x => x.name.toLowerCase() === o.name.toLowerCase())) {
-        createState.ktvMats.push({
-          id: o.id, code: o.code || null, name: o.name, qty: 1, uom: o.uom || 'Cái', price: 0,
-          source: 'TECHNICIAN', localOnly: o.source === 'local',
+      const dup = createState.mats.some(x =>
+        (o.id && x.id && String(x.id) === String(o.id)) ||
+        (x.name && o.name && x.name.toLowerCase() === String(o.name).toLowerCase())
+      );
+      if (dup) { toast('Vật tư đã có'); return; }
+      const mq = materialMinQty(o);
+      if (o.source === 'local') {
+        createState.mats.push({
+          id: o.id, code: o.code || null, name: o.name, qty: mq, uom: o.uom || 'Cái',
+          price: 0, source: 'TECHNICIAN', localOnly: true, toiThieu: mq,
+        });
+      } else {
+        const ful = resolveMaterialFulfillment({ sourceHint: 'PWMS', code: o.code, qty: mq, name: o.name });
+        createState.mats.push({
+          id: o.id, code: o.code || null, name: o.name, qty: mq, uom: o.uom || 'Cái',
+          price: o.refPrice ?? 0, source: ful.source, fulfillment: ful.fulfillment,
+          supplier: o.supplier || null, warehouse: o.warehouse || null, localOnly: false, toiThieu: mq,
         });
       }
-      $('#orderKtvMat').value = '';
+      $('#orderMat').value = '';
       renderMatChips();
     },
     onCreate: name => {
       const item = persistLocalMaterial(name);
-      toast('Đã lưu vật tư mới · chỉ nội bộ TMS (không sync PWMS)');
+      toast('Đã thêm vật tư mới (không có trong danh mục)');
       return item;
     },
+  });
+  $('#orderMat')?.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const raw = ($('#orderMat').value || '').trim();
+    if (!raw) return;
+    const opts = [...materialLocalOptions(), ...materialMasterOptions()];
+    const hit = opts.find(o =>
+      (o.name || '').toLowerCase() === raw.toLowerCase()
+      || (o.code || '').toLowerCase() === raw.toLowerCase()
+    );
+    if (hit) {
+      const dup = createState.mats.some(x =>
+        (hit.id && x.id && String(x.id) === String(hit.id))
+        || (x.name && hit.name && x.name.toLowerCase() === String(hit.name).toLowerCase())
+      );
+      if (dup) { toast('Vật tư đã có'); return; }
+      const mq = materialMinQty(hit);
+      if (hit.source === 'local') {
+        createState.mats.push({
+          id: hit.id, code: hit.code || null, name: hit.name, qty: mq, uom: hit.uom || 'Cái',
+          price: 0, source: 'TECHNICIAN', localOnly: true, toiThieu: mq,
+        });
+      } else {
+        const ful = resolveMaterialFulfillment({ sourceHint: 'PWMS', code: hit.code, qty: mq, name: hit.name });
+        createState.mats.push({
+          id: hit.id, code: hit.code || null, name: hit.name, qty: mq, uom: hit.uom || 'Cái',
+          price: hit.refPrice ?? 0, source: ful.source, fulfillment: ful.fulfillment,
+          supplier: hit.supplier || null, warehouse: hit.warehouse || null, localOnly: false, toiThieu: mq,
+        });
+      }
+    } else {
+      const item = persistLocalMaterial(raw);
+      createState.mats.push({
+        id: item.id, code: null, name: item.name, qty: 1, uom: 'Cái',
+        price: 0, source: 'TECHNICIAN', localOnly: true, toiThieu: 1,
+      });
+      toast('Đã thêm vật tư mới (không có trong danh mục)');
+    }
+    $('#orderMat').value = '';
+    hideAllAcDropdowns();
+    renderMatChips();
   });
 
   const syncKm = () => {
@@ -82094,7 +82326,7 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
       <div class="text-slate-600">${esc(hint)}</div>
       ${repairNames.length ? `<div class="text-emerald-800">Gợi ý hạng mục: ${repairNames.map((n, i) =>
         `<button type="button" class="text-blue-600 font-semibold underline-offset-2 hover:underline" data-suggest-content="${esc(n)}">${esc(n)}</button>`).join(', ')}</div>` : ''}
-      <div class="text-[11px] text-slate-500">Vật tư kho / ghi tay — autocomplete bên dưới · nhập mới chỉ lưu nội bộ.</div>`;
+      <div class="text-[11px] text-slate-500">Vật tư: nhập tự do bên dưới · có gợi ý danh mục thì chọn, không có thì tạo mới.</div>`;
     hintBox.querySelectorAll('[data-suggest-content]').forEach(b => {
       b.onclick = () => {
         const name = b.dataset.suggestContent;
@@ -82125,10 +82357,19 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
     e.preventDefault();
     const fd = new FormData(e.target);
     const vehicleId = Number(fd.get('vehicleId'));
-    const materials = [
-      ...createState.pwmsMats.map(m => ({ source: 'PWMS', code: m.code, name: m.name, qty: m.qty || 1, uom: m.uom || 'Cái', price: m.price || 0 })),
-      ...createState.ktvMats.map(m => ({ source: 'TECHNICIAN', code: m.code, name: m.name, qty: m.qty || 1, uom: m.uom || 'Cái', price: m.price || 0, localOnly: !!m.localOnly })),
-    ];
+    const materials = createState.mats.map(m => ({
+      source: m.source || 'TECHNICIAN',
+      fulfillment: m.fulfillment || m.source || 'TECHNICIAN',
+      code: m.code || null,
+      name: m.name,
+      qty: m.qty || 1,
+      uom: m.uom || 'Cái',
+      price: m.price || 0,
+      supplier: m.supplier || null,
+      warehouse: m.warehouse || null,
+      localOnly: !!m.localOnly,
+      materialId: m.id && !m.localOnly ? m.id : null,
+    }));
     const catalogId = Number(fd.get('catalogId')) || null;
     const cat = catalogId ? catById(catalogId) : null;
     // nếu còn text trên ô tìm chưa add — coi như thêm hạng mục cuối
@@ -82228,6 +82469,7 @@ function buildMultiPlanItemFromCatalog(c, opts) {
   const hasMat = !!(full && (full.id || full.code || full.name));
   const laborOnly = isPlanLaborOnlyContent(content);
   const unitPrice = hasMat && full.refPrice != null ? (Number(full.refPrice) || 0) : 0;
+  const mq = hasMat ? materialMinQty(full) : 1;
   return {
     catalogId: c?.id ?? null,
     system: c?.system || '',
@@ -82240,9 +82482,9 @@ function buildMultiPlanItemFromCatalog(c, opts) {
     materialName: hasMat ? (full.name || '') : '',
     materials: hasMat ? [{
       id: full.id, code: full.code || '', name: full.name || '',
-      uom: full.uom || 'Cái', qty: 1,
+      uom: full.uom || 'Cái', qty: mq, toiThieu: mq,
     }] : [],
-    qty: 1,
+    qty: mq,
     uom: hasMat ? (full.uom || 'Cái') : (c?.uom || 'Lần'),
     unitPrice,
     priceFromMat: hasMat,
@@ -82250,6 +82492,9 @@ function buildMultiPlanItemFromCatalog(c, opts) {
     priceDirty: false,
     note: '',
     checked: !!(opts && opts.checked),
+    /** Danh mục gắn xe: chỉ bỏ chọn, không xóa */
+    rowKind: 'catalog',
+    fromVehicle: true,
   };
 }
 function buildBlankMultiPlanItem() {
@@ -82257,7 +82502,7 @@ function buildBlankMultiPlanItem() {
     catalogId: null,
     system: '',
     systemId: null,
-    catalogName: '',
+    catalogName: '— Dòng trống —',
     catalogCode: '',
     content: '',
     materialId: null,
@@ -82272,7 +82517,16 @@ function buildBlankMultiPlanItem() {
     priceDirty: false,
     note: '',
     checked: true,
+    /** Dòng trống: luôn chọn · không checkbox · có nút xóa */
+    rowKind: 'blank',
+    fromVehicle: false,
   };
+}
+function isMultiPlanBlankRow(it) {
+  return !!(it && (it.rowKind === 'blank' || (!it.catalogId && !it.fromVehicle)));
+}
+function isMultiPlanCatalogRow(it) {
+  return !!(it && !isMultiPlanBlankRow(it));
 }
 function refreshMultiPlanItemFromContent(it) {
   const content = String(it.content || '').trim();
@@ -82283,10 +82537,12 @@ function refreshMultiPlanItemFromContent(it) {
   if (full) enrichMaterialPwmsFields(full, false);
   const hasMat = !!(full && (full.id || full.code || full.name));
   if (hasMat) {
+    const mq = materialMinQty(full);
     it.materialId = full.id || null;
     it.materialCode = full.code || '';
     it.materialName = full.name || '';
-    it.materials = [{ id: full.id, code: full.code || '', name: full.name || '', uom: full.uom || 'Cái', qty: 1 }];
+    it.materials = [{ id: full.id, code: full.code || '', name: full.name || '', uom: full.uom || 'Cái', qty: mq, toiThieu: mq }];
+    it.qty = mq;
     it.uom = full.uom || it.uom || 'Cái';
     it.priceFromMat = true;
     if (!it.priceDirty) it.unitPrice = full.refPrice != null ? (Number(full.refPrice) || 0) : 0;
@@ -82311,11 +82567,32 @@ function multiPlanMatLabel(it) {
 function openAddPlanModal(vid) {
   const seedId = vid || (DB.vehicles[0] && DB.vehicles[0].id);
   enrichAllMaterials(false);
-  let items = (DB.catalog || []).map((c, i) => buildMultiPlanItemFromCatalog(c, { checked: i < 3 }));
+  ensureVehicleCatalogAssign();
+
+  const catalogItemsForVehicle = (vid0) => {
+    const ids = vehicleAssignedCatalogIds(vid0);
+    return ids.map((cid) => catById(cid)).filter(Boolean)
+      .map((c) => buildMultiPlanItemFromCatalog(c, { checked: true }));
+  };
+  let items = catalogItemsForVehicle(seedId);
+
+  const selectableItems = () => items.filter(isMultiPlanCatalogRow);
+  const selectedForSave = () => items.filter((it) => isMultiPlanBlankRow(it) || it.checked);
 
   const setAllChecked = (on) => {
-    items.forEach((it) => { it.checked = !!on; });
+    selectableItems().forEach((it) => { it.checked = !!on; });
     renderBody();
+  };
+
+  const syncSelHint = () => {
+    const selHint = $('#planItemsSelHint');
+    const nCat = selectableItems().length;
+    const nCatOn = selectableItems().filter((it) => it.checked).length;
+    const nBlank = items.filter(isMultiPlanBlankRow).length;
+    if (!selHint) return;
+    selHint.textContent = nCat
+      ? ('DM gắn xe ' + nCatOn + '/' + nCat + (nBlank ? (' · ' + nBlank + ' dòng trống') : ''))
+      : (nBlank ? (nBlank + ' dòng trống') : '0 dòng');
   };
 
   const renderBody = () => {
@@ -82326,131 +82603,232 @@ function openAddPlanModal(vid) {
     if ($('#planCustomName') && !$('#planCustomName').dataset.touched) {
       $('#planCustomName').placeholder = autoName;
     }
-    const nSel = items.filter((it) => it.checked).length;
-    const allOn = items.length > 0 && nSel === items.length;
+    const selectable = selectableItems();
+    const nSel = selectable.filter((it) => it.checked).length;
+    const allOn = selectable.length > 0 && nSel === selectable.length;
     const someOn = nSel > 0 && !allOn;
     const hdr = $('#planItemsCheckAll');
     if (hdr) {
       hdr.checked = allOn;
       hdr.indeterminate = someOn;
+      hdr.disabled = selectable.length === 0;
+      hdr.title = selectable.length ? 'Chọn / bỏ chọn danh mục gắn xe' : 'Không có danh mục gắn xe';
     }
-    const selHint = $('#planItemsSelHint');
-    if (selHint) selHint.textContent = nSel ? ('Đã chọn ' + nSel + '/' + items.length) : ('0/' + items.length + ' dòng');
+    syncSelHint();
 
     const rows = items.map((it, idx) => {
+      const blank = isMultiPlanBlankRow(it);
       const c = it.catalogId ? catById(it.catalogId) : null;
       const matLabel = multiPlanMatLabel(it);
+      const minQHint = (it.materialId || it.materialName)
+        ? materialMinQty({ id: it.materialId, code: it.materialCode, name: it.materialName, toiThieu: it.materials?.[0]?.toiThieu })
+        : null;
       const priceHint = !String(it.content || '').trim()
         ? 'Nhập nội dung thực hiện'
         : (it.laborOnly
           ? 'Tiền công — nhập tay'
-          : (it.priceFromMat ? 'Từ VT gợi ý' : 'Chưa có VT gợi ý · đơn giá = 0'));
+          : (it.priceFromMat
+            ? ('Từ VT gợi ý · SL min ' + (minQHint || it.qty || 1))
+            : 'Chưa có VT gợi ý · đơn giá = 0'));
       const badge = c
         ? decisionBadge(planDecisionForCatalog(c, (getCatState(Number($('#planSeedVehicle')?.value || seedId), c.id).occurrence || 0) + 1))
         : '';
-      return `<tr class="row-h align-middle" data-item-idx="${idx}">
-        <td class="td text-center align-middle py-2">
-          <input type="checkbox" data-item-check="${idx}" ${it.checked ? 'checked' : ''} class="order-grid-row-checkbox !w-auto !m-0 align-middle" />
-        </td>
+      const checkCell = blank
+        ? `<span class="inline-flex size-4 items-center justify-center rounded border border-emerald-400 bg-emerald-50 text-[10px] font-bold text-emerald-700" title="Dòng trống · luôn đưa vào kế hoạch">✓</span>`
+        : `<input type="checkbox" data-item-check="${idx}" ${it.checked ? 'checked' : ''} class="order-grid-row-checkbox !w-auto !m-0 align-middle" title="Bỏ chọn để không đưa vào kế hoạch" />`;
+      const delCell = blank
+        ? `<button type="button" class="btn btn-outline btn-xs text-rose-700 !border-rose-300" data-item-del="${idx}" title="Xóa dòng trống">Xóa</button>`
+        : `<span class="text-[10px] text-slate-400" title="Danh mục gắn xe — chỉ bỏ chọn, không xóa">—</span>`;
+      return `<tr class="row-h align-middle ${blank ? 'bg-amber-50/40' : ''}" data-item-idx="${idx}" data-row-kind="${blank ? 'blank' : 'catalog'}">
+        <td class="td text-center align-middle py-2">${checkCell}</td>
         <td class="td align-middle py-2 min-w-[140px]">
-          <div class="font-medium text-slate-800">${esc(it.catalogName || '—')}</div>
-          <div class="text-[11px] text-slate-500">${c ? esc(c.code) : (it.catalogCode || 'Dòng trống')} · ${esc(it.system || '—')}</div>
+          <div class="font-medium text-slate-800">${esc(it.catalogName || (blank ? '— Dòng trống —' : '—'))}</div>
+          <div class="text-[11px] text-slate-500">${blank ? 'Nhập tay · luôn chọn' : ((c ? esc(c.code) : (it.catalogCode || '—')) + ' · ' + esc(it.system || '—'))}</div>
           ${badge}
         </td>
-        <td class="td align-middle py-2 min-w-[200px]">
-          <input type="text" class="form-control !text-sm !py-1" data-item-content="${idx}" value="${esc(it.content || '')}" placeholder="Nội dung thực hiện…" />
+        <td class="td align-middle py-2 min-w-[220px]">
+          <div class="ac-wrap">
+            <input type="search" class="form-control !text-sm !py-1" data-item-content="${idx}" value="${esc(it.content || '')}" placeholder="Nội dung thực hiện…" autocomplete="off" />
+            <div class="ac-dropdown hidden" data-item-content-dd="${idx}"></div>
+          </div>
         </td>
-        <td class="td align-middle py-2 min-w-[200px]">
-          <input type="text" class="form-control !text-sm !py-1" data-item-mat="${idx}" value="${esc(matLabel)}" placeholder="${it.laborOnly ? '— (tiền công)' : 'VT gợi ý…'}" ${it.laborOnly ? 'readonly' : ''} title="${esc(priceHint)}" />
+        <td class="td align-middle py-2 min-w-[220px]">
+          <div class="ac-wrap">
+            <input type="search" class="form-control !text-sm !py-1" data-item-mat="${idx}" value="${esc(matLabel)}" placeholder="${it.laborOnly ? '— (tiền công)' : 'VT gợi ý…'}" ${it.laborOnly ? 'readonly' : ''} title="${esc(priceHint)}" autocomplete="off" />
+            <div class="ac-dropdown hidden" data-item-mat-dd="${idx}"></div>
+          </div>
           <div class="text-[10px] text-slate-400 mt-0.5">${esc(priceHint)}</div>
         </td>
-        <td class="td align-middle py-2"><input type="number" min="1" class="form-control !w-20 !text-sm !py-1" data-item-qty="${idx}" value="${it.qty}" /></td>
+        <td class="td align-middle py-2"><input type="number" min="${minQHint || 1}" class="form-control !w-20 !text-sm !py-1" data-item-qty="${idx}" value="${it.qty}" title="${esc(minQHint ? ('Tối thiểu ' + minQHint) : 'Số lượng')}" /></td>
         <td class="td align-middle py-2">
           <input type="number" min="0" class="form-control !w-28 !text-sm !py-1" data-item-price="${idx}" value="${it.unitPrice}" title="${esc(priceHint)}" />
         </td>
         <td class="td text-right tabular-nums align-middle py-2 font-medium" data-item-total="${idx}">${money(it.qty * it.unitPrice)}</td>
-        <td class="td text-center align-middle py-2">
-          <button type="button" class="btn btn-outline btn-xs text-rose-700 !border-rose-300" data-item-del="${idx}" title="Xóa dòng">Xóa</button>
-        </td>
+        <td class="td text-center align-middle py-2">${delCell}</td>
       </tr>`;
     }).join('');
     const box = $('#planItemsBody');
-    if (box) box.innerHTML = rows || `<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">Chưa có dòng · bấm «+ Dòng trống» hoặc chọn từ danh mục</td></tr>`;
+    if (box) box.innerHTML = rows || `<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">Xe chưa gắn danh mục · bấm «+ Dòng trống» hoặc gắn danh mục trên xe</td></tr>`;
     bindItemEditors();
+  };
+
+  const applyMatToMultiPlanItem = (it, found, rawFallback) => {
+    if (found && found.source !== 'local') {
+      const full = materialById(found.id) || found;
+      enrichMaterialPwmsFields(full, false);
+      const mq = materialMinQty(full);
+      it.materialId = full.id || found.id || null;
+      it.materialCode = full.code || found.code || '';
+      it.materialName = full.name || found.name || '';
+      it.materials = [{ id: it.materialId, code: it.materialCode, name: it.materialName, uom: full.uom || found.uom || 'Cái', qty: mq, toiThieu: mq }];
+      it.qty = mq;
+      it.uom = full.uom || found.uom || it.uom || 'Cái';
+      it.priceFromMat = true;
+      it.priceDirty = false;
+      it.unitPrice = full.refPrice != null ? (Number(full.refPrice) || 0) : (found.refPrice != null ? Number(found.refPrice) || 0 : 0);
+      return;
+    }
+    const name = (found && found.name) || rawFallback || '';
+    const code = (found && found.code) || '';
+    const mq = found ? materialMinQty(found) : 1;
+    it.materialId = null;
+    it.materialCode = code;
+    it.materialName = name;
+    it.materials = name ? [{ id: null, code, name, uom: it.uom || 'Cái', qty: mq, toiThieu: mq }] : [];
+    if (name) it.qty = mq;
+    it.priceFromMat = false;
+    if (!it.priceDirty && !found) it.unitPrice = it.unitPrice || 0;
   };
 
   const bindItemEditors = () => {
     $$('[data-item-check]').forEach((el) => {
       el.onchange = () => {
-        items[Number(el.dataset.itemCheck)].checked = el.checked;
-        const nSel = items.filter((it) => it.checked).length;
+        const it = items[Number(el.dataset.itemCheck)];
+        if (!it || isMultiPlanBlankRow(it)) return;
+        it.checked = el.checked;
+        const selectable = selectableItems();
+        const nSel = selectable.filter((x) => x.checked).length;
         const hdr = $('#planItemsCheckAll');
         if (hdr) {
-          hdr.checked = items.length > 0 && nSel === items.length;
-          hdr.indeterminate = nSel > 0 && nSel < items.length;
+          hdr.checked = selectable.length > 0 && nSel === selectable.length;
+          hdr.indeterminate = nSel > 0 && nSel < selectable.length;
         }
-        const selHint = $('#planItemsSelHint');
-        if (selHint) selHint.textContent = nSel ? ('Đã chọn ' + nSel + '/' + items.length) : ('0/' + items.length + ' dòng');
+        syncSelHint();
       };
     });
     $$('[data-item-content]').forEach((el) => {
-      el.onchange = () => {
-        const idx = Number(el.dataset.itemContent);
-        items[idx].content = el.value;
+      const idx = Number(el.dataset.itemContent);
+      const dd = document.querySelector(`[data-item-content-dd="${idx}"]`);
+      const commitContent = (name, opt) => {
+        items[idx].content = name || '';
+        if (opt?.system) items[idx].system = opt.system;
         items[idx].priceDirty = false;
         refreshMultiPlanItemFromContent(items[idx]);
         renderBody();
       };
-      el.onkeydown = (e) => {
-        if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
-      };
+      bindCreatableAc(el, dd, {
+        fixed: true,
+        allowCreate: true,
+        getOptions: contentLookupOptions,
+        format: (o) => `${esc(o.name)}${o.system ? ` <span class="sub">· ${esc(o.system)}</span>` : ''}`,
+        onPick: (o) => commitContent(o.name || '', o),
+        onCreate: (name) => {
+          const item = persistLocalContent(name, items[idx].system || 'Khác');
+          toast('Đã lưu nội dung mới · chỉ nội bộ');
+          return item;
+        },
+        onEnter: (raw) => {
+          if (!raw) return;
+          const hit = contentLookupOptions().find((o) => (o.name || '').toLowerCase() === raw.toLowerCase());
+          if (hit) commitContent(hit.name, hit);
+          else {
+            const item = persistLocalContent(raw, items[idx].system || 'Khác');
+            commitContent(item.name, item);
+          }
+        },
+      });
+      el.addEventListener('change', () => {
+        const raw = String(el.value || '').trim();
+        if (raw === String(items[idx].content || '').trim()) return;
+        items[idx].content = raw;
+        items[idx].priceDirty = false;
+        refreshMultiPlanItemFromContent(items[idx]);
+        renderBody();
+      });
     });
     $$('[data-item-mat]').forEach((el) => {
-      el.onchange = () => {
-        const idx = Number(el.dataset.itemMat);
-        const it = items[idx];
-        const raw = String(el.value || '').trim();
-        if (!raw) {
+      const idx = Number(el.dataset.itemMat);
+      const it = items[idx];
+      if (it.laborOnly || el.readOnly) return;
+      const dd = document.querySelector(`[data-item-mat-dd="${idx}"]`);
+      const commitMat = (found, raw) => {
+        if (!found && !raw) {
           it.materialId = null; it.materialCode = ''; it.materialName = '';
           it.materials = []; it.priceFromMat = false;
           if (!it.priceDirty) it.unitPrice = 0;
-          renderBody();
-          return;
-        }
-        const parts = raw.split('·').map((s) => s.trim());
-        const code = parts.length > 1 ? parts[0] : '';
-        const name = parts.length > 1 ? parts.slice(1).join(' · ') : parts[0];
-        const found = (DB.materials || []).find((m) =>
-          (code && String(m.code || '') === code)
-          || String(m.name || '').toLowerCase() === name.toLowerCase()
-          || `${m.code || ''} · ${m.name || ''}` === raw
-        );
-        if (found) {
-          enrichMaterialPwmsFields(found, false);
-          it.materialId = found.id;
-          it.materialCode = found.code || '';
-          it.materialName = found.name || '';
-          it.materials = [{ id: found.id, code: found.code || '', name: found.name || '', uom: found.uom || 'Cái', qty: 1 }];
-          it.uom = found.uom || it.uom;
-          it.priceFromMat = true;
-          it.priceDirty = false;
-          it.unitPrice = found.refPrice != null ? (Number(found.refPrice) || 0) : 0;
         } else {
-          it.materialId = null;
-          it.materialCode = code || '';
-          it.materialName = name || raw;
-          it.materials = [{ id: null, code: it.materialCode, name: it.materialName, uom: it.uom || 'Cái', qty: 1 }];
-          it.priceFromMat = false;
+          applyMatToMultiPlanItem(it, found, raw);
         }
         renderBody();
       };
+      bindCreatableAc(el, dd, {
+        fixed: true,
+        allowCreate: true,
+        getOptions: () => [...materialLocalOptions(), ...materialMasterOptions()],
+        format: (o) => o.source === 'local'
+          ? `${esc(o.name)} <span class="local-tag">nội bộ</span>`
+          : `${esc(o.code || '—')} · ${esc(o.name)} · SL min ${materialMinQty(o)}${o.refPrice != null ? ` · ${money(o.refPrice)}` : ''}`,
+        onPick: (o) => commitMat(o, o.name),
+        onCreate: (name) => {
+          const item = persistLocalMaterial(name);
+          toast('Đã thêm vật tư mới (không có trong danh mục)');
+          return item;
+        },
+        onEnter: (raw) => {
+          if (!raw) { commitMat(null, ''); return; }
+          const opts = [...materialLocalOptions(), ...materialMasterOptions()];
+          const hit = opts.find((o) =>
+            (o.name || '').toLowerCase() === raw.toLowerCase()
+            || (o.code || '').toLowerCase() === raw.toLowerCase()
+            || `${o.code || ''} · ${o.name || ''}` === raw
+          );
+          if (hit) commitMat(hit, raw);
+          else {
+            const item = persistLocalMaterial(raw);
+            commitMat({ ...item, source: 'local' }, raw);
+          }
+        },
+      });
+      el.addEventListener('change', () => {
+        const raw = String(el.value || '').trim();
+        if (!raw) { commitMat(null, ''); return; }
+        const opts = [...materialLocalOptions(), ...materialMasterOptions()];
+        const hit = opts.find((o) =>
+          (o.name || '').toLowerCase() === raw.toLowerCase()
+          || (o.code || '').toLowerCase() === raw.toLowerCase()
+          || `${o.code || ''} · ${o.name || ''}` === raw
+        );
+        if (hit) commitMat(hit, raw);
+        else commitMat({ name: raw, code: '', source: 'local' }, raw);
+      });
     });
     $$('[data-item-qty]').forEach((el) => {
       el.oninput = () => {
         const idx = Number(el.dataset.itemQty);
-        items[idx].qty = Number(el.value) || 1;
+        const it = items[idx];
+        const minQ = it.materialId || it.materialCode || it.materialName
+          ? materialMinQty({ id: it.materialId, code: it.materialCode, name: it.materialName, toiThieu: it.materials?.[0]?.toiThieu })
+          : 1;
+        let q = Number(el.value) || minQ;
+        if (q < minQ) {
+          q = minQ;
+          el.value = String(minQ);
+          toast('SL tối thiểu của VT là ' + minQ);
+        }
+        it.qty = q;
+        if (it.materials?.[0]) it.materials[0].qty = q;
         const tot = $(`[data-item-total="${idx}"]`);
-        if (tot) tot.textContent = money(items[idx].qty * items[idx].unitPrice);
+        if (tot) tot.textContent = money(it.qty * it.unitPrice);
       };
     });
     $$('[data-item-price]').forEach((el) => {
@@ -82465,6 +82843,11 @@ function openAddPlanModal(vid) {
     $$('[data-item-del]').forEach((el) => {
       el.onclick = () => {
         const idx = Number(el.dataset.itemDel);
+        const it = items[idx];
+        if (!it || !isMultiPlanBlankRow(it)) {
+          toast('Danh mục gắn xe không xóa được — chỉ bỏ chọn');
+          return;
+        }
         items.splice(idx, 1);
         renderBody();
       };
@@ -82474,7 +82857,7 @@ function openAddPlanModal(vid) {
   openModal(`
     <div class="border-b border-slate-200 px-5 py-4">
       <h2 class="text-lg font-bold">Tạo kế hoạch · nhiều hạng mục</h2>
-      <p class="text-sm text-slate-600">Đơn giá / thành tiền lấy từ <strong>nội dung thực hiện</strong> + <strong>vật tư gợi ý</strong> — không lấy từ danh mục.</p>
+      <p class="text-sm text-slate-600">Danh mục <strong>gắn xe</strong>: chỉ bỏ chọn (không xóa). <strong>Dòng trống</strong>: luôn chọn · có nút Xóa. Đơn giá từ nội dung + vật tư gợi ý.</p>
     </div>
     <div class="px-5 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -82534,13 +82917,26 @@ function openAddPlanModal(vid) {
       <button type="button" id="btnSaveAsTemplate" class="btn btn-primary">Lưu thành mẫu</button>
     </div>`, 'max-w-6xl');
 
-  const collectSelected = () => items.filter(it => it.checked);
+  const collectSelected = () => selectedForSave();
+  const reloadCatalogsKeepBlanks = () => {
+    const blanks = items.filter(isMultiPlanBlankRow);
+    const vid0 = Number($('#planSeedVehicle')?.value || seedId);
+    items = [...blanks, ...catalogItemsForVehicle(vid0)];
+    renderBody();
+  };
   const syncNameFields = () => renderBody();
 
-  $('#planSeedVehicle').onchange = syncNameFields;
+  $('#planSeedVehicle').onchange = reloadCatalogsKeepBlanks;
   $('#planPeriod').oninput = syncNameFields;
   $('#planCustomName').addEventListener('input', () => { $('#planCustomName').dataset.touched = '1'; });
   $('[data-close]').onclick = closeModal;
+  const modalRoot = $('#modalRoot');
+  if (modalRoot) {
+    modalRoot.onclick = (e) => {
+      if (e.target === modalRoot) closeModal();
+      else if (!e.target.closest('.ac-wrap')) hideAllAcDropdowns();
+    };
+  }
   $('#btnPlanItemsSelectAll').onclick = () => setAllChecked(true);
   $('#btnPlanItemsClearAll').onclick = () => setAllChecked(false);
   $('#planItemsCheckAll').onchange = (e) => setAllChecked(e.target.checked);
@@ -82552,7 +82948,7 @@ function openAddPlanModal(vid) {
 
   const saveTemplate = (applySeed) => {
     const selected = collectSelected();
-    if (!selected.length) { toast('Chọn ít nhất 1 hạng mục'); return null; }
+    if (!selected.length) { toast('Chọn ít nhất 1 danh mục gắn xe hoặc thêm dòng trống'); return null; }
     const missingContent = selected.filter((it) => !String(it.content || '').trim());
     if (missingContent.length) {
       toast('Có ' + missingContent.length + ' dòng chưa có nội dung thực hiện');
@@ -83760,19 +84156,19 @@ function openMaterialModal(orderId, idx) {
   openModal(`
     <div class="border-b border-slate-200 px-5 py-4">
       <h2 class="text-lg font-bold">${isNew ? 'Thêm vật tư dự kiến' : 'Sửa vật tư dự kiến'}</h2>
-      <p class="text-sm text-slate-500">${esc(o.code)} · chọn từ kho thì lấy kho; nhập mới / không có mã kho thì kỹ thuật viên ghi — không cần chọn cách nhập</p>
+      <p class="text-sm text-slate-500">${esc(o.code)} · KTV nhập tự do; có trong danh mục thì gợi ý / điền sẵn, không có thì lưu nội bộ</p>
     </div>
     <form id="materialForm" class="space-y-3 px-5 py-4">
       <input type="hidden" id="matMaterialId" value="${esc(matState.materialId || '')}" />
       <input type="hidden" name="code" id="matCode" value="${esc(isKtvSeed ? '' : (m?.code || ''))}" />
       <label class="block text-sm font-medium text-slate-700">Tên vật tư <span class="text-rose-600">*</span>
-        <span class="field-hint">autocomplete · chọn kho hoặc + Tạo mới</span>
+        <span class="field-hint">nhập tự do · autocomplete tùy chọn</span>
         <div class="ac-wrap mt-1">
-          <input name="name" id="matName" type="search" autocomplete="off" required placeholder="Tìm tên trong kho, hoặc nhập mới…" value="${esc(m?.name || '')}" />
+          <input name="name" id="matName" type="search" autocomplete="off" required placeholder="Gõ tên vật tư…" value="${esc(m?.name || '')}" />
           <div class="ac-dropdown hidden" id="matNameDd"></div>
         </div>
       </label>
-      <p id="matFulfillHint" class="text-xs text-slate-600 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">Gõ tên để tìm kho, hoặc tạo mới nếu không có trong danh mục.</p>
+      <p id="matFulfillHint" class="text-xs text-slate-600 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">Gõ tên — khớp danh mục thì điền sẵn; không khớp thì dùng tên vừa nhập.</p>
       <label class="block text-sm font-medium text-slate-700">Nhà cung cấp
         <textarea name="supplier" id="matSupplier" rows="2" class="mt-1 w-full" placeholder="Từ kho khi chọn vật tư, hoặc nhập tay">${esc(m?.supplier || '')}</textarea>
       </label>
@@ -83782,10 +84178,13 @@ function openMaterialModal(orderId, idx) {
         <label class="block text-sm font-medium text-slate-700">Đơn vị tính<input name="uom" id="matUom" type="text" value="${esc(m?.uom || 'Cái')}" /></label>
       </div>
       <label class="block text-sm font-medium text-slate-700">Kho<input name="warehouse" id="matWarehouse" type="text" value="${esc(m?.warehouse || '')}" placeholder="Kho xuất / tồn" /></label>
-      <label class="block text-sm font-medium text-slate-700">Số lượng <span class="text-rose-600">*</span><input name="qty" id="matQty" type="number" step="0.01" min="0" value="${m?.qty ?? 1}" required /></label>
+      <label class="block text-sm font-medium text-slate-700">Số lượng <span class="text-rose-600">*</span>
+        <span class="field-hint" id="matQtyHint">${masterHit ? ('tối thiểu ' + materialMinQty(masterHit)) : 'theo toi_thieu VT khi chọn danh mục'}</span>
+        <input name="qty" id="matQty" type="number" step="0.01" min="0" value="${m?.qty ?? (masterHit ? materialMinQty(masterHit) : 1)}" required />
+      </label>
       <div class="flex flex-wrap items-center gap-2">
         <button type="button" id="btnSyncPwmsMats" class="btn btn-outline btn-sm">Đồng bộ danh mục PWMS</button>
-        <span class="text-[11px] text-slate-500">Làm mới giá · VAT · đơn vị tính · nhà cung cấp từ bản đã đồng bộ</span>
+        <span class="text-[11px] text-slate-500">Làm mới giá · VAT · đơn vị tính · nhà cung cấp · SL tối thiểu từ bản đã đồng bộ</span>
       </div>
       <div class="flex justify-end gap-2 pt-1">
         <button type="button" data-close class="btn btn-outline">Hủy</button>
@@ -83797,16 +84196,19 @@ function openMaterialModal(orderId, idx) {
     const el = $('#matFulfillHint');
     if (!el) return;
     const vat = $('#matVat')?.value ?? 8;
+    const name = ($('#matName')?.value || '').trim();
     if (!matState.materialId) {
-      el.innerHTML = `Nguồn: <strong class="text-amber-800">Kỹ thuật viên ghi</strong> — không có ID danh mục kho · chỉ cần <strong>tên</strong> · VAT ${esc(vat)}%.`;
+      el.innerHTML = name
+        ? `Nhập tự do «<strong>${esc(name)}</strong>» · chưa khớp danh mục · VAT ${esc(vat)}%.`
+        : `Gõ tên vật tư tự do. Có gợi ý thì chọn; không có thì tạo mới · VAT ${esc(vat)}%.`;
       return;
     }
     const qty = Number($('#matQty')?.value || 1);
     const code = ($('#matCode')?.value || '').trim();
     const ful = resolveMaterialFulfillment({ sourceHint: 'PWMS', code, qty, stockQty: matState.stockQty });
     el.innerHTML = ful.source === 'PWMS'
-      ? `Nguồn kho · hình thức: <strong class="text-emerald-700">Xuất kho</strong> — ${esc(ful.reason)} · VAT <strong>${esc(vat)}%</strong>`
-      : `Nguồn kho · hình thức: <strong class="text-violet-700">Sửa ngoài</strong> — ${esc(ful.reason)} · VAT <strong>${esc(vat)}%</strong>`;
+      ? `Đã khớp danh mục · gợi ý <strong class="text-emerald-700">Xuất kho</strong> — ${esc(ful.reason)} · VAT <strong>${esc(vat)}%</strong>`
+      : `Đã khớp danh mục · gợi ý <strong class="text-violet-700">Sửa ngoài</strong> — ${esc(ful.reason)} · VAT <strong>${esc(vat)}%</strong>`;
   };
   const resetManualFields = (keepName) => {
     const nameKeep = keepName != null ? keepName : ($('#matName')?.value || '');
@@ -83836,6 +84238,7 @@ function openMaterialModal(orderId, idx) {
     matState.materialId = x.id;
     matState.stockQty = x.stockQty;
     matState.localOnly = false;
+    matState.toiThieu = materialMinQty(x);
     if ($('#matMaterialId')) $('#matMaterialId').value = x.id || '';
     $('#matName').value = x.name || '';
     $('#matCode').value = x.code || '';
@@ -83844,6 +84247,8 @@ function openMaterialModal(orderId, idx) {
     $('#matVat').value = x.vat ?? 8;
     $('#matSupplier').value = x.supplier || '';
     $('#matWarehouse').value = x.warehouse || '';
+    if ($('#matQty')) $('#matQty').value = matState.toiThieu;
+    if ($('#matQtyHint')) $('#matQtyHint').textContent = 'tối thiểu ' + matState.toiThieu;
     refreshHint();
   };
   bindCreatableAc($('#matName'), $('#matNameDd'), {
@@ -83851,7 +84256,7 @@ function openMaterialModal(orderId, idx) {
     allowCreate: true,
     format: x => x.source === 'local'
       ? `${esc(x.name)} <span class="local-tag">nội bộ</span>`
-      : `${esc(x.name)} · tồn ${x.stockQty ?? '—'} · ${money(x.refPrice)} · VAT ${x.vat ?? 8}%`,
+      : `${esc(x.name)} · SL min ${materialMinQty(x)} · tồn ${x.stockQty ?? '—'} · ${money(x.refPrice)}`,
     onPick: x => {
       if (x.source === 'local') {
         resetManualFields(x.name || '');
@@ -83862,7 +84267,7 @@ function openMaterialModal(orderId, idx) {
     onCreate: name => {
       persistLocalMaterial(name);
       resetManualFields(name);
-      toast('Đã lưu vật tư mới · kỹ thuật viên ghi (không có ID kho)');
+      toast('Đã thêm tên vật tư mới (không có trong danh mục)');
       return null; /* đã reset form; không gọi onPick lại */
     },
   });
@@ -83889,10 +84294,17 @@ function openMaterialModal(orderId, idx) {
     const fd = new FormData(e.target);
     const name = String(fd.get('name') || '').trim();
     const code = String(fd.get('code') || '').trim() || null;
-    const qty = Number(fd.get('qty') || 0);
+    let qty = Number(fd.get('qty') || 0);
     const materialId = matState.materialId || ($('#matMaterialId')?.value || '').trim() || null;
     const sourceHint = materialId ? 'PWMS' : 'TECHNICIAN';
     if (!name) { toast('Nhập tên vật tư'); return; }
+    if (materialId) {
+      const minQ = matState.toiThieu || materialMinQty({ id: materialId, code });
+      if (qty < minQ) {
+        qty = minQ;
+        toast('SL đã chỉnh lên tối thiểu ' + minQ);
+      }
+    }
     if (sourceHint === 'TECHNICIAN'
       && !materialMasterOptions().some(x => x.name.toLowerCase() === name.toLowerCase())
       && !materialLocalOptions().some(x => x.name.toLowerCase() === name.toLowerCase())) {
@@ -83925,16 +84337,14 @@ function openMaterialModal(orderId, idx) {
     const saved = isNew ? o.materials[o.materials.length - 1] : o.materials[idx];
     stampMaterialSnapshot(saved, o, 'FILL');
     recalcOrderCost(o);
-    if (o.purchaseSync && orderHasPurchaseMaterials(o) && o.purchaseSync.status === 'SYNCED') {
+    if (o.purchaseSync && orderNeedsPurchaseSync(o) && o.purchaseSync.status === 'SYNCED') {
       o.purchaseSync.status = 'NONE';
       o.purchaseSync.note = 'Có thay đổi vật tư · cần đồng bộ lại mua hàng';
     }
     logOrderEdit(o, before, isNew ? 'Thêm vật tư dự kiến' : 'Sửa vật tư dự kiến');
     save();
     closeModal();
-    toast(isNew
-      ? (`Đã thêm · ${ful.source === 'PWMS' ? 'Xuất kho' : ful.source === 'EXTERNAL' ? 'Sửa ngoài' : 'Kỹ thuật viên ghi'}`)
-      : 'Đã lưu vật tư');
+    toast(isNew ? 'Đã thêm vật tư' : 'Đã lưu vật tư');
     render();
   };
 }
@@ -84085,13 +84495,13 @@ function syncPurchaseOrder(id) {
   ensureOrderApproval(o);
   ensurePurchaseSync(o);
   if (!canSyncPurchase(o)) {
-    toast('Chỉ đồng bộ khi đã duyệt, đang/đã thực hiện và có vật tư kho mua hàng');
+    toast('Chỉ đồng bộ khi đã duyệt và đang/đã thực hiện');
     return;
   }
   if (o.purchaseSync.status === 'SYNCING') return;
 
   o.purchaseSync.status = 'SYNCING';
-  o.purchaseSync.note = 'Đang gọi mua hàng lấy dữ liệu theo mã phiếu (xuất kho / sửa ngoài)…';
+  o.purchaseSync.note = 'Đang gọi mua hàng lấy dữ liệu theo mã phiếu (xuất kho / sửa ngoài / KTV ghi)…';
   toast('Đang đồng bộ mua hàng…');
   render();
 
@@ -84099,38 +84509,49 @@ function syncPurchaseOrder(id) {
     const changes = [];
     const issueDoc = 'XK-' + String(o.code || '').replace(/^RO-/, '');
     const extDoc = 'MH-NGOAI-' + String(o.code || '').replace(/^RO-/, '');
+    const ktvDoc = 'MH-KTV-' + String(o.code || '').replace(/^RO-/, '');
     const at = nowStamp();
     const mhLines = [];
     (o.materials || []).forEach(m => {
-      if (m.source !== 'PWMS' && m.source !== 'EXTERNAL') return;
+      if (m._draft) return;
+      const src = m.source || 'TECHNICIAN';
+      if (src !== 'PWMS' && src !== 'EXTERNAL' && src !== 'TECHNICIAN') return;
       const cat = materialByCode(m.code);
       if (cat) enrichMaterialPwmsFields(cat, false);
       const plannedPrice = m.price;
-      m.priceKind = m.priceKind || 'REF';
+      m.priceKind = m.priceKind || (src === 'TECHNICIAN' ? 'MANUAL' : 'REF');
       m.priceBeforeSync = plannedPrice;
       const base = cat?.refPrice != null ? cat.refPrice : (plannedPrice || 100000);
-      const next = Math.round(base * (1.02 + (hashStr(o.code + (m.code || m.name)) % 6) / 100));
-      const lagMin = 5 + (hashStr(o.code + (m.code || m.name || '') + String(m.source)) % 75);
+      const next = src === 'TECHNICIAN'
+        ? Math.round(Number(plannedPrice) || base)
+        : Math.round(base * (1.02 + (hashStr(o.code + (m.code || m.name)) % 6) / 100));
+      const lagMin = 5 + (hashStr(o.code + (m.code || m.name || '') + String(src)) % 75);
       const issuedAt = shiftStampMinutes(at, -lagMin);
+      const priceKind = src === 'PWMS' ? 'ISSUE' : src === 'EXTERNAL' ? 'EXTERNAL_PURCHASE' : 'TECHNICIAN';
+      const srcLabel = src === 'PWMS' ? 'xuất kho' : src === 'EXTERNAL' ? 'sửa ngoài' : 'KTV ghi';
       const line = {
         id: uid('pm'),
         plannedMaterialId: m.id || null,
         cluster: 'PURCHASE',
-        source: m.source,
-        fulfillment: m.fulfillment || m.source,
+        source: src,
+        fulfillment: m.fulfillment || src,
         code: m.code,
         name: m.name,
         qty: m.qty,
         uom: m.uom || 'Cái',
         price: next,
-        priceKind: m.source === 'PWMS' ? 'ISSUE' : 'EXTERNAL_PURCHASE',
-        supplier: cat?.supplier || m.supplier || PWMS_SUPPLIER_POOL[hashStr(m.code || m.name) % PWMS_SUPPLIER_POOL.length],
-        warehouse: m.source === 'PWMS'
+        priceKind,
+        supplier: src === 'TECHNICIAN'
+          ? (m.supplier || 'KTV mua tại chỗ')
+          : (cat?.supplier || m.supplier || PWMS_SUPPLIER_POOL[hashStr(m.code || m.name) % PWMS_SUPPLIER_POOL.length]),
+        warehouse: src === 'PWMS'
           ? (cat?.warehouse || m.warehouse || PWMS_WAREHOUSE_POOL[0])
-          : (m.warehouse || 'Sửa ngoài / nhà cung cấp'),
-        purchaseDocCode: m.source === 'PWMS' ? issueDoc : extDoc,
+          : src === 'EXTERNAL'
+            ? (m.warehouse || 'Sửa ngoài / nhà cung cấp')
+            : (m.warehouse || 'KTV ghi'),
+        purchaseDocCode: src === 'PWMS' ? issueDoc : src === 'EXTERNAL' ? extDoc : ktvDoc,
         purchaseOrderRef: o.code,
-        issueLineRef: m.source === 'PWMS'
+        issueLineRef: src === 'PWMS'
           ? ('XK-LINE-' + hashStr((m.code || '') + o.id).toString(36).slice(0, 6).toUpperCase())
           : null,
         issuedAt,
@@ -84138,7 +84559,7 @@ function syncPurchaseOrder(id) {
         snapshotAt: at,
       };
       mhLines.push(line);
-      changes.push(`${m.code || m.name}: dự kiến ${money(plannedPrice)} → MH ${money(next)} · ${m.source === 'PWMS' ? 'xuất kho' : 'sửa ngoài'} · cấp ${fmtStampVi(issuedAt)}`);
+      changes.push(`${m.code || m.name}: dự kiến ${money(plannedPrice)} → MH ${money(next)} · ${srcLabel} · cấp ${fmtStampVi(issuedAt)}`);
     });
     o.purchaseMaterials = mhLines;
     recomputeMaterialReadyAt(o);
@@ -84147,16 +84568,18 @@ function syncPurchaseOrder(id) {
     o.purchaseSync = {
       status: 'SYNCED',
       lastSyncedAt: at,
-      issueDocCode: issueDoc,
+      issueDocCode: mhLines.some(l => l.source === 'PWMS') ? issueDoc : (mhLines.some(l => l.source === 'EXTERNAL') ? extDoc : (mhLines.length ? ktvDoc : issueDoc)),
       externalDocCode: extDoc,
-      note: 'Cụm MH theo mã phiếu ' + o.code + ' · có đủ VT lúc ' + fmtStampVi(o.materialReadyAt) + ' · cụm dự kiến KTV giữ nguyên',
+      note: mhLines.length
+        ? ('Cụm MH theo mã phiếu ' + o.code + ' · ' + mhLines.length + ' dòng · cụm dự kiến giữ nguyên')
+        : ('Đã đồng bộ mua hàng theo phiếu ' + o.code + ' · không có dòng VT'),
     };
     recalcOrderCost(o);
     o.approvalLog.push({
       at,
       action: 'SYNC',
       by: 'Nguyễn Văn Kỹ thuật',
-      note: `Đồng bộ MH → cụm mua hàng theo phiếu ${o.code}` + (changes.length ? ' · ' + changes.join('; ') : ''),
+      note: `Đồng bộ MH → cụm mua hàng theo phiếu ${o.code}` + (changes.length ? ' · ' + changes.join('; ') : ' · không có dòng VT'),
     });
     toast('Đã đồng bộ cụm mua hàng theo mã phiếu · ' + o.code);
     render();
@@ -84567,6 +84990,7 @@ function bind() {
     const [oid, idx] = String(b.dataset.cancelMatDraft || '').split(':');
     cancelDraftMaterialRow(oid, Number(idx));
   });
+  bindDraftMaterialNameAutocomplete();
   $$('[data-edit-material]').forEach(b => b.onclick = () => {
     const [oid, idx] = b.dataset.editMaterial.split(':');
     openMaterialModal(oid, Number(idx));
