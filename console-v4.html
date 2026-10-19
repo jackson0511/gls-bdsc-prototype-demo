@@ -71817,8 +71817,38 @@ function lastMaintForCatalog(vehicleId, catalogId) {
   const ord = ordersOf(vehicleId)
     .filter(o => Number(o.catalogId) === Number(catalogId) && (o.status === 'COMPLETED' || o.approvalStatus === 'APPROVED'))
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))[0];
-  if (!ord) return null;
-  return { date: ord.date || null, km: ord.km != null ? Number(ord.km) : null };
+  if (ord) return { date: ord.date || null, km: ord.km != null ? Number(ord.km) : null };
+  /* Fallback: phiếu BD gần nhất của xe (lưới Lần N) */
+  const track = typeof listMaintTrackOrders === 'function'
+    ? listMaintTrackOrders(vehicleId)
+    : ordersOf(vehicleId).filter(isMaintTrackOrder);
+  const lastTrack = (track || []).filter((o) => o.status === 'COMPLETED' || o.approvalStatus === 'APPROVED').slice(-1)[0]
+    || (track || []).slice(-1)[0];
+  if (!lastTrack) return null;
+  return { date: lastTrack.date || null, km: lastTrack.km != null ? Number(lastTrack.km) : null, orderCode: lastTrack.code || '' };
+}
+/** Trường hiển thị lần BD gần nhất trên lưới nhắc. */
+function remindLastMaintDisplay(vehicleId, catalogId, opts) {
+  const o = opts || {};
+  if (o.rowKind === 'TIRE_BATTERY') {
+    const installed = o.installedAt ? String(o.installedAt).slice(0, 10) : '';
+    const km = o.installedKm != null && Number.isFinite(Number(o.installedKm)) ? Number(o.installedKm) : null;
+    return {
+      lastMaintDate: installed || '',
+      lastMaintDateText: installed ? (typeof fmtDateViShort === 'function' ? fmtDateViShort(installed) : installed) : '—',
+      lastMaintKmNum: km,
+      lastMaintKmText: km != null ? (kmFmt(km) + ' km') : '—',
+    };
+  }
+  const last = lastMaintForCatalog(vehicleId, catalogId);
+  const date = last?.date ? String(last.date).slice(0, 10) : '';
+  const km = last?.km != null && Number.isFinite(Number(last.km)) ? Number(last.km) : null;
+  return {
+    lastMaintDate: date,
+    lastMaintDateText: date ? (typeof fmtDateViShort === 'function' ? fmtDateViShort(date) : date) : '—',
+    lastMaintKmNum: km,
+    lastMaintKmText: km != null ? (kmFmt(km) + ' km') : '—',
+  };
 }
 
 function lastVehicleMaintSummary(vehicleId) {
@@ -76752,9 +76782,10 @@ function formatRemindKmLeft(kmLeft) {
  * - Ép vài xe vượt nextKm → «Còn lại» âm (case vượt km dự tính)
  */
 function ensureRemindOdoDemoData() {
-  if (DB._remindOdoSeeded === 3) return;
-  DB._remindOdoSeeded = 3;
+  if (DB._remindOdoSeeded === 4) return;
+  DB._remindOdoSeeded = 4;
   ensureVehicleCatalogAssign();
+  try { if (typeof ensureMaintTrackDemoOrders === 'function') ensureMaintTrackDemoOrders(); } catch (_) {}
   (DB.vehicles || []).forEach((v) => {
     const id = Number(v.id) || 0;
     if (!Number.isFinite(Number(v.km)) || Number(v.km) < 1000) {
@@ -76797,6 +76828,31 @@ function ensureRemindOdoDemoData() {
       v.km = Math.max(0, nextKm - before);
       v.gpsKm = v.km + 80;
     }
+  });
+  /* Bổ sung lastKm / lastDate (lần BD gần nhất) nếu thiếu — để cột demo có dữ liệu */
+  (DB.vehicles || []).forEach((v) => {
+    const track = typeof listMaintTrackOrders === 'function' ? listMaintTrackOrders(v.id) : [];
+    const lastOrd = (track || []).filter((o) => o.status === 'COMPLETED' || o.approvalStatus === 'APPROVED').slice(-1)[0]
+      || (track || []).slice(-1)[0];
+    vehicleAssignedCatalogIds(v.id).forEach((cid, ci) => {
+      const st = getCatState(v.id, cid);
+      if (st.lastKm == null && st.lastDate == null) {
+        if (lastOrd) {
+          st.lastKm = lastOrd.km != null ? Number(lastOrd.km) : Math.max(0, Math.round((Number(v.km) || 0) - 12000 - ci * 800));
+          st.lastDate = lastOrd.date || null;
+        } else {
+          const ago = 40 + (Number(v.id) + ci) % 90;
+          const d = new Date();
+          d.setDate(d.getDate() - ago);
+          st.lastDate = d.toISOString().slice(0, 10);
+          st.lastKm = Math.max(0, Math.round((Number(v.km) || 100000) - (8000 + ci * 1500 + ((Number(v.id) * 11) % 4000))));
+        }
+      } else {
+        if (st.lastKm == null && lastOrd?.km != null) st.lastKm = Number(lastOrd.km);
+        if (!st.lastDate && lastOrd?.date) st.lastDate = lastOrd.date;
+      }
+      if (st.occurrence == null || Number(st.occurrence) < 1) st.occurrence = Math.max(1, Number(st.occurrence) || 1);
+    });
   });
 }
 function ensureRemindExpectedDateMap() {
@@ -76954,6 +77010,7 @@ function collectRemindDueLeaves(filters) {
       if (f.remindStatus !== 'ALL' && status !== f.remindStatus) return;
       if (f.catalogId === '__TIRE__' || f.catalogId === '__BATTERY__') return;
       if (f.catalogId !== 'ALL' && String(c.id) !== String(f.catalogId)) return;
+      const lastMaint = remindLastMaintDisplay(v.id, c.id, { rowKind: 'CATALOG' });
       const leaf = {
         rowKind: 'CATALOG',
         groupKey: String(v.id),
@@ -76978,6 +77035,7 @@ function collectRemindDueLeaves(filters) {
         remindPlanDate: next?.date ? String(next.date).slice(0, 10) : '',
         nextDate: next?.date ? String(next.date).slice(0, 10) : '',
         dueKmNum: next.km != null ? Number(next.km) : null,
+        ...lastMaint,
         usedKmNum: null,
         maxKmNum: null,
         usedMonthNum: null,
@@ -76999,7 +77057,7 @@ function collectRemindDueLeaves(filters) {
       };
       leaf.expectedDate = remindComputeExpectedDate(leaf);
       leaf.expectedDateManual = !!(ensureRemindExpectedDateMap()[remindLeafKey(leaf)]);
-      leaf.searchBlob = [searchBlob, leaf.expectedDate].join(' ');
+      leaf.searchBlob = [searchBlob, leaf.expectedDate, leaf.lastMaintDateText, leaf.lastMaintKmText].join(' ');
       leaves.push(leaf);
     });
     tireBatteryAlertsForVehicle(v).forEach((a) => {
@@ -77019,6 +77077,17 @@ function collectRemindDueLeaves(filters) {
       if (f.catalogId === '__BATTERY__' && a.kind !== 'BATTERY') return;
       if (f.catalogId !== 'ALL' && f.catalogId !== '__TIRE__' && f.catalogId !== '__BATTERY__') return;
       const gpsKmTb = vehicleGpsOdoKm(v);
+      const uTb = a.id && typeof tireBatteryUnitById === 'function' ? tireBatteryUnitById(a.id) : null;
+      const installedKmTb = (uTb?.installedKm != null)
+        ? Number(uTb.installedKm)
+        : (a.usedKm != null && v.km != null
+          ? Math.max(0, Math.round(Number(v.km) - Number(a.usedKm)))
+          : null);
+      const lastMaintTb = remindLastMaintDisplay(v.id, null, {
+        rowKind: 'TIRE_BATTERY',
+        installedAt: a.installedAt || uTb?.installedAt || '',
+        installedKm: installedKmTb,
+      });
       const leaf = {
         rowKind: 'TIRE_BATTERY',
         groupKey: String(v.id),
@@ -77044,6 +77113,7 @@ function collectRemindDueLeaves(filters) {
         remindPlanDate: '',
         nextDate: '',
         dueKmNum: null,
+        ...lastMaintTb,
         usedKmNum: null,
         maxKmNum: null,
         usedMonthNum: usedMonth,
@@ -77067,7 +77137,7 @@ function collectRemindDueLeaves(filters) {
       };
       leaf.expectedDate = remindComputeExpectedDate(leaf);
       leaf.expectedDateManual = !!(ensureRemindExpectedDateMap()[remindLeafKey(leaf)]);
-      leaf.searchBlob = [searchBlob, leaf.expectedDate].join(' ');
+      leaf.searchBlob = [searchBlob, leaf.expectedDate, leaf.lastMaintDateText, leaf.lastMaintKmText].join(' ');
       leaves.push(leaf);
     });
   });
@@ -77094,13 +77164,19 @@ function buildRemindDashboardGridRows(leaves) {
     const nOver = kids.filter(k => k.status === 'overdue').length;
     const nSoon = kids.filter(k => k.status === 'dueSoon').length;
     const nDue = kids.filter(k => k.isDue).length;
+    const nOverrunTitle = kids.filter((k) => k.kmOverrun).length;
     const worst = nOver ? 'overdue' : nSoon ? 'dueSoon' : 'normal';
     const groupTitle = [
       kids.length + ' hạng mục',
-      nOver ? (nOver + ' quá hạn') : (nSoon ? (nSoon + ' sắp hạn') : 'ổn'),
+      nOverrunTitle ? (nOverrunTitle + ' vượt km') : (nOver ? (nOver + ' quá hạn') : (nSoon ? (nSoon + ' sắp hạn') : 'ổn')),
     ].join(' · ');
     const classSet = [...new Set(kids.map((k) => k.maintClassLabel).filter(Boolean))];
     const nOverrun = kids.filter((k) => k.kmOverrun).length;
+    const vehLast = typeof lastVehicleMaintSummary === 'function'
+      ? lastVehicleMaintSummary(first.vehicleId)
+      : null;
+    const groupLastDate = vehLast?.date ? String(vehLast.date).slice(0, 10) : '';
+    const groupLastKm = vehLast?.km != null ? Number(vehLast.km) : null;
     rows.push({
       id: 'g-' + groupKey,
       __group: true,
@@ -77122,6 +77198,12 @@ function buildRemindDashboardGridRows(leaves) {
       milestoneText: nDue ? (nDue + ' đến hạn') : '—',
       remindMaintText: '—',
       remindPlanText: '—',
+      lastMaintDate: groupLastDate,
+      lastMaintDateText: groupLastDate
+        ? (typeof fmtDateViShort === 'function' ? fmtDateViShort(groupLastDate) : groupLastDate)
+        : '—',
+      lastMaintKmNum: groupLastKm,
+      lastMaintKmText: groupLastKm != null ? (kmFmt(groupLastKm) + ' km') : '—',
       usedKmText: '—',
       maxKmText: '—',
       usedMonthText: '—',
@@ -77211,6 +77293,20 @@ function registerRemindDashboardGrid(leaves) {
           ? ('GPS ' + (diff >= 0 ? '+' : '') + kmFmt(diff) + ' km so với đồng hồ')
           : 'Km ODO GPS';
         return `<span class="tabular-nums text-slate-800" title="${esc(tip)}">${esc(item.gpsOdoText || '—')}</span>`;
+      } },
+    { id: 'lastMaintDateText', field: 'lastMaintDate', name: 'Ngày BD gần nhất', width: 130, minWidth: 110, sortable: true, cssClass: 'c',
+      toolTip: 'Ngày lần bảo dưỡng / lắp gần nhất (danh mục: catState / phiếu BD · lốp/ắc: ngày lắp)',
+      formatter: (r, c, v, col, item) => {
+        const txt = item.lastMaintDateText || '—';
+        if (txt === '—') return '<span class="text-slate-300">—</span>';
+        return `<span class="tabular-nums text-xs text-slate-800" title="${esc(item.lastMaintDate || txt)}">${esc(txt)}</span>`;
+      } },
+    { id: 'lastMaintKmText', field: 'lastMaintKmNum', name: 'ODO lần BD gần nhất', width: 140, minWidth: 120, sortable: true, cssClass: 'r',
+      toolTip: 'Số km ODO tại lần bảo dưỡng / lắp gần nhất',
+      formatter: (r, c, v, col, item) => {
+        const txt = item.lastMaintKmText || '—';
+        if (txt === '—') return '<span class="text-slate-300">—</span>';
+        return `<span class="tabular-nums text-xs text-slate-800">${esc(txt)}</span>`;
       } },
     { id: 'avgKmPerMonthText', field: 'avgKmPerMonthNum', name: 'Km TB / tháng', width: 132, minWidth: 110, sortable: true, cssClass: 'r sg-col-editable', headerCssClass: 'sg-col-editable', toolTip: 'Xe chạy trung bình 1 tháng (km) — bấm ✎ để sửa',
       formatter: (r, c, v, col, item) => {
