@@ -64917,6 +64917,72 @@ function nhomLookupOptions() {
 function planByLineId(lineId) {
   return (DB.plans || []).find(p => String(p.id) === String(lineId)) || null;
 }
+function materialById(id) {
+  return (DB.materials || []).find((m) => String(m.id) === String(id))
+    || ((DB.localLookups?.materials) || []).find((m) => String(m.id) === String(id))
+    || null;
+}
+function planMaterialsList(p) {
+  if (!p) return [];
+  if (Array.isArray(p.materials) && p.materials.length) {
+    return p.materials.map((m) => ({
+      id: m.id || m.materialId || '',
+      code: m.code || '',
+      name: m.name || m.ten || '',
+      uom: m.uom || 'Cái',
+      qty: Number(m.qty) || 1,
+    })).filter((m) => m.name || m.code);
+  }
+  if (Array.isArray(p.materialIds) && p.materialIds.length) {
+    return p.materialIds.map((id) => {
+      const m = materialById(id);
+      if (!m) return null;
+      return { id: m.id, code: m.code || '', name: m.name || '', uom: m.uom || 'Cái', qty: 1 };
+    }).filter(Boolean);
+  }
+  return [];
+}
+function planMaterialsText(p) {
+  const list = planMaterialsList(p);
+  if (!list.length) return '—';
+  return list.map((m) => {
+    const label = m.code ? (m.code + ' · ' + m.name) : m.name;
+    return (Number(m.qty) > 1 ? (label + ' ×' + m.qty) : label);
+  }).join('; ');
+}
+function materialsForPlanSystem(systemId, systemName) {
+  enrichAllMaterials(false);
+  const sys = systemId ? vehicleSystemById(systemId) : null;
+  const name = String(sys?.name || systemName || '').trim().toLowerCase();
+  const all = [...materialMasterOptions(), ...materialLocalOptions()];
+  if (!name) return all.slice(0, 80);
+  const matched = all.filter((m) => {
+    const full = materialById(m.id) || m;
+    const he = String(full.heThong || m.heThong || '').toLowerCase();
+    const blob = `${full.name || ''} ${full.code || ''} ${he}`.toLowerCase();
+    return he === name || he.includes(name) || name.includes(he) || blob.includes(name.split(/\s+/)[0] || name);
+  });
+  return (matched.length ? matched : all).slice(0, 80);
+}
+function contentOptionsForPlanSystem(systemId, systemName) {
+  const sys = systemId ? vehicleSystemById(systemId) : null;
+  const name = String(sys?.name || systemName || '').trim();
+  const barems = systemId && typeof baremRowsForSystem === 'function' ? baremRowsForSystem(systemId) : [];
+  if (barems.length) {
+    return barems.map((b) => ({
+      id: 'br-' + b.id,
+      name: b.content,
+      system: name,
+      source: 'barem',
+      sub: Number(b.baremHours).toFixed(2) + 'h',
+    }));
+  }
+  const repairs = typeof repairItemsForSystem === 'function' ? repairItemsForSystem(systemId, name) : [];
+  if (repairs.length) {
+    return repairs.map((r) => ({ id: r.id, name: r.name, system: r.system || name, source: 'master' }));
+  }
+  return contentLookupOptions().filter((c) => !name || !c.system || c.system === name);
+}
 function applyWiCellPick(orderId, idx, field, opt) {
   const o = DB.orders.find(x => String(x.id) === String(orderId));
   if (!o || !canEditOrderDetail(o) || !o.workItems?.[idx]) return;
@@ -64979,6 +65045,16 @@ function applyPlanCellPick(lineId, field, opt, quiet) {
     p.service = opt.name;
     if (opt.system) p.system = opt.system;
     if (String(opt.id).startsWith('cat-')) p.catalogId = Number(String(opt.id).slice(4));
+  } else if (field === 'vatTu' || field === 'materials') {
+    const cur = planMaterialsList(p);
+    const exists = cur.some((m) => String(m.id) === String(opt.id) || (m.name && m.name === opt.name));
+    if (!exists) {
+      cur.push({
+        id: opt.id, code: opt.code || '', name: opt.name || '', uom: opt.uom || 'Cái', qty: 1,
+      });
+    }
+    p.materials = cur;
+    p.materialIds = cur.map((m) => m.id).filter(Boolean);
   } else if (field === 'vendor') {
     p.vendor = opt.name;
   } else if (field === 'dichVu') {
@@ -65121,13 +65197,31 @@ function handleCellPopClick(btn, ev) {
     openCellPickPopover({
       anchor: btn, cellNode, title: 'Nội dung thực hiện', value: valueText,
       allowCreate: true,
-      getOptions: () => contentLookupOptions(),
+      getOptions: () => {
+        const p = planByLineId(lineId);
+        return contentOptionsForPlanSystem(p?.systemId, p?.system);
+      },
       formatRow: (o) => ({
         title: esc(o.name),
         sub: esc(o.system || o.sub || ''),
       }),
       onCreate: (raw) => persistLocalContent(raw),
       onPick: (opt) => applyPlanCellPick(lineId, 'content', opt),
+    });
+    return;
+  }
+  if (kind === 'plan-vatTu') {
+    const p0 = planByLineId(lineId);
+    openCellPickPopover({
+      anchor: btn, cellNode, title: 'Chọn vật tư (PWMS)', value: '',
+      allowCreate: true,
+      getOptions: () => materialsForPlanSystem(p0?.systemId, p0?.system),
+      formatRow: (o) => ({
+        title: `${esc(o.name)}${o.source === 'local' ? ' <span class="local-tag">nội bộ</span>' : ''}`,
+        sub: esc([o.code, o.uom].filter(Boolean).join(' · ') || '—'),
+      }),
+      onCreate: (raw) => persistLocalMaterial(raw),
+      onPick: (opt) => applyPlanCellPick(lineId, 'vatTu', opt),
     });
     return;
   }
@@ -66016,18 +66110,32 @@ function planPmhNote(g) {
   return notes.join('; ');
 }
 function ensurePlanAssignSeed() {
-  if (DB._planAssignSeeded) return;
-  DB._planAssignSeeded = true;
+  /* 2 = đã seed KTV/ngày + vật tư mẫu trên dòng KH */
+  if (DB._planAssignSeeded === 2) return;
+  const alreadyTech = DB._planAssignSeeded === true || DB._planAssignSeeded === 1;
+  DB._planAssignSeeded = 2;
   const techs = typeof technicianLookupOptions === 'function' ? technicianLookupOptions() : [];
   const names = techs.length
     ? techs.map(t => t.name).filter(Boolean)
     : ['Nguyễn Văn An', 'Trần Minh Tuấn', 'Lê Quốc Huy', 'Phạm Thu Hà'];
+  enrichAllMaterials(false);
+  const matsPool = (DB.materials || []).filter((m) => !m.localOnly);
   (DB.plans || []).forEach((p, i) => {
-    if (!p.technicianName && i % 3 === 0) p.technicianName = names[i % names.length];
-    if (!p.scheduleDate && i % 4 === 0) {
-      const per = String(p.period || '2026-09');
-      const day = String(10 + (i % 18)).padStart(2, '0');
-      p.scheduleDate = (per.length >= 7 ? per.slice(0, 7) : '2026-09') + '-' + day;
+    if (!alreadyTech) {
+      if (!p.technicianName && i % 3 === 0) p.technicianName = names[i % names.length];
+      if (!p.scheduleDate && i % 4 === 0) {
+        const per = String(p.period || '2026-09');
+        const day = String(10 + (i % 18)).padStart(2, '0');
+        p.scheduleDate = (per.length >= 7 ? per.slice(0, 7) : '2026-09') + '-' + day;
+      }
+    }
+    if ((!p.materials || !p.materials.length) && matsPool.length && i % 2 === 0) {
+      const bySys = materialsForPlanSystem(p.systemId, p.system);
+      const pick = (bySys.length ? bySys : matsPool).slice(0, 1 + (i % 2));
+      p.materials = pick.map((m) => ({
+        id: m.id, code: m.code || '', name: m.name || '', uom: m.uom || 'Cái', qty: 1,
+      }));
+      p.materialIds = p.materials.map((m) => m.id);
     }
   });
 }
@@ -66100,6 +66208,8 @@ function planLineGridRow(g, p, v, parentId) {
     applyTo: p.applyTo || planApplyTo(v),
     ptId: p.ptId || planPtId(v),
     content: p.service || c?.name || '—',
+    vatTu: planMaterialsText(p),
+    materials: planMaterialsList(p),
     vendor: p.vendor || '—',
     dichVu: kind === 'MAINT' ? 'Bảo dưỡng' : 'Sửa chữa',
     phanLoai: p.costKind || '—',
@@ -66193,6 +66303,8 @@ function planGridRows(groups) {
       /* text thô có chevron — phòng khi formatter HTML bị bỏ */
       displayTitle: (isPlanVehicleCollapsed(bucket.vehicleId) ? '▸ ' : '▾ ') + groupTitle,
       vendor: '—',
+      vatTu: '',
+      materials: [],
       dichVu: '—',
       phanLoai: '—',
       system: '—',
@@ -66488,11 +66600,15 @@ function readAddPlanFormExtras() {
     note: String($('#addPlanNote')?.value || '').trim(),
     workKind,
     serviceManual: String($('#addPlanServiceManual')?.value || '').trim(),
+    content: String($('#addPlanContent')?.value || '').trim(),
+    materials: (typeof window._addPlanSelectedMats === 'function' ? window._addPlanSelectedMats() : []) || [],
   };
 }
 function createPlanLineRecord(vehicleId, period, base, extras, nOffset) {
   const id = Math.max(0, ...(DB.plans || []).map((p) => Number(p.id) || 0)) + 1 + (nOffset || 0);
   const unitPrice = extras.unitPrice != null ? extras.unitPrice : (Number(base.unitPrice) || 0);
+  const content = String(extras.content || extras.serviceManual || base.service || '').trim() || '—';
+  const mats = Array.isArray(extras.materials) ? extras.materials : (base.materials || []);
   return {
     id,
     code: 'KH-' + String(period).replace('-', '') + '-' + String(id).padStart(4, '0'),
@@ -66515,7 +66631,11 @@ function createPlanLineRecord(vehicleId, period, base, extras, nOffset) {
     status: 'NEW',
     source: base.source || 'MANUAL',
     workKind: extras.workKind || base.workKind || 'MAINTENANCE',
-    service: base.service || extras.serviceManual || '—',
+    service: content,
+    materials: mats.map((m) => ({
+      id: m.id, code: m.code || '', name: m.name || '', uom: m.uom || 'Cái', qty: Number(m.qty) || 1,
+    })),
+    materialIds: mats.map((m) => m.id).filter(Boolean),
     note: extras.note || base.note || '',
     keepOnPlan: false,
     baseSync: { status: 'NONE', code: null, baseStatus: null, lastSyncedAt: null, submittedAt: null, note: '' },
@@ -66525,8 +66645,9 @@ function addPlanLinesFromCatalog(vehicleId, period, catalogIds, extras) {
   const v = vehicleById(Number(vehicleId));
   if (!v) return 0;
   const ex = extras || {};
+  const ids = catalogIds || [];
   let n = 0;
-  (catalogIds || []).forEach((cid) => {
+  ids.forEach((cid) => {
     const c = typeof catById === 'function' ? catById(cid) : (DB.catalog || []).find(x => String(x.id) === String(cid));
     if (!c) return;
     const exists = (DB.plans || []).some((p) =>
@@ -66536,6 +66657,8 @@ function addPlanLinesFromCatalog(vehicleId, period, catalogIds, extras) {
       && !p.deferredTo
     );
     if (exists) return;
+    /* 1 danh mục: cho phép ghi đè nội dung từ form; nhiều danh mục: giữ tên từng DM */
+    const contentOverride = ids.length === 1 && ex.content ? ex.content : '';
     DB.plans.unshift(createPlanLineRecord(vehicleId, period, {
       catalogId: c.id,
       service: c.name,
@@ -66550,6 +66673,7 @@ function addPlanLinesFromCatalog(vehicleId, period, catalogIds, extras) {
       note: 'Thêm từ lưới kế hoạch',
     }, {
       ...ex,
+      content: contentOverride || c.name,
       unitPrice: ex.unitPrice != null ? ex.unitPrice : (Number(c.refPrice) || 0),
       systemId: ex.systemId || c.systemId || null,
       system: ex.system || c.system || '',
@@ -66563,7 +66687,7 @@ function addPlanLinesFromCatalog(vehicleId, period, catalogIds, extras) {
   return n;
 }
 function addManualPlanLine(vehicleId, period, extras) {
-  const service = String(extras?.serviceManual || '').trim();
+  const service = String(extras?.content || extras?.serviceManual || '').trim();
   if (!service) return 0;
   const exists = (DB.plans || []).some((p) =>
     Number(p.vehicleId) === Number(vehicleId)
@@ -66579,7 +66703,7 @@ function addManualPlanLine(vehicleId, period, extras) {
     source: 'MANUAL',
     note: 'Nhập tay từ lưới kế hoạch',
     unitPrice: extras.unitPrice != null ? extras.unitPrice : 0,
-  }, extras, 0));
+  }, { ...extras, content: service }, 0));
   return 1;
 }
 function openAddPlanLinesForVehicle(vehicleId, periodHint) {
@@ -66592,9 +66716,11 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
   const cats = (DB.catalog || []).map((c) => (typeof normalizeCatalog === 'function' ? normalizeCatalog(c) : c))
     .slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
   const checked = new Set();
+  const selectedMats = new Map(); /* id -> {id,code,name,uom,qty} */
   let mode = 'catalog'; /* catalog | manual */
-  const dirty = { vendor: false, unitPrice: false, uom: false, workKind: false, costKind: false, nhom: false };
+  const dirty = { vendor: false, unitPrice: false, uom: false, workKind: false, costKind: false, nhom: false, content: false, materials: false };
   const markDirty = (key) => { dirty[key] = true; };
+  window._addPlanSelectedMats = () => [...selectedMats.values()];
   const setSelectValue = (el, value) => {
     if (!el) return;
     const v0 = String(value || '');
@@ -66627,6 +66753,61 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
     if (/sửa chữa|^sc\b|sc-/.test(nm)) wk.value = 'REPAIR';
     else if (/bảo dưỡng|^bd\b|bd-/.test(nm)) wk.value = 'MAINTENANCE';
   };
+  const refreshContentOptions = (preferName) => {
+    const sysId = $('#addPlanSystem')?.value || '';
+    const sysName = sysId ? systemNameById(sysId) : '';
+    const el = $('#addPlanContent');
+    if (!el) return;
+    const prev = preferName != null ? preferName : el.value;
+    const opts = contentOptionsForPlanSystem(sysId || null, sysName);
+    const catsAsContent = cats.filter((c) => catalogMatchesMaster(c)).slice(0, 40)
+      .map((c) => ({ id: 'cat-' + c.id, name: c.name, system: c.system || '', source: 'catalog' }));
+    const merged = new Map();
+    [...opts, ...catsAsContent].forEach((o) => {
+      if (o?.name) merged.set(String(o.name).toLowerCase(), o);
+    });
+    el.innerHTML = '<option value="">— Chọn nội dung thực hiện —</option>'
+      + [...merged.values()].map((o) =>
+        `<option value="${esc(o.name)}" data-src="${esc(o.source || '')}">${esc(o.name)}${o.system ? ' · ' + esc(o.system) : ''}</option>`
+      ).join('');
+    if (prev && [...el.options].some((o) => o.value === prev)) el.value = prev;
+  };
+  const renderMatList = () => {
+    const sysId = $('#addPlanSystem')?.value || '';
+    const sysName = sysId ? systemNameById(sysId) : '';
+    const q = String($('#addPlanMatSearch')?.value || '').trim().toLowerCase();
+    const list = materialsForPlanSystem(sysId || null, sysName).filter((m) => {
+      if (!q) return true;
+      return `${m.code || ''} ${m.name || ''}`.toLowerCase().includes(q);
+    });
+    const box = $('#addPlanMatList');
+    if (!box) return;
+    box.innerHTML = list.length
+      ? list.map((m) => {
+        const on = selectedMats.has(String(m.id));
+        return `<label class="flex items-start gap-2 border-b border-slate-100 px-3 py-1.5 cursor-pointer hover:bg-slate-50 ${on ? 'bg-blue-50/40' : ''}">
+          <input type="checkbox" class="mt-0.5 !w-auto" data-add-plan-mat="${esc(m.id)}" ${on ? 'checked' : ''} />
+          <span class="min-w-0"><span class="font-medium text-slate-800">${esc(m.name)}</span>
+            <span class="block text-[11px] text-slate-500">${esc(m.code || '—')} · ${esc(m.uom || 'Cái')}${m.supplier ? ' · ' + esc(m.supplier) : ''}</span></span>
+        </label>`;
+      }).join('')
+      : '<div class="px-3 py-6 text-center text-slate-400 text-sm">Không có vật tư khớp</div>';
+    const cnt = $('#addPlanMatCount');
+    if (cnt) cnt.textContent = String(selectedMats.size);
+    $$('[data-add-plan-mat]').forEach((el) => {
+      el.onchange = () => {
+        const id = String(el.getAttribute('data-add-plan-mat'));
+        const m = list.find((x) => String(x.id) === id) || materialById(id);
+        if (el.checked && m) {
+          selectedMats.set(id, { id: m.id, code: m.code || '', name: m.name || '', uom: m.uom || 'Cái', qty: 1 });
+          dirty.materials = true;
+        } else {
+          selectedMats.delete(id);
+        }
+        if (cnt) cnt.textContent = String(selectedMats.size);
+      };
+    });
+  };
   const autoFillFromCatalog = (c) => {
     if (!c) return;
     if (!dirty.vendor && c.supplier) setSelectValue($('#addPlanVendor'), c.supplier);
@@ -66650,8 +66831,30 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
       setSelectValue($('#addPlanServiceType'), c.serviceTypeId);
       syncWorkKindFromServiceType();
     }
+    refreshContentOptions(c.name);
+    if (!dirty.content && c.name) {
+      const cel = $('#addPlanContent');
+      if (cel) {
+        if (![...cel.options].some((o) => o.value === c.name)) {
+          const opt = document.createElement('option');
+          opt.value = c.name;
+          opt.textContent = c.name;
+          cel.appendChild(opt);
+        }
+        cel.value = c.name;
+      }
+    }
+    if (!dirty.materials && !selectedMats.size) {
+      const sug = materialsForPlanSystem(c.systemId, c.system).slice(0, 2);
+      sug.forEach((m) => selectedMats.set(String(m.id), {
+        id: m.id, code: m.code || '', name: m.name || '', uom: m.uom || 'Cái', qty: 1,
+      }));
+      renderMatList();
+    } else {
+      renderMatList();
+    }
     const hint = $('#addPlanFillHint');
-    if (hint) hint.textContent = 'Đã điền từ danh mục «' + (c.name || c.code || '') + '» · có thể sửa lại';
+    if (hint) hint.textContent = 'Đã điền từ danh mục «' + (c.name || c.code || '') + '» · nội dung / vật tư có thể sửa';
   };
   const catalogMatchesMaster = (c) => {
     const sysId = $('#addPlanSystem')?.value || '';
@@ -66785,15 +66988,27 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
         <p class="text-xs text-slate-500 m-0"><span id="addPlanCatCount">0</span> danh mục · đã chọn <span id="addPlanSelCount" class="font-semibold text-slate-800">0</span></p>
       </div>
 
-      <div id="addPlanManualPanel" class="hidden space-y-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
-        <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">2 · Nội dung nhập tay</div>
-        <label class="block text-sm font-medium text-slate-700">Nội dung thực hiện <span class="text-rose-600">*</span>
-          <input id="addPlanServiceManual" type="text" class="form-control" placeholder="VD: Bảo dưỡng tổng quát tại xưởng…" />
-        </label>
+      <div id="addPlanManualPanel" class="hidden rounded-md border border-amber-100 bg-amber-50/50 px-3 py-2 text-xs text-amber-900">
+        Chế độ nhập tay: chọn <strong>Nội dung thực hiện</strong> và <strong>Vật tư</strong> ở bước 3 (không bắt buộc tick danh mục).
       </div>
 
       <div class="rounded-md border border-slate-200 px-3 py-3 space-y-3">
-        <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">3 · Chi tiết dòng (tự điền từ DM · có thể sửa)</div>
+        <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">3 · Nội dung · vật tư · chi tiết dòng</div>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <label class="block text-sm font-medium text-slate-700 sm:col-span-2">Nội dung thực hiện <span class="text-rose-600">*</span>
+            <select id="addPlanContent" class="form-control">
+              <option value="">— Chọn nội dung (barem / SC / danh mục) —</option>
+            </select>
+          </label>
+          <div class="sm:col-span-2 space-y-1.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="text-sm font-medium text-slate-700">Vật tư (PWMS)</span>
+              <input id="addPlanMatSearch" type="search" class="form-control !w-52" placeholder="Tìm mã / tên VT…" autocomplete="off" />
+            </div>
+            <div id="addPlanMatList" class="max-h-36 overflow-y-auto rounded-md border border-slate-200 bg-white text-sm"></div>
+            <p class="text-[11px] text-slate-500 m-0">Đã chọn <span id="addPlanMatCount" class="font-semibold text-slate-800">0</span> vật tư · lọc theo hệ thống nếu có</p>
+          </div>
+        </div>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label class="block text-sm font-medium text-slate-700">Nhà cung cấp
             <select id="addPlanVendor" class="form-control">${addPlanSelectOptsHtml(vendorLookupOptions(), '', '— Chọn NCC —')}</select>
@@ -66844,16 +67059,21 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
   $('#addPlanSystem')?.addEventListener('change', () => {
     refreshServiceTypeOptions();
     syncWorkKindFromServiceType();
+    refreshContentOptions();
+    renderMatList();
     renderList();
   });
   $('#addPlanServiceType')?.addEventListener('change', () => {
     syncWorkKindFromServiceType();
+    refreshContentOptions();
     renderList();
   });
   $('#addPlanWorkKind')?.addEventListener('change', () => {
     dirty.workKind = true;
     if ($('#addPlanWorkKind')) $('#addPlanWorkKind').dataset.touched = '1';
   });
+  $('#addPlanContent')?.addEventListener('change', () => markDirty('content'));
+  $('#addPlanMatSearch')?.addEventListener('input', renderMatList);
   $('#addPlanVendor')?.addEventListener('change', () => markDirty('vendor'));
   $('#addPlanUnitPrice')?.addEventListener('input', () => markDirty('unitPrice'));
   $('#addPlanUom')?.addEventListener('change', () => markDirty('uom'));
@@ -66863,22 +67083,26 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
     period = String($('#addPlanPeriod')?.value || period).trim();
     if (!/^\d{4}-\d{2}$/.test(period)) { toast('Kỳ không hợp lệ (YYYY-MM)'); return; }
     const extras = readAddPlanFormExtras();
+    if (!extras.content && mode === 'manual') { toast('Chọn nội dung thực hiện'); return; }
     let n = 0;
     if (mode === 'manual') {
-      if (!extras.serviceManual) { toast('Nhập nội dung thực hiện'); return; }
       n = addManualPlanLine(vehicleId, period, extras);
       if (!n) { toast('Dòng nhập tay này đã có trên kỳ này'); return; }
     } else {
       if (!checked.size) { toast('Chọn ít nhất 1 hạng mục hoặc chuyển sang Nhập tay'); return; }
+      /* Nội dung form ghi đè tên danh mục nếu đã chọn */
       n = addPlanLinesFromCatalog(vehicleId, period, [...checked], extras);
       if (!n) { toast('Các hạng mục đã có trên kế hoạch kỳ này'); render(); return; }
     }
     if (typeof save === 'function') save();
     closeModal();
+    try { delete window._addPlanSelectedMats; } catch (_) {}
     toast('Đã thêm ' + n + ' hạng mục vào kế hoạch · ' + (v.plate || '') + ' · ' + period);
     render();
   });
   refreshServiceTypeOptions();
+  refreshContentOptions();
+  renderMatList();
   syncModeUi();
   renderList();
 }
@@ -67722,7 +67946,7 @@ function planGroupTitleCellHtml(item) {
   return `<span class="plan-group-title-cell" data-vehicle-id="${esc(item.vehicleId)}" title="Bấm để thêm kế hoạch · chevron để thu/mở nhóm">${planTreeToggleBtnHtml(item)}<span class="plan-group-title-text" title="${esc(title)} · bấm để thêm kế hoạch">${esc(title)}</span></span>`;
 }
 function mountPlanGridFallback(host, rows) {
-  const head = `<th class="w-10"><input type="checkbox" id="planGridCheckAll" class="order-grid-select-all-checkbox" /></th><th>#</th><th>Năm</th><th>Tháng</th><th>Số xe</th><th>Số mooc</th><th>Áp dụng cho</th><th>PT ID</th><th>Nội dung thực hiện</th><th>Nhà cung cấp</th><th>Dịch vụ</th><th>Phân loại</th><th>Hệ thống</th><th>Nhóm</th><th class="text-right">Số lượng</th><th>ĐVT</th><th class="text-right">Đơn giá</th><th class="text-right">% VAT</th><th class="text-right">Thành tiền</th><th class="text-right">Tổng tiền</th><th>Ghi chú cho PMH</th><th>Kỹ thuật viên</th><th>Ngày thực hiện</th><th>BASE</th><th></th>`;
+  const head = `<th class="w-10"><input type="checkbox" id="planGridCheckAll" class="order-grid-select-all-checkbox" /></th><th>#</th><th>Năm</th><th>Tháng</th><th>Số xe</th><th>Số mooc</th><th>Áp dụng cho</th><th>PT ID</th><th>Nội dung thực hiện</th><th>Vật tư</th><th>Nhà cung cấp</th><th>Dịch vụ</th><th>Phân loại</th><th>Hệ thống</th><th>Nhóm</th><th class="text-right">Số lượng</th><th>ĐVT</th><th class="text-right">Đơn giá</th><th class="text-right">% VAT</th><th class="text-right">Thành tiền</th><th class="text-right">Tổng tiền</th><th>Ghi chú cho PMH</th><th>Kỹ thuật viên</th><th>Ngày thực hiện</th><th>BASE</th><th></th>`;
   host.innerHTML = `<table class="plan-fallback"><thead><tr>${head}</tr></thead><tbody>${rows.map((r, i) => {
     const on = (view.planPanelOpen && r.key === view.selectedPlanGroupKey ? 'is-on' : '') + (r.__vehGroup ? ' plan-vehicle-group-row' : '');
     const lid = planLineIdOfRow(r);
@@ -67732,7 +67956,7 @@ function mountPlanGridFallback(host, rows) {
     const act = r.__vehGroup
       ? `<button type="button" class="btn btn-outline btn-xs" data-plan-sync-base-vehicle="${esc(r.vehicleId)}">BASE</button> <button type="button" class="btn btn-primary btn-xs" data-plan-schedule="${esc(r.key)}">Lên lịch</button>`
       : `<button type="button" class="btn btn-primary btn-xs" data-plan-schedule="${esc(r.key)}">Lên lịch</button>`;
-    const cells = `${ck}<td>${esc(r.year)}</td><td>${esc(r.month)}</td><td class="font-medium">${esc(r.soXe)}</td><td>${esc(r.soMooc)}</td><td>${esc(r.applyTo)}</td><td class="font-mono text-xs">${esc(r.ptId)}</td><td>${esc(r.content)}</td><td>${r.__vehGroup ? '' : esc(r.vendor)}</td><td>${r.__vehGroup ? '' : esc(r.dichVu)}</td><td>${r.__vehGroup ? '' : esc(r.phanLoai)}</td><td>${r.__vehGroup ? '' : esc(r.system)}</td><td>${r.__vehGroup ? '' : esc(r.nhom)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.qtyText)}</td><td>${r.__vehGroup ? '' : esc(r.uom)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.unitPriceText)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.vatText)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.thanhTienText)}</td><td class="text-right tabular-nums fw6">${esc(r.totalText)}</td><td>${r.__vehGroup ? '' : esc(r.pmhNote)}</td><td>${esc(r.technicianName || '—')}</td><td>${esc(r.scheduleDateText || r.scheduleDate || '—')}</td><td>${planBaseSyncBadge({ status: r.baseStatus, code: r.baseCode })}</td><td class="whitespace-nowrap">${act}</td>`;
+    const cells = `${ck}<td>${esc(r.year)}</td><td>${esc(r.month)}</td><td class="font-medium">${esc(r.soXe)}</td><td>${esc(r.soMooc)}</td><td>${esc(r.applyTo)}</td><td class="font-mono text-xs">${esc(r.ptId)}</td><td>${esc(r.content)}</td><td>${r.__vehGroup ? '' : esc(r.vatTu || '—')}</td><td>${r.__vehGroup ? '' : esc(r.vendor)}</td><td>${r.__vehGroup ? '' : esc(r.dichVu)}</td><td>${r.__vehGroup ? '' : esc(r.phanLoai)}</td><td>${r.__vehGroup ? '' : esc(r.system)}</td><td>${r.__vehGroup ? '' : esc(r.nhom)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.qtyText)}</td><td>${r.__vehGroup ? '' : esc(r.uom)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.unitPriceText)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.vatText)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.thanhTienText)}</td><td class="text-right tabular-nums fw6">${esc(r.totalText)}</td><td>${r.__vehGroup ? '' : esc(r.pmhNote)}</td><td>${esc(r.technicianName || '—')}</td><td>${esc(r.scheduleDateText || r.scheduleDate || '—')}</td><td>${planBaseSyncBadge({ status: r.baseStatus, code: r.baseCode })}</td><td class="whitespace-nowrap">${act}</td>`;
     return `<tr class="${on}" data-gkey="${esc(r.key)}" data-line-id="${esc(lid)}" data-vehicle-id="${esc(r.vehicleId)}">${cells}</tr>`;
   }).join('') || `<tr><td colspan="25" class="px-4 py-10 text-center text-slate-500">Không có kế hoạch khớp bộ lọc</td></tr>`}</tbody></table>`;
   host.querySelectorAll('.pg-row').forEach(cb => {
@@ -68249,6 +68473,7 @@ function pastePlanGridCell(item, columnDef, raw) {
     if (!opt) return false;
     applyPlanCellPick(lineId, field === 'technicianName' ? 'technician' : field, opt, true);
     if (field === 'content') { item.content = opt.name; if (opt.system) item.system = opt.system; }
+    else if (field === 'vatTu') { item.vatTu = planMaterialsText(planByLineId(lineId)); item.materials = planMaterialsList(planByLineId(lineId)); }
     else if (field === 'vendor') item.vendor = opt.name;
     else if (field === 'dichVu') item.dichVu = opt.name || (opt.id === 'MAINT' ? 'Bảo dưỡng' : 'Sửa chữa');
     else if (field === 'phanLoai') item.phanLoai = opt.name;
@@ -68492,7 +68717,7 @@ function openPlanCellAutocomplete(grid, row, cell) {
   const item = typeof grid.getDataItem === 'function' ? grid.getDataItem(row) : null;
   if (!col || !item) return false;
   const map = {
-    content: 'plan-content', vendor: 'plan-vendor', dichVu: 'plan-dichVu',
+    content: 'plan-content', vatTu: 'plan-vatTu', vendor: 'plan-vendor', dichVu: 'plan-dichVu',
     phanLoai: 'plan-phanLoai', system: 'plan-system', nhom: 'plan-nhom', uom: 'plan-uom',
     qtyText: 'plan-qty', unitPriceText: 'plan-unitPrice', vatText: 'plan-vat', pmhNote: 'plan-pmhNote',
     technicianName: 'plan-technician', scheduleDateText: 'plan-scheduleDate', scheduleDate: 'plan-scheduleDate',
@@ -69310,6 +69535,11 @@ function mountPlanSlickGrid() {
         const spacer = `<span class="sg-tree-spacer" style="width:${indentPx}px"></span>`;
         const inner = leafPop(item, item.content, `data-cell-pop="plan-content" data-line-id="${esc(item.lineId)}"`);
         return `<span class="sg-tree-cell">${spacer}<span class="sg-tree-leaf-pad"></span>${inner}</span>`;
+      } },
+    { id: 'vatTu', field: 'vatTu', name: 'Vật tư', width: 220, sortable: true, cssClass: 'sg-col-editable', headerCssClass: 'sg-col-editable', columnGroup: 'Hạng mục',
+      formatter: (r, c, v, col, item) => {
+        if (item.__vehGroup) return '';
+        return leafPop(item, item.vatTu || '—', `data-cell-pop="plan-vatTu" data-line-id="${esc(item.lineId)}"`);
       } },
     { id: 'vendor', field: 'vendor', name: 'Nhà cung cấp', width: 140, sortable: true, cssClass: 'sg-col-editable', headerCssClass: 'sg-col-editable', columnGroup: 'Hạng mục',
       formatter: (r, c, v, col, item) => leafPop(item, item.vendor, `data-cell-pop="plan-vendor" data-line-id="${esc(item.lineId)}"`) },
