@@ -72925,6 +72925,21 @@ function absorbDriverInbox() {
     return 0;
   }
 }
+/** Cộng tháng vào ngày YYYY-MM-DD (local) — tháng 12 → năm + 1; clamp ngày cuối tháng. */
+function addMonthsToDateKey(dateKey, months) {
+  const base = String(dateKey || '').slice(0, 10);
+  const todayFallback = (typeof todayDateKey === 'function' ? todayDateKey() : new Date().toISOString().slice(0, 10));
+  const src = /^\d{4}-\d{2}-\d{2}$/.test(base) ? base : todayFallback;
+  const [y, m, d] = src.split('-').map(Number);
+  const targetMonthStart = new Date(y, (m - 1) + Number(months || 0), 1);
+  const lastDay = new Date(targetMonthStart.getFullYear(), targetMonthStart.getMonth() + 1, 0).getDate();
+  const day = Math.min(d, lastDay);
+  const result = new Date(targetMonthStart.getFullYear(), targetMonthStart.getMonth(), day);
+  const yy = result.getFullYear();
+  const mm = String(result.getMonth() + 1).padStart(2, '0');
+  const dd = String(result.getDate()).padStart(2, '0');
+  return yy + '-' + mm + '-' + dd;
+}
 function openSchedulePlanModal(opts) {
   const title = opts?.title || 'Đưa vào kế hoạch';
   const subtitle = opts?.subtitle || 'Chọn tháng này, tháng sau, hoặc chỉ định ngày cụ thể.';
@@ -72952,7 +72967,7 @@ function openSchedulePlanModal(opts) {
       <label class="block text-sm font-medium text-slate-700">Ngày cụ thể
         <input name="scheduleDate" type="date" id="schedulePlanDate" value="${esc(dateVal)}" ${usePref ? '' : 'disabled'} />
       </label>
-      <p class="m-0 text-xs text-slate-500">Kỳ kế hoạch = tháng của ngày chọn. Dòng được gắn <code>scheduleDate</code> để xưởng biết ngày dự kiến.</p>
+      <p class="m-0 text-xs text-slate-500">Kỳ kế hoạch = tháng của ngày chọn. «Tháng sau» = ngày hôm nay + 1 tháng (qua năm thì +1 năm). Dòng được gắn <code>scheduleDate</code> để xưởng biết ngày dự kiến.</p>
       <div class="flex justify-end gap-2">
         <button type="button" data-close class="btn btn-outline">Huỷ</button>
         <button class="btn btn-primary">Xác nhận</button>
@@ -72961,7 +72976,17 @@ function openSchedulePlanModal(opts) {
   const syncDate = () => {
     const mode = document.querySelector('#schedulePlanForm [name=mode]:checked')?.value;
     const inp = $('#schedulePlanDate');
-    if (inp) inp.disabled = mode !== 'date';
+    if (!inp) return;
+    if (mode === 'this') {
+      inp.value = today;
+      inp.disabled = true;
+    } else if (mode === 'next') {
+      inp.value = addMonthsToDateKey(today, 1);
+      inp.disabled = true;
+    } else {
+      if (!inp.value) inp.value = usePref ? prefDate : today;
+      inp.disabled = false;
+    }
   };
   $$('#schedulePlanForm [name=mode]').forEach((r) => r.addEventListener('change', syncDate));
   syncDate();
@@ -72971,19 +72996,15 @@ function openSchedulePlanModal(opts) {
     e.preventDefault();
     const fd = new FormData(e.target);
     const mode = String(fd.get('mode') || 'this');
-    const now = new Date();
-    let period = now.toISOString().slice(0, 7);
     let scheduleDate = today;
     if (mode === 'next') {
-      const d = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      period = d.toISOString().slice(0, 7);
-      scheduleDate = period + '-01';
+      scheduleDate = addMonthsToDateKey(today, 1);
     } else if (mode === 'date') {
       scheduleDate = String(fd.get('scheduleDate') || today);
-      period = scheduleDate.slice(0, 7);
     } else {
       scheduleDate = today;
     }
+    const period = String(scheduleDate).slice(0, 7);
     closeModal();
     if (typeof opts?.onConfirm === 'function') opts.onConfirm({ mode, period, scheduleDate });
   };
