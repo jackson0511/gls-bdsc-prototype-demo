@@ -66324,10 +66324,10 @@ function planLineGridRow(g, p, v, parentId) {
     soMooc: soMooc || '—',
     applyTo: p.applyTo || planApplyTo(v),
     ptId: p.ptId || planPtId(v),
-    content: p.service || c?.name || '—',
+    content: (p.service != null && String(p.service).trim() !== '') ? p.service : (c?.name || ''),
     vatTu: planMaterialsText(p),
     materials: planMaterialsList(p),
-    vendor: p.vendor || '—',
+    vendor: (p.vendor != null && String(p.vendor).trim() !== '' && p.vendor !== '—') ? p.vendor : '',
     dichVu: kind === 'MAINT' ? 'Bảo dưỡng' : 'Sửa chữa',
     phanLoai: p.costKind || '—',
     system: p.system || c?.system || '—',
@@ -66548,6 +66548,7 @@ function planSidePanelHtml(g) {
               <input type="checkbox" class="pg-check-all" data-group-key="${esc(g.key)}" /> Chọn tất cả chưa vào phiếu
             </label>
             <button type="button" class="btn btn-primary btn-xs" data-add-plan-lines="${esc(g.vehicleId)}" data-period="${esc(g.period || '')}">+ Thêm hạng mục</button>
+            <button type="button" class="btn btn-outline btn-xs" data-plan-add-blank="${esc(g.vehicleId)}" data-period="${esc(g.period || '')}">+ Dòng trống</button>
             <button type="button" class="btn btn-outline btn-xs" data-plan-group-order-selected="${esc(g.key)}">Tạo phiếu từ đã chọn</button>
             <button type="button" class="btn btn-outline btn-xs" data-plan-keep-selected="${esc(g.key)}">Giữ trên kế hoạch</button>
             ${(g.lines || []).length ? `<button type="button" class="btn btn-outline btn-xs text-rose-700 !border-rose-300" data-del-plan-veh="${esc(g.vehicleId)}" data-period="${esc(g.period || '')}">Xoá kế hoạch kỳ này</button>` : ''}
@@ -66822,6 +66823,40 @@ function addManualPlanLine(vehicleId, period, extras) {
     unitPrice: extras.unitPrice != null ? extras.unitPrice : 0,
   }, { ...extras, content: service }, 0));
   return 1;
+}
+/** Thêm 1 dòng kế hoạch trống trên lưới — user tự nhập nội dung / vật tư bằng ô ✎ */
+function addBlankPlanLine(vehicleId, periodHint, opts) {
+  const v = vehicleById(Number(vehicleId));
+  if (!v) { toast('Không tìm thấy xe'); return null; }
+  let period = String(periodHint || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(period)) period = currentPlanGridPeriod();
+  const scope = typeof menuWorkScope === 'function' ? menuWorkScope() : 'MAINT';
+  const workKind = scope === 'REPAIR' ? 'REPAIR' : 'MAINTENANCE';
+  const rec = createPlanLineRecord(vehicleId, period, {
+    catalogId: null,
+    service: '',
+    source: 'MANUAL',
+    note: 'Dòng trống · nhập trên lưới',
+    vendor: '',
+    unitPrice: 0,
+  }, {
+    content: '',
+    vendor: '',
+    unitPrice: 0,
+    uom: 'Lần',
+    qty: 1,
+    vat: 8,
+    workKind,
+    materials: [],
+    note: 'Dòng trống · nhập trên lưới',
+  }, 0);
+  rec.service = '';
+  rec.vendor = '';
+  DB.plans.unshift(rec);
+  if (typeof save === 'function') save();
+  if (!opts?.silent) toast('Đã thêm dòng trống · ' + (v.plate || '') + ' · ' + period);
+  if (!opts?.noRender) render();
+  return rec;
 }
 function openAddPlanLinesForVehicle(vehicleId, periodHint) {
   const v = vehicleById(Number(vehicleId));
@@ -67624,6 +67659,7 @@ function showPlanCtx(ev, item) {
   el.classList.remove('hidden');
   const bits = item.__vehGroup ? [
     slickMenuItem('add-plan', 'plus', 'Thêm kế hoạch cho xe này'),
+    slickMenuItem('add-blank', 'plus', 'Thêm dòng trống'),
     slickMenuItem('detail', 'file', 'Xem chi tiết xe · kỳ'),
     unlinked.length
       ? slickMenuItem('do-now', 'calCheck', 'Làm tháng này (tạo phiếu)')
@@ -67641,6 +67677,8 @@ function showPlanCtx(ev, item) {
     planCheckedLineIds().length > 1 ? slickMenuItem('bulk-order', 'files', 'Tạo phiếu ' + planCheckedLineIds().length + ' hạng mục đã chọn') : '',
     (item.lineIds || []).length ? slickMenuItem('delete-veh', 'x', 'Xoá kế hoạch xe này (' + (item.lineIds || []).length + ')') : '',
   ] : [
+    slickMenuItem('add-blank', 'plus', 'Thêm dòng trống (cùng xe)'),
+    slickMenuItem('add-plan', 'plus', 'Thêm kế hoạch cho xe này'),
     slickMenuItem('detail', 'file', 'Xem hạng mục'),
     unlinked.length
       ? slickMenuItem('do-now', 'calCheck', 'Làm tháng này (tạo phiếu)')
@@ -67680,6 +67718,11 @@ function runPlanCtx(act, g, item) {
   if (act === 'add-plan') {
     const period = item?.period && /^\d{4}-\d{2}$/.test(String(item.period)) ? item.period : (g?.period || '');
     openAddPlanLinesForVehicle(item?.vehicleId || g?.vehicleId, period);
+    return;
+  }
+  if (act === 'add-blank') {
+    const period = item?.period && /^\d{4}-\d{2}$/.test(String(item.period)) ? item.period : (g?.period || '');
+    addBlankPlanLine(item?.vehicleId || g?.vehicleId, period);
     return;
   }
   if (act === 'delete-line') {
@@ -68198,8 +68241,8 @@ function mountPlanGridFallback(host, rows) {
       ? `<td><input type="checkbox" class="pg-row pg-veh-group order-grid-row-checkbox" data-gkey="${esc(r.key)}" data-vehicle-id="${esc(r.vehicleId)}" /></td><td></td>`
       : `<td><input type="checkbox" class="pg-row order-grid-row-checkbox" data-gkey="${esc(r.key)}" data-line-id="${esc(lid)}" data-vehicle-id="${esc(r.vehicleId)}" ${isPlanLineChecked(lid) ? 'checked' : ''} /></td><td class="text-slate-400">${i + 1}</td>`;
     const act = r.__vehGroup
-      ? `<button type="button" class="btn btn-outline btn-xs" data-plan-sync-base-vehicle="${esc(r.vehicleId)}">BASE</button> <button type="button" class="btn btn-primary btn-xs" data-plan-schedule="${esc(r.key)}">Lên lịch</button> <button type="button" class="btn btn-outline btn-xs text-rose-700 !border-rose-300" data-del-plan-veh="${esc(r.vehicleId)}" data-period="${esc(r.period || '')}">Xóa</button>`
-      : `<button type="button" class="btn btn-primary btn-xs" data-plan-schedule="${esc(r.key)}">Lên lịch</button> <button type="button" class="btn btn-outline btn-xs text-rose-700 !border-rose-300" data-del-plan="${esc(lid)}">Xóa</button>`;
+      ? `<button type="button" class="btn btn-outline btn-xs" data-plan-add-blank="${esc(r.vehicleId)}" data-period="${esc(r.period || '')}">+ Dòng trống</button> <button type="button" class="btn btn-outline btn-xs" data-plan-sync-base-vehicle="${esc(r.vehicleId)}">BASE</button> <button type="button" class="btn btn-primary btn-xs" data-plan-schedule="${esc(r.key)}">Lên lịch</button> <button type="button" class="btn btn-outline btn-xs text-rose-700 !border-rose-300" data-del-plan-veh="${esc(r.vehicleId)}" data-period="${esc(r.period || '')}">Xóa</button>`
+      : `<button type="button" class="btn btn-outline btn-xs" data-plan-add-blank="${esc(r.vehicleId)}" data-period="${esc(r.period || '')}" title="Thêm dòng trống">+</button> <button type="button" class="btn btn-primary btn-xs" data-plan-schedule="${esc(r.key)}">Lên lịch</button> <button type="button" class="btn btn-outline btn-xs text-rose-700 !border-rose-300" data-del-plan="${esc(lid)}">Xóa</button>`;
     const cells = `${ck}<td>${esc(r.year)}</td><td>${esc(r.month)}</td><td class="font-medium">${esc(r.soXe)}</td><td>${esc(r.soMooc)}</td><td>${esc(r.applyTo)}</td><td class="font-mono text-xs">${esc(r.ptId)}</td><td>${esc(r.content)}</td><td>${r.__vehGroup ? '' : esc(r.vatTu || '—')}</td><td>${r.__vehGroup ? '' : esc(r.vendor)}</td><td>${r.__vehGroup ? '' : esc(r.dichVu)}</td><td>${r.__vehGroup ? '' : esc(r.phanLoai)}</td><td>${r.__vehGroup ? '' : esc(r.system)}</td><td>${r.__vehGroup ? '' : esc(r.nhom)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.qtyText)}</td><td>${r.__vehGroup ? '' : esc(r.uom)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.unitPriceText)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.vatText)}</td><td class="text-right tabular-nums">${r.__vehGroup ? '' : esc(r.thanhTienText)}</td><td class="text-right tabular-nums fw6">${esc(r.totalText)}</td><td>${r.__vehGroup ? '' : esc(r.pmhNote)}</td><td>${esc(r.technicianName || '—')}</td><td>${esc(r.scheduleDateText || r.scheduleDate || '—')}</td><td>${planBaseSyncBadge({ status: r.baseStatus, code: r.baseCode })}</td><td class="whitespace-nowrap">${act}</td>`;
     return `<tr class="${on}" data-gkey="${esc(r.key)}" data-line-id="${esc(lid)}" data-vehicle-id="${esc(r.vehicleId)}">${cells}</tr>`;
   }).join('') || `<tr><td colspan="25" class="px-4 py-10 text-center text-slate-500">Không có kế hoạch khớp bộ lọc</td></tr>`}</tbody></table>`;
@@ -68240,6 +68283,10 @@ function mountPlanGridFallback(host, rows) {
     };
   });
   host.querySelectorAll('[data-plan-schedule]').forEach(b => b.onclick = (e) => { e.stopPropagation(); schedulePlanGroupToDate(b.dataset.planSchedule); });
+  host.querySelectorAll('[data-plan-add-blank]').forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    addBlankPlanLine(b.getAttribute('data-plan-add-blank'), b.getAttribute('data-period') || '');
+  });
   host.querySelectorAll('[data-plan-sync-base-vehicle]').forEach(b => b.onclick = (e) => {
     e.stopPropagation();
     const vid = b.getAttribute('data-plan-sync-base-vehicle');
@@ -69825,9 +69872,10 @@ function mountPlanSlickGrid() {
     { id: 'scheduleDateText', field: 'scheduleDateText', name: 'Ngày thực hiện', width: 120, sortable: true, cssClass: 'sg-col-editable c', headerCssClass: 'sg-col-editable', columnGroup: 'Thực hiện',
       formatter: assignDateFmt },
     { id: 'baseLabel', field: 'baseLabel', name: 'BASE', width: 110, formatter: baseFmt, sortable: true, denyPaste: true, columnGroup: 'BASE' },
-    { id: '_act', field: 'act', name: '', width: 220, minWidth: 180, cssClass: 'pg-act-cell', sortable: false, denyPaste: true, columnGroup: ' ', formatter: (row, cell, val, col, item) => {
+    { id: '_act', field: 'act', name: '', width: 280, minWidth: 220, cssClass: 'pg-act-cell', sortable: false, denyPaste: true, columnGroup: ' ', formatter: (row, cell, val, col, item) => {
       if (item.__vehGroup) {
         return `<div class="flex items-center justify-center gap-1 px-1 flex-wrap">
+          <button type="button" class="btn btn-outline btn-xs whitespace-nowrap" data-plan-add-blank="${esc(item.vehicleId)}" data-period="${esc(item.period || '')}" title="Thêm dòng trống cho xe này">${planTbIco('plus')} Dòng trống</button>
           <button type="button" class="btn btn-outline btn-xs whitespace-nowrap" data-plan-sync-base-vehicle="${esc(item.vehicleId)}" title="Đồng bộ BASE cho kế hoạch xe này">${planTbIco('refresh')} BASE</button>
           <button type="button" class="btn btn-primary btn-xs whitespace-nowrap" data-plan-schedule="${esc(item.key)}">Lên lịch</button>
           <button type="button" class="btn btn-outline btn-xs whitespace-nowrap text-rose-700 !border-rose-300" data-del-plan-veh="${esc(item.vehicleId)}" data-period="${esc(item.period || '')}" title="Xóa toàn bộ hạng mục kỳ này của xe">${planTbIco('x')} Xóa</button>
@@ -69835,6 +69883,7 @@ function mountPlanSlickGrid() {
       }
       const lid = planLineIdOfRow(item);
       return `<div class="flex items-center justify-center gap-1 px-1">
+        <button type="button" class="btn btn-outline btn-xs whitespace-nowrap" data-plan-add-blank="${esc(item.vehicleId)}" data-period="${esc(item.period || '')}" title="Thêm dòng trống cùng xe">${planTbIco('plus')}</button>
         <button type="button" class="btn btn-primary btn-xs whitespace-nowrap" data-plan-schedule="${esc(item.key)}">Lên lịch</button>
         <button type="button" class="btn btn-outline btn-xs whitespace-nowrap text-rose-700 !border-rose-300" data-del-plan="${esc(lid)}" title="Xóa hạng mục khỏi kế hoạch">${planTbIco('x')} Xóa</button>
       </div>`;
@@ -70263,6 +70312,15 @@ function mountPlanSlickGrid() {
       schedulePlanGroupToDate(scheduleBtn.dataset.planSchedule);
       return;
     }
+    const addBlankBtn = t && t.closest && t.closest('[data-plan-add-blank]');
+    if (addBlankBtn) {
+      if (native.stopPropagation) native.stopPropagation();
+      addBlankPlanLine(
+        addBlankBtn.getAttribute('data-plan-add-blank'),
+        addBlankBtn.getAttribute('data-period') || item.period || ''
+      );
+      return;
+    }
     const delLineBtn = t && t.closest && t.closest('[data-del-plan]');
     if (delLineBtn) {
       if (native.stopPropagation) native.stopPropagation();
@@ -70369,6 +70427,10 @@ function bindPlanSidePanel() {
   $$('[data-add-plan-lines]', panel).forEach(b => b.onclick = (e) => {
     e.stopPropagation();
     openAddPlanLinesForVehicle(b.dataset.addPlanLines, b.getAttribute('data-period') || '');
+  });
+  $$('[data-plan-add-blank]', panel).forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    addBlankPlanLine(b.getAttribute('data-plan-add-blank'), b.getAttribute('data-period') || '');
   });
   $$('[data-del-plan-veh]', panel).forEach(b => b.onclick = (e) => {
     e.stopPropagation();
