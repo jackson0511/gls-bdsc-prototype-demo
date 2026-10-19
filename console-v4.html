@@ -69270,7 +69270,9 @@ function mountListSlickGrid(host, rows, cols, opts) {
         };
       }
       if (key === 'remindDashboard' && !item.__group) {
-        const tone = item.status === 'overdue' ? 'remind-overdue-row' : item.status === 'dueSoon' ? 'remind-due-row' : '';
+        const tone = (item.kmOverrun || item.status === 'overdue')
+          ? 'remind-overdue-row'
+          : item.status === 'dueSoon' ? 'remind-due-row' : '';
         return {
           cssClasses: [tone, sel ? 'list-row-sel' : ''].filter(Boolean).join(' '),
         };
@@ -76728,6 +76730,75 @@ function vehicleAvgKmPerMonth(v) {
   const typeBoost = /đầu kéo|tractor|casca|freight/i.test(String(v.type || '') + ' ' + String(v.brand || '')) ? 800 : 0;
   return Math.max(1500, 7200 + areaBoost + typeBoost + (id % 13) * 280);
 }
+/** Km ODO từ GPS (có thể lệch đồng hồ xe). */
+function vehicleGpsOdoKm(v) {
+  if (!v) return null;
+  const g = Number(v.gpsKm);
+  if (Number.isFinite(g) && g >= 0) return Math.round(g);
+  const odo = Number(v.km);
+  if (!Number.isFinite(odo) || odo < 0) return null;
+  return Math.round(odo);
+}
+/** Hiển thị km còn lại — số âm = đã vượt mốc dự tính. */
+function formatRemindKmLeft(kmLeft) {
+  if (kmLeft == null || !Number.isFinite(Number(kmLeft))) return '—';
+  const n = Math.round(Number(kmLeft));
+  if (n < 0) return '−' + kmFmt(Math.abs(n)) + ' km · vượt';
+  return kmFmt(n) + ' km';
+}
+/**
+ * Seed demo ODO / GPS ODO cho nhắc BD:
+ * - Gán km đồng hồ + gpsKm lệch nhẹ
+ * - Ép vài xe vượt nextKm → «Còn lại» âm (case vượt km dự tính)
+ */
+function ensureRemindOdoDemoData() {
+  if (DB._remindOdoSeeded === 3) return;
+  DB._remindOdoSeeded = 3;
+  ensureVehicleCatalogAssign();
+  (DB.vehicles || []).forEach((v) => {
+    const id = Number(v.id) || 0;
+    if (!Number.isFinite(Number(v.km)) || Number(v.km) < 1000) {
+      v.km = v.isTrailer
+        ? (380000 + (id % 19) * 2700)
+        : (920000 + (id % 29) * 3850);
+    }
+    const base = Math.round(Number(v.km) || 0);
+    const drift = ((id * 37) % 1100) - 250; /* GPS lệch −250…+850 km */
+    if (!Number.isFinite(Number(v.gpsKm)) || Number(v.gpsKm) < 1000) {
+      v.gpsKm = Math.max(0, base + drift);
+    }
+  });
+  const tractors = (DB.vehicles || []).filter((v) => v && !v.isTrailer);
+  tractors.slice(0, 10).forEach((v, i) => {
+    const cids = vehicleAssignedCatalogIds(v.id);
+    if (!cids.length) return;
+    const cid = cids[i % cids.length];
+    const c = typeof catById === 'function' ? catById(cid) : null;
+    if (!c) return;
+    const st = getCatState(v.id, cid);
+    let nextKm = st.nextKm != null ? Number(st.nextKm) : null;
+    if (nextKm == null || !Number.isFinite(nextKm)) {
+      const comp = computeNextFromRules(effectiveCatalogForVehicle(v.id, c), st, Number(v.km) || 0, v.hours || 0);
+      nextKm = comp.nextKm != null ? Number(comp.nextKm) : null;
+    }
+    if (nextKm == null || !Number.isFinite(nextKm)) {
+      nextKm = Math.max(80000, Math.round((Number(v.km) || 200000) - 5000));
+      st.nextKm = nextKm;
+    } else {
+      st.nextKm = nextKm;
+    }
+    /* ~ nửa số xe: vượt mốc (kmLeft âm); vài xe sắp hạn */
+    if (i < 4 || i % 2 === 0) {
+      const overrun = 4200 + i * 1350; /* đã chạy quá mốc */
+      v.km = nextKm + overrun;
+      v.gpsKm = v.km + 220 + i * 55; /* GPS thường cao hơn đồng hồ một chút */
+    } else if (i % 3 === 0) {
+      const before = Math.max(400, Math.floor((Number(DB.settings?.maintenanceRemindKmBefore) || 2000) * 0.55));
+      v.km = Math.max(0, nextKm - before);
+      v.gpsKm = v.km + 80;
+    }
+  });
+}
 function ensureRemindExpectedDateMap() {
   if (!DB.remindExpectedDateOverrides || typeof DB.remindExpectedDateOverrides !== 'object') {
     DB.remindExpectedDateOverrides = {};
@@ -76851,20 +76922,25 @@ function collectRemindDueLeaves(filters) {
   const f = filters || F();
   ensureVehicleCatalogAssign();
   ensureTireBatteryUnits(false);
+  ensureRemindOdoDemoData();
   const leaves = [];
   (DB.vehicles || []).forEach((v) => {
     if (f.area !== 'ALL' && v.area !== f.area) return;
     if (f.kind === 'vehicle' && v.isTrailer) return;
     if (f.kind === 'trailer' && !v.isTrailer) return;
     const assigned = new Set(vehicleAssignedCatalogIds(v.id).map(Number));
+    const odoKm = Number(v.km) || 0;
+    const gpsKm = vehicleGpsOdoKm(v);
+    /* So sánh mốc với km thực tế lớn hơn (đồng hồ vs GPS) để bắt case vượt sớm */
+    const effectiveKm = Math.max(odoKm, gpsKm != null ? Number(gpsKm) : 0);
     (DB.catalog || []).filter((c) => assigned.has(Number(c.id))).forEach((c) => {
       const st = getCatState(v.id, c.id);
       const next = { km: st.nextKm, date: st.nextDate };
       if (next.km == null && next.date == null) {
-        const comp = computeNextFromRules(effectiveCatalogForVehicle(v.id, c), st, v.km);
+        const comp = computeNextFromRules(effectiveCatalogForVehicle(v.id, c), st, effectiveKm);
         next.km = comp.nextKm; next.date = comp.nextDate;
       }
-      const kmLeft = next.km != null ? next.km - v.km : null;
+      const kmLeft = next.km != null ? Number(next.km) - effectiveKm : null;
       let status = 'normal';
       if (kmLeft != null && kmLeft <= 0) status = 'overdue';
       else if (kmLeft != null && kmLeft <= DB.settings.maintenanceRemindKmBefore) status = 'dueSoon';
@@ -76873,7 +76949,7 @@ function collectRemindDueLeaves(filters) {
       const itemLabel = c.name || c.code || '—';
       const avgKm = vehicleAvgKmPerMonth(v);
       const maintClass = remindMaintClassLabel('CATALOG', c);
-      const searchBlob = [v.plate, v.type, c.name, c.code, v.area, marks.remindMaintText, marks.remindPlanText, maintClass, avgKm].join(' ');
+      const searchBlob = [v.plate, v.type, c.name, c.code, v.area, marks.remindMaintText, marks.remindPlanText, maintClass, avgKm, gpsKm].join(' ');
       if (!matchSearch(searchBlob, f.search)) return;
       if (f.remindStatus !== 'ALL' && status !== f.remindStatus) return;
       if (f.catalogId === '__TIRE__' || f.catalogId === '__BATTERY__') return;
@@ -76885,8 +76961,10 @@ function collectRemindDueLeaves(filters) {
         catalogId: c.id,
         plate: v.plate || '—',
         areaLabel: formatAreaLabel(v.area),
-        odoText: kmFmt(v.km),
-        odoNum: Number(v.km) || 0,
+        odoText: kmFmt(odoKm),
+        odoNum: odoKm,
+        gpsOdoText: gpsKm != null ? kmFmt(gpsKm) : '—',
+        gpsOdoNum: gpsKm != null ? Number(gpsKm) : null,
         avgKmPerMonthNum: avgKm,
         avgKmPerMonthText: avgKm != null ? (kmFmt(avgKm) + ' km') : '—',
         maintClassLabel: maintClass,
@@ -76899,6 +76977,7 @@ function collectRemindDueLeaves(filters) {
         remindPlanText: marks.remindPlanText,
         remindPlanDate: next?.date ? String(next.date).slice(0, 10) : '',
         nextDate: next?.date ? String(next.date).slice(0, 10) : '',
+        dueKmNum: next.km != null ? Number(next.km) : null,
         usedKmNum: null,
         maxKmNum: null,
         usedMonthNum: null,
@@ -76908,9 +76987,12 @@ function collectRemindDueLeaves(filters) {
         usedMonthText: '—',
         maxMonthText: '—',
         kmLeft,
-        kmLeftText: kmLeft != null ? (kmFmt(kmLeft) + ' km') : '—',
+        kmLeftText: formatRemindKmLeft(kmLeft),
+        kmOverrun: kmLeft != null && kmLeft < 0,
         status,
-        statusText: status === 'overdue' ? 'Quá hạn' : status === 'dueSoon' ? 'Sắp đến hạn' : 'Bình thường',
+        statusText: kmLeft != null && kmLeft < 0
+          ? ('Vượt km · ' + kmFmt(Math.abs(Math.round(kmLeft))) + ' km')
+          : (status === 'overdue' ? 'Quá hạn' : status === 'dueSoon' ? 'Sắp đến hạn' : 'Bình thường'),
         isDue,
         isTrailer: !!v.isTrailer,
         searchBlob,
@@ -76936,6 +77018,7 @@ function collectRemindDueLeaves(filters) {
       if (f.catalogId === '__TIRE__' && a.kind !== 'TIRE') return;
       if (f.catalogId === '__BATTERY__' && a.kind !== 'BATTERY') return;
       if (f.catalogId !== 'ALL' && f.catalogId !== '__TIRE__' && f.catalogId !== '__BATTERY__') return;
+      const gpsKmTb = vehicleGpsOdoKm(v);
       const leaf = {
         rowKind: 'TIRE_BATTERY',
         groupKey: String(v.id),
@@ -76946,6 +77029,8 @@ function collectRemindDueLeaves(filters) {
         areaLabel: formatAreaLabel(v.area),
         odoText: kmFmt(v.km),
         odoNum: Number(v.km) || 0,
+        gpsOdoText: gpsKmTb != null ? kmFmt(gpsKmTb) : '—',
+        gpsOdoNum: gpsKmTb != null ? Number(gpsKmTb) : null,
         avgKmPerMonthNum: avgKm,
         avgKmPerMonthText: avgKm != null ? (kmFmt(avgKm) + ' km') : '—',
         maintClassLabel: maintClass,
@@ -76958,6 +77043,7 @@ function collectRemindDueLeaves(filters) {
         remindPlanText: '—',
         remindPlanDate: '',
         nextDate: '',
+        dueKmNum: null,
         usedKmNum: null,
         maxKmNum: null,
         usedMonthNum: usedMonth,
@@ -76967,9 +77053,14 @@ function collectRemindDueLeaves(filters) {
         usedMonthText: String(usedMonth),
         maxMonthText: String(maxMonth),
         kmLeft: null,
-        kmLeftText: monthLeft != null ? (monthLeft + ' th') : '—',
+        kmLeftText: monthLeft != null
+          ? (monthLeft < 0 ? ('−' + Math.abs(monthLeft) + ' th · vượt') : (monthLeft + ' th'))
+          : '—',
+        kmOverrun: monthLeft != null && monthLeft < 0,
         status,
-        statusText: status === 'overdue' ? 'Quá hạn' : 'Sắp đến hạn',
+        statusText: monthLeft != null && monthLeft < 0
+          ? ('Vượt tháng · ' + Math.abs(monthLeft) + ' th')
+          : (status === 'overdue' ? 'Quá hạn' : 'Sắp đến hạn'),
         isDue: true,
         isTrailer: !!v.isTrailer,
         searchBlob,
@@ -77009,6 +77100,7 @@ function buildRemindDashboardGridRows(leaves) {
       nOver ? (nOver + ' quá hạn') : (nSoon ? (nSoon + ' sắp hạn') : 'ổn'),
     ].join(' · ');
     const classSet = [...new Set(kids.map((k) => k.maintClassLabel).filter(Boolean))];
+    const nOverrun = kids.filter((k) => k.kmOverrun).length;
     rows.push({
       id: 'g-' + groupKey,
       __group: true,
@@ -77019,6 +77111,8 @@ function buildRemindDashboardGridRows(leaves) {
       areaLabel: first.areaLabel,
       odoText: first.odoText,
       odoNum: first.odoNum,
+      gpsOdoText: first.gpsOdoText,
+      gpsOdoNum: first.gpsOdoNum,
       avgKmPerMonthNum: first.avgKmPerMonthNum,
       avgKmPerMonthText: first.avgKmPerMonthText,
       maintClassLabel: classSet.length === 1 ? classSet[0] : (classSet.length ? (classSet.length + ' loại') : '—'),
@@ -77036,9 +77130,12 @@ function buildRemindDashboardGridRows(leaves) {
       maxKmNum: null,
       usedMonthNum: null,
       maxMonthNum: null,
-      kmLeftText: '',
+      kmLeftText: nOverrun ? (nOverrun + ' vượt km') : '',
+      kmOverrun: nOverrun > 0,
       status: worst,
-      statusText: worst === 'overdue' ? 'Quá hạn' : worst === 'dueSoon' ? 'Sắp đến hạn' : 'Bình thường',
+      statusText: nOverrun
+        ? ('Vượt km · ' + nOverrun)
+        : (worst === 'overdue' ? 'Quá hạn' : worst === 'dueSoon' ? 'Sắp đến hạn' : 'Bình thường'),
       leafCount: kids.length,
       dueCount: nDue,
       isTrailer: first.isTrailer,
@@ -77072,6 +77169,9 @@ function registerRemindDashboardGrid(leaves) {
     return `<div class="flex h-full items-center justify-center"><input type="checkbox" class="rem-row order-grid-row-checkbox" data-remind-leaf-key="${esc(k)}" data-kind="${esc(item.rowKind || 'CATALOG')}" data-vid="${esc(item.vehicleId)}" data-cid="${esc(item.catalogId || '')}" data-tb-id="${esc(item.tbId || '')}" data-due="${item.isDue ? '1' : '0'}" ${isRemindLeafChecked(item) ? 'checked' : ''} aria-label="Chọn dòng nhắc" /></div>`;
   };
   const statusFmt = (r, c, v, col, item) => {
+    if (item.kmOverrun) {
+      return `<span class="inline-flex items-center rounded border border-rose-400 bg-rose-100 px-1.5 py-0.5 text-[11px] font-semibold text-rose-900" title="${esc(item.statusText || 'Vượt km dự tính')}">Vượt km</span>`;
+    }
     if (item.__group) {
       return item.status === 'overdue' ? evalBadge('overdue') : item.status === 'dueSoon' ? evalBadge('soon') : evalBadge('ok');
     }
@@ -77099,8 +77199,19 @@ function registerRemindDashboardGrid(leaves) {
         if (item.__group) return '<span class="text-slate-300">—</span>';
         return `<span class="text-xs text-slate-700" title="${esc(item.kindLabel || '')}">${esc(item.kindLabel || '—')}</span>`;
       } },
-    { id: 'odoText', field: 'odoNum', name: 'Số km xe', width: 100, minWidth: 88, sortable: true, cssClass: 'r', toolTip: 'Số km trên đồng hồ xe / mooc',
+    { id: 'odoText', field: 'odoNum', name: 'Số km xe', width: 100, minWidth: 88, sortable: true, cssClass: 'r', toolTip: 'Số km trên đồng hồ xe / mooc (ODO cabin)',
       formatter: (r, c, v, col, item) => `<span class="tabular-nums">${esc(item.odoText || '—')}</span>` },
+    { id: 'gpsOdoText', field: 'gpsOdoNum', name: 'Km ODO GPS', width: 112, minWidth: 96, sortable: true, cssClass: 'r',
+      toolTip: 'Số km ODO từ thiết bị GPS — có thể lệch đồng hồ; dùng cùng mốc để phát hiện vượt km dự tính',
+      formatter: (r, c, v, col, item) => {
+        const gps = item.gpsOdoNum;
+        const odo = item.odoNum;
+        const diff = (gps != null && odo != null) ? (Number(gps) - Number(odo)) : null;
+        const tip = diff != null
+          ? ('GPS ' + (diff >= 0 ? '+' : '') + kmFmt(diff) + ' km so với đồng hồ')
+          : 'Km ODO GPS';
+        return `<span class="tabular-nums text-slate-800" title="${esc(tip)}">${esc(item.gpsOdoText || '—')}</span>`;
+      } },
     { id: 'avgKmPerMonthText', field: 'avgKmPerMonthNum', name: 'Km TB / tháng', width: 132, minWidth: 110, sortable: true, cssClass: 'r sg-col-editable', headerCssClass: 'sg-col-editable', toolTip: 'Xe chạy trung bình 1 tháng (km) — bấm ✎ để sửa',
       formatter: (r, c, v, col, item) => {
         if (item.vehicleId == null) return '<span class="text-slate-300">—</span>';
@@ -77159,12 +77270,22 @@ function registerRemindDashboardGrid(leaves) {
           <button type="button" class="sg-cell-edit-btn" data-cell-pop="remind-expectedDate" data-leaf-key="${esc(key)}" data-expected-current="${esc(item.expectedDate || '')}" title="Đổi ngày dự kiến bảo dưỡng" aria-label="Đổi ngày dự kiến">✎</button>
         </div>`;
       } },
-    { id: 'kmLeftText', field: 'kmLeft', name: 'Còn lại', width: 100, minWidth: 88, sortable: true, cssClass: 'r',
-      toolTip: 'Danh mục: km còn lại · Lốp/ắc: tháng còn lại',
+    { id: 'kmLeftText', field: 'kmLeft', name: 'Còn lại', width: 130, minWidth: 110, sortable: true, cssClass: 'r',
+      toolTip: 'Danh mục: km còn lại tới mốc (số âm = đã vượt km dự tính theo max(đồng hồ, GPS)) · Lốp/ắc: tháng còn lại',
       formatter: (r, c, v, col, item) => {
-        if (item.__group) return '<span class="text-slate-400">—</span>';
-        const cls = item.status === 'overdue' ? 'text-rose-700 font-semibold' : item.status === 'dueSoon' ? 'text-amber-700' : 'text-slate-700';
-        return `<span class="tabular-nums ${cls}">${esc(item.kmLeftText || '—')}</span>`;
+        if (item.__group) {
+          return item.kmOverrun
+            ? `<span class="tabular-nums text-rose-700 font-semibold">${esc(item.kmLeftText || '—')}</span>`
+            : '<span class="text-slate-400">—</span>';
+        }
+        const overrun = !!item.kmOverrun || (item.kmLeft != null && Number(item.kmLeft) < 0);
+        const cls = overrun
+          ? 'text-rose-700 font-bold'
+          : (item.status === 'overdue' ? 'text-rose-700 font-semibold' : item.status === 'dueSoon' ? 'text-amber-700' : 'text-slate-700');
+        const tip = overrun
+          ? ('Đã vượt mốc dự tính ' + (item.dueKmNum != null ? (kmFmt(item.dueKmNum) + ' km') : '') + ' — cần đưa vào KH / BD')
+          : (item.kmLeftText || '');
+        return `<span class="tabular-nums ${cls}" title="${esc(tip)}">${esc(item.kmLeftText || '—')}</span>`;
       } },
     { id: 'statusText', field: 'statusText', name: 'Trạng thái', width: 120, minWidth: 100, sortable: true, filterType: 'select', cssClass: 'c', formatter: statusFmt },
     { id: '_act', field: 'act', name: 'Thao tác', width: 168, minWidth: 140, sortable: false, filterable: false,
@@ -77208,6 +77329,7 @@ function pageReminder() {
     normal: leaves.filter((r) => r.status === 'normal').length,
     dueSoon: leaves.filter((r) => r.status === 'dueSoon').length,
     overdue: leaves.filter((r) => r.status === 'overdue').length,
+    overrun: leaves.filter((r) => r.kmOverrun).length,
   };
   const catalogFilterOpts = [
     ['ALL', 'Tất cả'],
@@ -77254,7 +77376,7 @@ function pageReminder() {
     remindActions = `<button type="button" data-remind-tab="history" class="btn btn-outline btn-sm">Xem lịch sử BD</button>`;
     remindBody = `
     ${remindTabs}
-    <div class="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950">Luồng BD: danh mục gắn xe · mốc km → <strong>quá hạn tự vào kế hoạch</strong> · sắp đến hạn / <strong>lốp·ắc đến hạn</strong> thì <strong>Đưa vào KH</strong>. Lưới group theo xe · ▾/▸ thu nhóm. Lịch sử Lần N: tab <strong>Lịch sử</strong>.</div>
+    <div class="mb-3 rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-950">Luồng BD: danh mục gắn xe · mốc km → <strong>quá hạn tự vào kế hoạch</strong> · sắp đến hạn / <strong>lốp·ắc đến hạn</strong> thì <strong>Đưa vào KH</strong>. Cột <strong>Km ODO GPS</strong> đối chiếu đồng hồ; <strong>Còn lại âm</strong> = đã <strong>vượt km dự tính</strong> (badge Vượt km). Lưới group theo xe · ▾/▸ thu nhóm.</div>
     ${filterBarShell([
       filterSearch('flt-search', 'Biển số, danh mục, seri…', f.search),
       filterSelect('flt-kind', 'Loại phương tiện', f.kind, [['ALL', 'Tất cả'], ['vehicle', 'Xe'], ['trailer', 'Mooc']]),
@@ -77274,6 +77396,7 @@ function pageReminder() {
             <div class="plan-kpi-chip" title="Bình thường"><span class="plan-kpi-ico">✓</span><span class="plan-kpi-val text-emerald-700">${kpis.normal}</span></div>
             <div class="plan-kpi-chip" title="Sắp đến hạn"><span class="plan-kpi-ico">!</span><span class="plan-kpi-val text-amber-700">${kpis.dueSoon}</span></div>
             <div class="plan-kpi-chip" title="Quá hạn"><span class="plan-kpi-ico">‼</span><span class="plan-kpi-val text-rose-700">${kpis.overdue}</span></div>
+            <div class="plan-kpi-chip" title="Đã vượt km / tháng dự tính (Còn lại âm)"><span class="plan-kpi-ico">−</span><span class="plan-kpi-val text-rose-800">${kpis.overrun}</span></div>
           </div>
         </div>
         <div class="plan-grid-toolbar ${nSel ? 'has-sel' : ''}">
