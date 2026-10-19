@@ -66439,11 +66439,80 @@ function currentPlanGridPeriod() {
   }
   return latestPlanPeriod() || new Date().toISOString().slice(0, 7);
 }
-function addPlanLinesFromCatalog(vehicleId, period, catalogIds) {
+function addPlanSelectOptsHtml(list, selected, emptyLabel) {
+  const opts = (list || []).map((o) => {
+    const val = String(o.name != null ? o.name : (o.id || ''));
+    const label = String(o.name || o.id || '');
+    return `<option value="${esc(val)}" ${String(selected || '') === val ? 'selected' : ''}>${esc(label)}</option>`;
+  }).join('');
+  return `<option value="">${esc(emptyLabel || '—')}</option>` + opts;
+}
+function readAddPlanFormExtras() {
+  const sysSel = $('#addPlanSystem');
+  const sysId = sysSel?.value || '';
+  const sysName = sysId
+    ? (typeof systemNameById === 'function' ? systemNameById(sysId) : String(sysSel?.selectedOptions?.[0]?.textContent || '').trim())
+    : '';
+  const qty = Math.max(1, Number($('#addPlanQty')?.value) || 1);
+  const unitPriceRaw = $('#addPlanUnitPrice')?.value;
+  const unitPrice = unitPriceRaw === '' || unitPriceRaw == null ? null : Math.max(0, Number(unitPriceRaw) || 0);
+  const vat = Math.max(0, Number($('#addPlanVat')?.value));
+  const scheduleDate = String($('#addPlanScheduleDate')?.value || '').trim();
+  const workKindSel = String($('#addPlanWorkKind')?.value || '').toUpperCase();
+  const scope = typeof menuWorkScope === 'function' ? menuWorkScope() : 'MAINT';
+  const workKind = workKindSel === 'REPAIR' || workKindSel === 'MAINTENANCE'
+    ? workKindSel
+    : (scope === 'REPAIR' ? 'REPAIR' : 'MAINTENANCE');
+  return {
+    vendor: String($('#addPlanVendor')?.value || '').trim(),
+    systemId: sysId || null,
+    system: sysName || '',
+    costKind: String($('#addPlanCostKind')?.value || '').trim(),
+    groupName: String($('#addPlanNhom')?.value || '').trim(),
+    qty,
+    uom: String($('#addPlanUom')?.value || '').trim() || 'Lần',
+    unitPrice,
+    vat: Number.isFinite(vat) ? vat : 8,
+    technicianName: String($('#addPlanTechnician')?.value || '').trim(),
+    scheduleDate: scheduleDate || null,
+    note: String($('#addPlanNote')?.value || '').trim(),
+    workKind,
+    serviceManual: String($('#addPlanServiceManual')?.value || '').trim(),
+  };
+}
+function createPlanLineRecord(vehicleId, period, base, extras, nOffset) {
+  const id = Math.max(0, ...(DB.plans || []).map((p) => Number(p.id) || 0)) + 1 + (nOffset || 0);
+  const unitPrice = extras.unitPrice != null ? extras.unitPrice : (Number(base.unitPrice) || 0);
+  return {
+    id,
+    code: 'KH-' + String(period).replace('-', '') + '-' + String(id).padStart(4, '0'),
+    vehicleId: Number(vehicleId),
+    catalogId: base.catalogId != null ? base.catalogId : null,
+    period,
+    qty: extras.qty || 1,
+    uom: extras.uom || base.uom || 'Lần',
+    unitPrice,
+    vat: extras.vat != null ? extras.vat : 8,
+    vendor: extras.vendor || base.vendor || '—',
+    systemId: extras.systemId || base.systemId || null,
+    system: extras.system || base.system || '',
+    costKind: extras.costKind || base.costKind || '',
+    groupName: extras.groupName || base.groupName || '',
+    technicianName: extras.technicianName || '',
+    scheduleDate: extras.scheduleDate || null,
+    status: 'NEW',
+    source: base.source || 'MANUAL',
+    workKind: extras.workKind || base.workKind || 'MAINTENANCE',
+    service: base.service || extras.serviceManual || '—',
+    note: extras.note || base.note || '',
+    keepOnPlan: false,
+    baseSync: { status: 'NONE', code: null, baseStatus: null, lastSyncedAt: null, submittedAt: null, note: '' },
+  };
+}
+function addPlanLinesFromCatalog(vehicleId, period, catalogIds, extras) {
   const v = vehicleById(Number(vehicleId));
   if (!v) return 0;
-  const scope = typeof menuWorkScope === 'function' ? menuWorkScope() : 'MAINT';
-  const workKind = scope === 'REPAIR' ? 'REPAIR' : 'MAINTENANCE';
+  const ex = extras || {};
   let n = 0;
   (catalogIds || []).forEach((cid) => {
     const c = typeof catById === 'function' ? catById(cid) : (DB.catalog || []).find(x => String(x.id) === String(cid));
@@ -66455,38 +66524,67 @@ function addPlanLinesFromCatalog(vehicleId, period, catalogIds) {
       && !p.deferredTo
     );
     if (exists) return;
-    const id = Math.max(0, ...(DB.plans || []).map((p) => Number(p.id) || 0)) + 1 + n;
-    DB.plans.unshift({
-      id,
-      code: 'KH-' + String(period).replace('-', '') + '-' + String(id).padStart(4, '0'),
-      vehicleId: Number(vehicleId),
+    DB.plans.unshift(createPlanLineRecord(vehicleId, period, {
       catalogId: c.id,
-      period,
-      qty: 1,
-      uom: 'Lần',
-      unitPrice: Number(c.refPrice) || 0,
-      vat: 8,
-      vendor: c.supplier || '—',
-      system: c.system || '',
-      status: 'NEW',
-      source: 'MANUAL',
-      workKind,
       service: c.name,
+      system: c.system || '',
+      vendor: c.supplier || '—',
+      unitPrice: Number(c.refPrice) || 0,
+      uom: 'Lần',
+      source: 'MANUAL',
       note: 'Thêm từ lưới kế hoạch',
-      keepOnPlan: false,
-      baseSync: { status: 'NONE', code: null, baseStatus: null, lastSyncedAt: null, submittedAt: null, note: '' },
-    });
+    }, {
+      ...ex,
+      /* đơn giá trống → lấy từ danh mục; có nhập thì áp dụng chung */
+      unitPrice: ex.unitPrice != null ? ex.unitPrice : (Number(c.refPrice) || 0),
+      system: ex.system || c.system || '',
+      vendor: ex.vendor || c.supplier || '—',
+    }, n));
     n++;
   });
   return n;
+}
+function addManualPlanLine(vehicleId, period, extras) {
+  const service = String(extras?.serviceManual || '').trim();
+  if (!service) return 0;
+  const exists = (DB.plans || []).some((p) =>
+    Number(p.vehicleId) === Number(vehicleId)
+    && !p.catalogId
+    && String(p.service || '') === service
+    && String(p.period) === String(period)
+    && !p.deferredTo
+  );
+  if (exists) return 0;
+  DB.plans.unshift(createPlanLineRecord(vehicleId, period, {
+    catalogId: null,
+    service,
+    source: 'MANUAL',
+    note: 'Nhập tay từ lưới kế hoạch',
+    unitPrice: extras.unitPrice != null ? extras.unitPrice : 0,
+  }, extras, 0));
+  return 1;
 }
 function openAddPlanLinesForVehicle(vehicleId, periodHint) {
   const v = vehicleById(Number(vehicleId));
   if (!v) { toast('Không tìm thấy xe'); return; }
   let period = String(periodHint || '').trim();
   if (!/^\d{4}-\d{2}$/.test(period)) period = currentPlanGridPeriod();
+  const scope = typeof menuWorkScope === 'function' ? menuWorkScope() : 'MAINT';
+  const defaultWorkKind = scope === 'REPAIR' ? 'REPAIR' : 'MAINTENANCE';
   const cats = (DB.catalog || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
   const checked = new Set();
+  let mode = 'catalog'; /* catalog | manual */
+  const syncModeUi = () => {
+    const catBox = $('#addPlanCatalogPanel');
+    const manBox = $('#addPlanManualPanel');
+    if (catBox) catBox.classList.toggle('hidden', mode !== 'catalog');
+    if (manBox) manBox.classList.toggle('hidden', mode !== 'manual');
+    $$('[data-add-plan-mode]').forEach((b) => {
+      const on = b.getAttribute('data-add-plan-mode') === mode;
+      b.classList.toggle('btn-primary', on);
+      b.classList.toggle('btn-outline', !on);
+    });
+  };
   const renderList = () => {
     const q = String($('#addPlanCatSearch')?.value || '').trim().toLowerCase();
     const rows = cats.filter((c) => {
@@ -66523,37 +66621,94 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
       <h2 class="text-lg font-bold">Thêm kế hoạch · ${esc(v.plate || '')}</h2>
       <p class="text-sm text-slate-600">${esc(v.type || '')} · ${esc(v.brand || '')} ${esc(v.model || '')} · kỳ <span class="font-medium text-slate-800">${esc(period)}</span></p>
     </div>
-    <div class="px-5 py-4 space-y-3">
-      <div class="flex flex-wrap items-end gap-3">
-        <label class="block min-w-[140px] flex-1 text-sm font-medium text-slate-700">Kỳ (YYYY-MM)
+    <div class="px-5 py-4 space-y-4 max-h-[75vh] overflow-y-auto">
+      <div class="flex flex-wrap gap-2">
+        <button type="button" class="btn btn-primary btn-sm" data-add-plan-mode="catalog">Từ danh mục</button>
+        <button type="button" class="btn btn-outline btn-sm" data-add-plan-mode="manual">Nhập tay</button>
+      </div>
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <label class="block text-sm font-medium text-slate-700">Kỳ (YYYY-MM)
           <input id="addPlanPeriod" type="text" class="form-control" value="${esc(period)}" />
         </label>
-        <label class="block min-w-[200px] flex-[2] text-sm font-medium text-slate-700">Tìm danh mục
-          <input id="addPlanCatSearch" type="search" class="form-control" placeholder="Tên, mã, hệ thống…" autocomplete="off" />
+        <label class="block text-sm font-medium text-slate-700">Loại dịch vụ
+          <select id="addPlanWorkKind" class="form-control">
+            <option value="MAINTENANCE" ${defaultWorkKind === 'MAINTENANCE' ? 'selected' : ''}>Bảo dưỡng</option>
+            <option value="REPAIR" ${defaultWorkKind === 'REPAIR' ? 'selected' : ''}>Sửa chữa</option>
+          </select>
+        </label>
+        <label class="block text-sm font-medium text-slate-700">Nhà cung cấp
+          <select id="addPlanVendor" class="form-control">${addPlanSelectOptsHtml(vendorLookupOptions(), '', '— Chọn NCC —')}</select>
+        </label>
+        <label class="block text-sm font-medium text-slate-700">Hệ thống
+          <select id="addPlanSystem" class="form-control">
+            <option value="">— Theo danh mục / nhập tay —</option>
+            ${systemOptionsHtml('', '')}
+          </select>
+        </label>
+        <label class="block text-sm font-medium text-slate-700">Phân loại
+          <select id="addPlanCostKind" class="form-control">${addPlanSelectOptsHtml(costKindLookupOptions(), '', '—')}</select>
+        </label>
+        <label class="block text-sm font-medium text-slate-700">Nhóm
+          <select id="addPlanNhom" class="form-control">${addPlanSelectOptsHtml(nhomLookupOptions(), '', '—')}</select>
+        </label>
+        <label class="block text-sm font-medium text-slate-700">Số lượng
+          <input id="addPlanQty" type="number" min="1" class="form-control" value="1" />
+        </label>
+        <label class="block text-sm font-medium text-slate-700">ĐVT
+          <select id="addPlanUom" class="form-control">${addPlanSelectOptsHtml(uomLookupOptions(), 'Lần', '—')}</select>
+        </label>
+        <label class="block text-sm font-medium text-slate-700">Đơn giá <span class="font-normal text-slate-400">(trống = theo DM)</span>
+          <input id="addPlanUnitPrice" type="number" min="0" class="form-control" placeholder="Theo danh mục" />
+        </label>
+        <label class="block text-sm font-medium text-slate-700">% VAT
+          <input id="addPlanVat" type="number" min="0" class="form-control" value="8" />
+        </label>
+        <label class="block text-sm font-medium text-slate-700">Kỹ thuật viên
+          <select id="addPlanTechnician" class="form-control">${addPlanSelectOptsHtml(technicianLookupOptions(), '', '— Chưa gán —')}</select>
+        </label>
+        <label class="block text-sm font-medium text-slate-700">Ngày thực hiện
+          <input id="addPlanScheduleDate" type="date" class="form-control" />
         </label>
       </div>
-      <div class="overflow-hidden rounded-md border border-slate-200">
-        <div class="max-h-72 overflow-y-auto">
-          <table class="min-w-full text-sm">
-            <thead class="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
-              <tr>
-                <th class="px-3 py-2 w-10"></th>
-                <th class="px-3 py-2 text-left font-medium">Hạng mục</th>
-                <th class="px-3 py-2 text-right font-medium">Đơn giá</th>
-                <th class="px-3 py-2 text-left font-medium"></th>
-              </tr>
-            </thead>
-            <tbody id="addPlanCatBody"></tbody>
-          </table>
+      <label class="block text-sm font-medium text-slate-700">Ghi chú cho PMH
+        <input id="addPlanNote" type="text" class="form-control" placeholder="Ghi chú áp dụng cho dòng thêm…" />
+      </label>
+      <div id="addPlanCatalogPanel" class="space-y-2">
+        <label class="block text-sm font-medium text-slate-700">Tìm danh mục
+          <input id="addPlanCatSearch" type="search" class="form-control" placeholder="Tên, mã, hệ thống…" autocomplete="off" />
+        </label>
+        <div class="overflow-hidden rounded-md border border-slate-200">
+          <div class="max-h-56 overflow-y-auto">
+            <table class="min-w-full text-sm">
+              <thead class="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th class="px-3 py-2 w-10"></th>
+                  <th class="px-3 py-2 text-left font-medium">Hạng mục</th>
+                  <th class="px-3 py-2 text-right font-medium">Đơn giá DM</th>
+                  <th class="px-3 py-2 text-left font-medium"></th>
+                </tr>
+              </thead>
+              <tbody id="addPlanCatBody"></tbody>
+            </table>
+          </div>
         </div>
+        <p class="text-xs text-slate-500 m-0">Đã chọn <span id="addPlanSelCount" class="font-semibold text-slate-800">0</span> hạng mục · thông tin phía trên áp dụng chung</p>
       </div>
-      <p class="text-xs text-slate-500 m-0">Đã chọn <span id="addPlanSelCount" class="font-semibold text-slate-800">0</span> hạng mục</p>
+      <div id="addPlanManualPanel" class="hidden space-y-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-3">
+        <label class="block text-sm font-medium text-slate-700">Nội dung thực hiện <span class="text-rose-600">*</span>
+          <input id="addPlanServiceManual" type="text" class="form-control" placeholder="VD: Bảo dưỡng tổng quát tại xưởng…" />
+        </label>
+        <p class="text-xs text-slate-500 m-0">Tạo 1 dòng kế hoạch nhập tay (không gắn danh mục). Điền NCC / hệ thống / SL / đơn giá ở phía trên.</p>
+      </div>
     </div>
     <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-3">
       <button type="button" data-close class="btn btn-outline">Hủy</button>
       <button type="button" id="btnConfirmAddPlanLines" class="btn btn-primary">Thêm vào kế hoạch</button>
-    </div>`, 'max-w-3xl');
+    </div>`, 'max-w-4xl');
   $('[data-close]')?.addEventListener('click', closeModal);
+  $$('[data-add-plan-mode]').forEach((b) => {
+    b.onclick = () => { mode = b.getAttribute('data-add-plan-mode') || 'catalog'; syncModeUi(); };
+  });
   $('#addPlanCatSearch')?.addEventListener('input', renderList);
   $('#addPlanPeriod')?.addEventListener('change', () => {
     period = String($('#addPlanPeriod').value || '').trim() || period;
@@ -66562,14 +66717,23 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
   $('#btnConfirmAddPlanLines')?.addEventListener('click', () => {
     period = String($('#addPlanPeriod')?.value || period).trim();
     if (!/^\d{4}-\d{2}$/.test(period)) { toast('Kỳ không hợp lệ (YYYY-MM)'); return; }
-    if (!checked.size) { toast('Chọn ít nhất 1 hạng mục'); return; }
-    const n = addPlanLinesFromCatalog(vehicleId, period, [...checked]);
+    const extras = readAddPlanFormExtras();
+    let n = 0;
+    if (mode === 'manual') {
+      if (!extras.serviceManual) { toast('Nhập nội dung thực hiện'); return; }
+      n = addManualPlanLine(vehicleId, period, extras);
+      if (!n) { toast('Dòng nhập tay này đã có trên kỳ này'); return; }
+    } else {
+      if (!checked.size) { toast('Chọn ít nhất 1 hạng mục hoặc chuyển sang Nhập tay'); return; }
+      n = addPlanLinesFromCatalog(vehicleId, period, [...checked], extras);
+      if (!n) { toast('Các hạng mục đã có trên kế hoạch kỳ này'); render(); return; }
+    }
     if (typeof save === 'function') save();
     closeModal();
-    if (!n) { toast('Các hạng mục đã có trên kế hoạch kỳ này'); render(); return; }
     toast('Đã thêm ' + n + ' hạng mục vào kế hoạch · ' + (v.plate || '') + ' · ' + period);
     render();
   });
+  syncModeUi();
   renderList();
 }
 function deletePlanLinesByIds(ids, opts) {
