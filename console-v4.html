@@ -75368,6 +75368,10 @@ function applyTemplateToVehicles(tpl, vehicleIds, period, periodStart, periodEnd
     const ids = [];
     (tpl.items || []).forEach(it => {
       const st = it.catalogId ? getCatState(vid, it.catalogId) : { nextKm: null, nextDate: null };
+      const mats = Array.isArray(it.materials) ? it.materials : [];
+      const mat0 = mats[0] ? (materialById(mats[0].id) || mats[0]) : null;
+      if (mat0 && mat0.id) enrichMaterialPwmsFields(mat0, false);
+      const content = String(it.content || it.service || '').trim();
       const p = {
         id: uid('p'),
         period,
@@ -75376,19 +75380,26 @@ function applyTemplateToVehicles(tpl, vehicleIds, period, periodStart, periodEnd
         driver: '—',
         branch: v.area,
         catalogId: it.catalogId,
+        systemId: it.systemId || null,
         system: it.system,
-        service: it.service,
+        service: content,
+        materials: mats.map((m) => ({
+          id: m.id, code: m.code || '', name: m.name || '', uom: m.uom || 'Cái', qty: Number(m.qty) || 1,
+        })),
+        materialIds: mats.map((m) => m.id).filter(Boolean),
         qty: it.qty || 1,
-        uom: it.uom || 'Lần',
-        unitPrice: it.unitPrice || 0,
-        vat: 8,
+        uom: it.uom || mat0?.uom || 'Lần',
+        unitPrice: it.unitPrice != null ? it.unitPrice : (mat0?.refPrice != null ? Number(mat0.refPrice) || 0 : 0),
+        vat: mat0?.vat != null ? Number(mat0.vat) : 8,
         status: 'NEW',
         note: it.note || ('Theo mẫu ' + (tpl.customName || tpl.name)),
         nextKm: st.nextKm,
         nextDate: st.nextDate,
-        vendor: '—',
+        vendor: mat0?.supplier || '—',
+        costKind: mats.length ? 'Tiền Vật Tư' : 'Tiền Công',
         templateId: tpl.id,
         source: 'TEMPLATE',
+        workKind: 'MAINTENANCE',
       };
       DB.plans.unshift(p);
       ids.push(p.id);
@@ -75532,20 +75543,27 @@ function pagePlanTemplate() {
       <div class="border-b border-slate-200 px-5 py-3 text-sm font-semibold">Hạng mục trong mẫu</div>
       <table class="min-w-full text-sm">
         <thead class="bg-slate-50 text-slate-600"><tr>
-          <th class="th text-left">Danh mục / công việc</th><th class="th text-left">Hệ thống</th>
+          <th class="th text-left">Nội dung thực hiện</th>
+          <th class="th text-left">Vật tư gợi ý</th>
+          <th class="th text-left">Hệ thống</th>
           <th class="th text-right">Số lượng</th><th class="th text-right">Đơn giá</th><th class="th text-right">Thành tiền</th>
         </tr></thead>
         <tbody>
           ${(tpl.items||[]).map(it => {
-            const c = catById(it.catalogId);
-            return `<tr class="row-h">
-              <td class="td font-medium">${esc(it.service)}${c?`<div class="text-[11px] text-slate-500">${esc(c.code)}</div>`:''}</td>
-              <td class="td">${esc(it.system)}</td>
-              <td class="td text-right">${it.qty} ${esc(it.uom||'')}</td>
-              <td class="td text-right tabular-nums">${money(it.unitPrice)}</td>
-              <td class="td text-right tabular-nums">${money((it.qty||1)*(it.unitPrice||0))}</td>
+            const c = it.catalogId ? catById(it.catalogId) : null;
+            const mats = Array.isArray(it.materials) ? it.materials : [];
+            const matTxt = mats.length
+              ? mats.map((m) => (m.code ? (m.code + ' · ' + m.name) : m.name)).join('; ')
+              : '—';
+            return `<tr class="row-h align-middle">
+              <td class="td font-medium align-middle">${esc(it.content || it.service || '—')}${c?`<div class="text-[11px] text-slate-500">${esc(c.code)} · ${esc(c.name)}</div>`:''}</td>
+              <td class="td align-middle text-[12px]">${esc(matTxt)}</td>
+              <td class="td align-middle">${esc(it.system || '—')}</td>
+              <td class="td text-right align-middle">${it.qty} ${esc(it.uom||'')}</td>
+              <td class="td text-right tabular-nums align-middle">${money(it.unitPrice)}</td>
+              <td class="td text-right tabular-nums align-middle">${money((it.qty||1)*(it.unitPrice||0))}</td>
             </tr>`;
-          }).join('') || `<tr><td colspan="5" class="px-5 py-8 text-center text-slate-400">Chưa có hạng mục</td></tr>`}
+          }).join('') || `<tr><td colspan="6" class="px-5 py-8 text-center text-slate-400">Chưa có hạng mục</td></tr>`}
         </tbody>
       </table>
     </div>
@@ -81841,15 +81859,105 @@ function openCreateOrderModal(prefVehicleId, prefType, prefSource, prefCatalogId
   };
 }
 
+/** Dòng trong modal «Tạo KH nhiều hạng mục» — đơn giá từ VT gợi ý (không lấy từ danh mục). */
+function buildMultiPlanItemFromCatalog(c, opts) {
+  const content = String(c?.name || '').trim();
+  const sug = suggestMaterialsForPlanLine(content, c?.systemId, c?.system);
+  const mat0 = sug[0] || null;
+  const full = mat0 ? (materialById(mat0.id) || mat0) : null;
+  if (full) enrichMaterialPwmsFields(full, false);
+  const hasMat = !!(full && (full.id || full.code || full.name));
+  const laborOnly = isPlanLaborOnlyContent(content);
+  const unitPrice = hasMat && full.refPrice != null ? (Number(full.refPrice) || 0) : 0;
+  return {
+    catalogId: c?.id ?? null,
+    system: c?.system || '',
+    systemId: c?.systemId || null,
+    catalogName: c?.name || '',
+    catalogCode: c?.code || '',
+    content,
+    materialId: hasMat ? (full.id || null) : null,
+    materialCode: hasMat ? (full.code || '') : '',
+    materialName: hasMat ? (full.name || '') : '',
+    materials: hasMat ? [{
+      id: full.id, code: full.code || '', name: full.name || '',
+      uom: full.uom || 'Cái', qty: 1,
+    }] : [],
+    qty: 1,
+    uom: hasMat ? (full.uom || 'Cái') : (c?.uom || 'Lần'),
+    unitPrice,
+    priceFromMat: hasMat,
+    laborOnly,
+    priceDirty: false,
+    note: '',
+    checked: !!(opts && opts.checked),
+  };
+}
+function buildBlankMultiPlanItem() {
+  return {
+    catalogId: null,
+    system: '',
+    systemId: null,
+    catalogName: '',
+    catalogCode: '',
+    content: '',
+    materialId: null,
+    materialCode: '',
+    materialName: '',
+    materials: [],
+    qty: 1,
+    uom: 'Lần',
+    unitPrice: 0,
+    priceFromMat: false,
+    laborOnly: true,
+    priceDirty: false,
+    note: '',
+    checked: true,
+  };
+}
+function refreshMultiPlanItemFromContent(it) {
+  const content = String(it.content || '').trim();
+  it.laborOnly = isPlanLaborOnlyContent(content);
+  const sug = content ? suggestMaterialsForPlanLine(content, it.systemId, it.system) : [];
+  const mat0 = sug[0] || null;
+  const full = mat0 ? (materialById(mat0.id) || mat0) : null;
+  if (full) enrichMaterialPwmsFields(full, false);
+  const hasMat = !!(full && (full.id || full.code || full.name));
+  if (hasMat) {
+    it.materialId = full.id || null;
+    it.materialCode = full.code || '';
+    it.materialName = full.name || '';
+    it.materials = [{ id: full.id, code: full.code || '', name: full.name || '', uom: full.uom || 'Cái', qty: 1 }];
+    it.uom = full.uom || it.uom || 'Cái';
+    it.priceFromMat = true;
+    if (!it.priceDirty) it.unitPrice = full.refPrice != null ? (Number(full.refPrice) || 0) : 0;
+  } else {
+    it.materialId = null;
+    it.materialCode = '';
+    it.materialName = '';
+    it.materials = [];
+    it.priceFromMat = false;
+    if (!it.priceDirty) it.unitPrice = 0;
+  }
+  return it;
+}
+function multiPlanMatLabel(it) {
+  if (!it) return '';
+  if (it.materialCode || it.materialName) {
+    return it.materialCode ? (it.materialCode + ' · ' + it.materialName) : it.materialName;
+  }
+  return '';
+}
+
 function openAddPlanModal(vid) {
   const seedId = vid || (DB.vehicles[0] && DB.vehicles[0].id);
-  let items = DB.catalog.slice(0, 3).map(c => ({
-    catalogId: c.id, system: c.system, service: c.name, qty: 1, uom: 'Lần', unitPrice: 3500000, note: '', checked: true,
-  }));
-  // allow adding more from full catalog unchecked
-  DB.catalog.slice(3).forEach(c => {
-    items.push({ catalogId: c.id, system: c.system, service: c.name, qty: 1, uom: 'Lần', unitPrice: 2000000, note: '', checked: false });
-  });
+  enrichAllMaterials(false);
+  let items = (DB.catalog || []).map((c, i) => buildMultiPlanItemFromCatalog(c, { checked: i < 3 }));
+
+  const setAllChecked = (on) => {
+    items.forEach((it) => { it.checked = !!on; });
+    renderBody();
+  };
 
   const renderBody = () => {
     const v = vehicleById(Number($('#planSeedVehicle')?.value || seedId));
@@ -81859,40 +81967,155 @@ function openAddPlanModal(vid) {
     if ($('#planCustomName') && !$('#planCustomName').dataset.touched) {
       $('#planCustomName').placeholder = autoName;
     }
+    const nSel = items.filter((it) => it.checked).length;
+    const allOn = items.length > 0 && nSel === items.length;
+    const someOn = nSel > 0 && !allOn;
+    const hdr = $('#planItemsCheckAll');
+    if (hdr) {
+      hdr.checked = allOn;
+      hdr.indeterminate = someOn;
+    }
+    const selHint = $('#planItemsSelHint');
+    if (selHint) selHint.textContent = nSel ? ('Đã chọn ' + nSel + '/' + items.length) : ('0/' + items.length + ' dòng');
+
     const rows = items.map((it, idx) => {
-      const c = catById(it.catalogId);
-      return `<tr class="row-h" data-item-idx="${idx}">
-        <td class="td text-center"><input type="checkbox" data-item-check="${idx}" ${it.checked?'checked':''} class="!w-auto" /></td>
-        <td class="td"><div class="font-medium">${esc(it.service)}</div><div class="text-[11px] text-slate-500">${c?esc(c.code):''} · ${esc(it.system)}</div>
-          ${c?decisionBadge(planDecisionForCatalog(c, (getCatState(Number($('#planSeedVehicle')?.value||seedId), c.id).occurrence||0)+1)):''}</td>
-        <td class="td"><input type="number" min="1" class="!w-20" data-item-qty="${idx}" value="${it.qty}" /></td>
-        <td class="td"><input type="number" min="0" class="!w-28" data-item-price="${idx}" value="${it.unitPrice}" /></td>
-        <td class="td text-right tabular-nums">${money(it.qty * it.unitPrice)}</td>
+      const c = it.catalogId ? catById(it.catalogId) : null;
+      const matLabel = multiPlanMatLabel(it);
+      const priceHint = !String(it.content || '').trim()
+        ? 'Nhập nội dung thực hiện'
+        : (it.laborOnly
+          ? 'Tiền công — nhập tay'
+          : (it.priceFromMat ? 'Từ VT gợi ý' : 'Chưa có VT gợi ý · đơn giá = 0'));
+      const badge = c
+        ? decisionBadge(planDecisionForCatalog(c, (getCatState(Number($('#planSeedVehicle')?.value || seedId), c.id).occurrence || 0) + 1))
+        : '';
+      return `<tr class="row-h align-middle" data-item-idx="${idx}">
+        <td class="td text-center align-middle py-2">
+          <input type="checkbox" data-item-check="${idx}" ${it.checked ? 'checked' : ''} class="order-grid-row-checkbox !w-auto !m-0 align-middle" />
+        </td>
+        <td class="td align-middle py-2 min-w-[140px]">
+          <div class="font-medium text-slate-800">${esc(it.catalogName || '—')}</div>
+          <div class="text-[11px] text-slate-500">${c ? esc(c.code) : (it.catalogCode || 'Dòng trống')} · ${esc(it.system || '—')}</div>
+          ${badge}
+        </td>
+        <td class="td align-middle py-2 min-w-[200px]">
+          <input type="text" class="form-control !text-sm !py-1" data-item-content="${idx}" value="${esc(it.content || '')}" placeholder="Nội dung thực hiện…" />
+        </td>
+        <td class="td align-middle py-2 min-w-[200px]">
+          <input type="text" class="form-control !text-sm !py-1" data-item-mat="${idx}" value="${esc(matLabel)}" placeholder="${it.laborOnly ? '— (tiền công)' : 'VT gợi ý…'}" ${it.laborOnly ? 'readonly' : ''} title="${esc(priceHint)}" />
+          <div class="text-[10px] text-slate-400 mt-0.5">${esc(priceHint)}</div>
+        </td>
+        <td class="td align-middle py-2"><input type="number" min="1" class="form-control !w-20 !text-sm !py-1" data-item-qty="${idx}" value="${it.qty}" /></td>
+        <td class="td align-middle py-2">
+          <input type="number" min="0" class="form-control !w-28 !text-sm !py-1" data-item-price="${idx}" value="${it.unitPrice}" title="${esc(priceHint)}" />
+        </td>
+        <td class="td text-right tabular-nums align-middle py-2 font-medium" data-item-total="${idx}">${money(it.qty * it.unitPrice)}</td>
+        <td class="td text-center align-middle py-2">
+          <button type="button" class="btn btn-outline btn-xs text-rose-700 !border-rose-300" data-item-del="${idx}" title="Xóa dòng">Xóa</button>
+        </td>
       </tr>`;
     }).join('');
     const box = $('#planItemsBody');
-    if (box) box.innerHTML = rows;
+    if (box) box.innerHTML = rows || `<tr><td colspan="8" class="px-4 py-8 text-center text-slate-400">Chưa có dòng · bấm «+ Dòng trống» hoặc chọn từ danh mục</td></tr>`;
     bindItemEditors();
   };
 
   const bindItemEditors = () => {
-    $$('[data-item-check]').forEach(el => el.onchange = () => { items[Number(el.dataset.itemCheck)].checked = el.checked; });
-    $$('[data-item-qty]').forEach(el => el.oninput = () => {
-      items[Number(el.dataset.itemQty)].qty = Number(el.value) || 1;
-      renderBody();
+    $$('[data-item-check]').forEach((el) => {
+      el.onchange = () => {
+        items[Number(el.dataset.itemCheck)].checked = el.checked;
+        const nSel = items.filter((it) => it.checked).length;
+        const hdr = $('#planItemsCheckAll');
+        if (hdr) {
+          hdr.checked = items.length > 0 && nSel === items.length;
+          hdr.indeterminate = nSel > 0 && nSel < items.length;
+        }
+        const selHint = $('#planItemsSelHint');
+        if (selHint) selHint.textContent = nSel ? ('Đã chọn ' + nSel + '/' + items.length) : ('0/' + items.length + ' dòng');
+      };
     });
-    $$('[data-item-price]').forEach(el => el.oninput = () => {
-      items[Number(el.dataset.itemPrice)].unitPrice = Number(el.value) || 0;
-      const idx = Number(el.dataset.itemPrice);
-      const tr = $(`[data-item-idx="${idx}"]`);
-      if (tr) tr.querySelectorAll('td')[4].textContent = money(items[idx].qty * items[idx].unitPrice);
+    $$('[data-item-content]').forEach((el) => {
+      el.onchange = () => {
+        const idx = Number(el.dataset.itemContent);
+        items[idx].content = el.value;
+        items[idx].priceDirty = false;
+        refreshMultiPlanItemFromContent(items[idx]);
+        renderBody();
+      };
+      el.onkeydown = (e) => {
+        if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+      };
+    });
+    $$('[data-item-mat]').forEach((el) => {
+      el.onchange = () => {
+        const idx = Number(el.dataset.itemMat);
+        const it = items[idx];
+        const raw = String(el.value || '').trim();
+        if (!raw) {
+          it.materialId = null; it.materialCode = ''; it.materialName = '';
+          it.materials = []; it.priceFromMat = false;
+          if (!it.priceDirty) it.unitPrice = 0;
+          renderBody();
+          return;
+        }
+        const parts = raw.split('·').map((s) => s.trim());
+        const code = parts.length > 1 ? parts[0] : '';
+        const name = parts.length > 1 ? parts.slice(1).join(' · ') : parts[0];
+        const found = (DB.materials || []).find((m) =>
+          (code && String(m.code || '') === code)
+          || String(m.name || '').toLowerCase() === name.toLowerCase()
+          || `${m.code || ''} · ${m.name || ''}` === raw
+        );
+        if (found) {
+          enrichMaterialPwmsFields(found, false);
+          it.materialId = found.id;
+          it.materialCode = found.code || '';
+          it.materialName = found.name || '';
+          it.materials = [{ id: found.id, code: found.code || '', name: found.name || '', uom: found.uom || 'Cái', qty: 1 }];
+          it.uom = found.uom || it.uom;
+          it.priceFromMat = true;
+          it.priceDirty = false;
+          it.unitPrice = found.refPrice != null ? (Number(found.refPrice) || 0) : 0;
+        } else {
+          it.materialId = null;
+          it.materialCode = code || '';
+          it.materialName = name || raw;
+          it.materials = [{ id: null, code: it.materialCode, name: it.materialName, uom: it.uom || 'Cái', qty: 1 }];
+          it.priceFromMat = false;
+        }
+        renderBody();
+      };
+    });
+    $$('[data-item-qty]').forEach((el) => {
+      el.oninput = () => {
+        const idx = Number(el.dataset.itemQty);
+        items[idx].qty = Number(el.value) || 1;
+        const tot = $(`[data-item-total="${idx}"]`);
+        if (tot) tot.textContent = money(items[idx].qty * items[idx].unitPrice);
+      };
+    });
+    $$('[data-item-price]').forEach((el) => {
+      el.oninput = () => {
+        const idx = Number(el.dataset.itemPrice);
+        items[idx].unitPrice = Number(el.value) || 0;
+        items[idx].priceDirty = true;
+        const tot = $(`[data-item-total="${idx}"]`);
+        if (tot) tot.textContent = money(items[idx].qty * items[idx].unitPrice);
+      };
+    });
+    $$('[data-item-del]').forEach((el) => {
+      el.onclick = () => {
+        const idx = Number(el.dataset.itemDel);
+        items.splice(idx, 1);
+        renderBody();
+      };
     });
   };
 
   openModal(`
     <div class="border-b border-slate-200 px-5 py-4">
       <h2 class="text-lg font-bold">Tạo kế hoạch · nhiều hạng mục</h2>
-      <p class="text-sm text-slate-600">Chọn xe gốc (để đặt tên mẫu) · kỳ · tick nhiều danh mục BD · lưu thành mẫu để áp dụng xe khác</p>
+      <p class="text-sm text-slate-600">Đơn giá / thành tiền lấy từ <strong>nội dung thực hiện</strong> + <strong>vật tư gợi ý</strong> — không lấy từ danh mục.</p>
     </div>
     <div class="px-5 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -81919,12 +82142,27 @@ function openAddPlanModal(vid) {
         </label>
       </div>
       <div class="overflow-hidden rounded-md border border-slate-200">
-        <div class="border-b border-slate-200 bg-white px-3 py-2 text-sm font-semibold">Hạng mục bảo dưỡng (tick nhiều dòng)</div>
-        <div class="overflow-x-auto max-h-64">
+        <div class="border-b border-slate-200 bg-white px-3 py-2 flex flex-wrap items-center gap-2">
+          <span class="text-sm font-semibold">Hạng mục bảo dưỡng</span>
+          <span id="planItemsSelHint" class="text-xs text-slate-500 tabular-nums">0 dòng</span>
+          <span class="flex-1"></span>
+          <button type="button" class="btn btn-outline btn-xs" id="btnPlanItemsSelectAll">Chọn tất cả</button>
+          <button type="button" class="btn btn-outline btn-xs" id="btnPlanItemsClearAll">Bỏ chọn tất cả</button>
+          <button type="button" class="btn btn-outline btn-xs" id="btnPlanItemsAddBlank">+ Dòng trống</button>
+        </div>
+        <div class="overflow-x-auto max-h-72">
           <table class="min-w-full text-sm">
-            <thead class="bg-slate-50 text-slate-600 sticky top-0"><tr>
-              <th class="th w-10"></th><th class="th text-left">Hạng mục</th>
-              <th class="th text-left">Số lượng</th><th class="th text-left">Đơn giá</th><th class="th text-right">Thành tiền</th>
+            <thead class="bg-slate-50 text-slate-600 sticky top-0 z-[1]"><tr>
+              <th class="th w-10 text-center align-middle py-2">
+                <input type="checkbox" id="planItemsCheckAll" class="order-grid-row-checkbox !w-auto !m-0" title="Chọn / bỏ chọn tất cả" />
+              </th>
+              <th class="th text-left align-middle">Danh mục</th>
+              <th class="th text-left align-middle">Nội dung thực hiện</th>
+              <th class="th text-left align-middle">Vật tư gợi ý</th>
+              <th class="th text-left align-middle">SL</th>
+              <th class="th text-left align-middle">Đơn giá</th>
+              <th class="th text-right align-middle">Thành tiền</th>
+              <th class="th w-14"></th>
             </tr></thead>
             <tbody id="planItemsBody"></tbody>
           </table>
@@ -81935,7 +82173,7 @@ function openAddPlanModal(vid) {
       <button type="button" data-close class="btn btn-outline">Hủy</button>
       <button type="button" id="btnSavePlanVehicleOnly" class="btn btn-outline">Chỉ tạo cho xe gốc</button>
       <button type="button" id="btnSaveAsTemplate" class="btn btn-primary">Lưu thành mẫu</button>
-    </div>`, 'max-w-4xl');
+    </div>`, 'max-w-6xl');
 
   const collectSelected = () => items.filter(it => it.checked);
   const syncNameFields = () => renderBody();
@@ -81944,11 +82182,23 @@ function openAddPlanModal(vid) {
   $('#planPeriod').oninput = syncNameFields;
   $('#planCustomName').addEventListener('input', () => { $('#planCustomName').dataset.touched = '1'; });
   $('[data-close]').onclick = closeModal;
+  $('#btnPlanItemsSelectAll').onclick = () => setAllChecked(true);
+  $('#btnPlanItemsClearAll').onclick = () => setAllChecked(false);
+  $('#planItemsCheckAll').onchange = (e) => setAllChecked(e.target.checked);
+  $('#btnPlanItemsAddBlank').onclick = () => {
+    items.unshift(buildBlankMultiPlanItem());
+    renderBody();
+  };
   renderBody();
 
   const saveTemplate = (applySeed) => {
     const selected = collectSelected();
     if (!selected.length) { toast('Chọn ít nhất 1 hạng mục'); return null; }
+    const missingContent = selected.filter((it) => !String(it.content || '').trim());
+    if (missingContent.length) {
+      toast('Có ' + missingContent.length + ' dòng chưa có nội dung thực hiện');
+      return null;
+    }
     const v = vehicleById(Number($('#planSeedVehicle').value));
     const period = $('#planPeriod').value.trim() || '2026-10';
     const periodStart = $('#planStart').value || null;
@@ -81968,8 +82218,18 @@ function openAddPlanModal(vid) {
       year: v.year ?? null,
       seedVehicleId: v.id,
       items: selected.map(it => ({
-        catalogId: it.catalogId, system: it.system, service: it.service,
-        qty: it.qty, uom: it.uom, unitPrice: it.unitPrice, note: it.note || '',
+        catalogId: it.catalogId,
+        system: it.system,
+        systemId: it.systemId || null,
+        service: it.content || it.catalogName || '',
+        content: it.content || '',
+        materials: (it.materials || []).map((m) => ({
+          id: m.id, code: m.code || '', name: m.name || '', uom: m.uom || 'Cái', qty: Number(m.qty) || 1,
+        })),
+        qty: it.qty,
+        uom: it.uom,
+        unitPrice: it.unitPrice,
+        note: it.note || '',
       })),
       applications: [],
       createdAt: new Date().toISOString().slice(0, 10),
@@ -81994,7 +82254,6 @@ function openAddPlanModal(vid) {
   $('#btnSavePlanVehicleOnly').onclick = () => {
     const tpl = saveTemplate(true);
     if (!tpl) return;
-    // still save as template (master) but land on vehicle plans
     closeModal();
     if (!goVehicleDetail(tpl.seedVehicleId, { vehicleTab: 'catalog' })) {
       view = { ...view, name: menuPlansNav(), plansTab: 'lines' };
