@@ -66318,8 +66318,10 @@ function planSidePanelHtml(g) {
             <label class="inline-flex items-center gap-1.5 font-medium text-slate-800">
               <input type="checkbox" class="pg-check-all" data-group-key="${esc(g.key)}" /> Chọn tất cả chưa vào phiếu
             </label>
-            <button type="button" class="btn btn-primary btn-xs" data-plan-group-order-selected="${esc(g.key)}">Tạo phiếu từ đã chọn</button>
+            <button type="button" class="btn btn-primary btn-xs" data-add-plan-lines="${esc(g.vehicleId)}" data-period="${esc(g.period || '')}">+ Thêm hạng mục</button>
+            <button type="button" class="btn btn-outline btn-xs" data-plan-group-order-selected="${esc(g.key)}">Tạo phiếu từ đã chọn</button>
             <button type="button" class="btn btn-outline btn-xs" data-plan-keep-selected="${esc(g.key)}">Giữ trên kế hoạch</button>
+            ${(g.lines || []).length ? `<button type="button" class="btn btn-outline btn-xs text-rose-700 !border-rose-300" data-del-plan-veh="${esc(g.vehicleId)}" data-period="${esc(g.period || '')}">Xoá kế hoạch kỳ này</button>` : ''}
           </div>
           <p class="mt-1 text-[11px] text-slate-500">${unlinked.length} dòng chưa vào phiếu</p>
           <div class="mt-2">${planGroupOrderButtonHtml(g)}</div>
@@ -66427,6 +66429,164 @@ function copyPlanGroupLinesToNextMonth(g) {
     n++;
   });
   return { n, next };
+}
+function currentPlanGridPeriod() {
+  ensurePlanGridDefaultPeriod();
+  const y = view.planGridColFilters?.year;
+  const m = view.planGridColFilters?.month;
+  if (!view.planShowAllPeriods && y && m && String(y) !== '—' && String(m) !== '—') {
+    return String(y) + '-' + String(m).padStart(2, '0');
+  }
+  return latestPlanPeriod() || new Date().toISOString().slice(0, 7);
+}
+function addPlanLinesFromCatalog(vehicleId, period, catalogIds) {
+  const v = vehicleById(Number(vehicleId));
+  if (!v) return 0;
+  const scope = typeof menuWorkScope === 'function' ? menuWorkScope() : 'MAINT';
+  const workKind = scope === 'REPAIR' ? 'REPAIR' : 'MAINTENANCE';
+  let n = 0;
+  (catalogIds || []).forEach((cid) => {
+    const c = typeof catById === 'function' ? catById(cid) : (DB.catalog || []).find(x => String(x.id) === String(cid));
+    if (!c) return;
+    const exists = (DB.plans || []).some((p) =>
+      Number(p.vehicleId) === Number(vehicleId)
+      && Number(p.catalogId) === Number(c.id)
+      && String(p.period) === String(period)
+      && !p.deferredTo
+    );
+    if (exists) return;
+    const id = Math.max(0, ...(DB.plans || []).map((p) => Number(p.id) || 0)) + 1 + n;
+    DB.plans.unshift({
+      id,
+      code: 'KH-' + String(period).replace('-', '') + '-' + String(id).padStart(4, '0'),
+      vehicleId: Number(vehicleId),
+      catalogId: c.id,
+      period,
+      qty: 1,
+      uom: 'Lần',
+      unitPrice: Number(c.refPrice) || 0,
+      vat: 8,
+      vendor: c.supplier || '—',
+      system: c.system || '',
+      status: 'NEW',
+      source: 'MANUAL',
+      workKind,
+      service: c.name,
+      note: 'Thêm từ lưới kế hoạch',
+      keepOnPlan: false,
+      baseSync: { status: 'NONE', code: null, baseStatus: null, lastSyncedAt: null, submittedAt: null, note: '' },
+    });
+    n++;
+  });
+  return n;
+}
+function openAddPlanLinesForVehicle(vehicleId, periodHint) {
+  const v = vehicleById(Number(vehicleId));
+  if (!v) { toast('Không tìm thấy xe'); return; }
+  let period = String(periodHint || '').trim();
+  if (!/^\d{4}-\d{2}$/.test(period)) period = currentPlanGridPeriod();
+  const cats = (DB.catalog || []).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'vi'));
+  const checked = new Set();
+  const renderList = () => {
+    const q = String($('#addPlanCatSearch')?.value || '').trim().toLowerCase();
+    const rows = cats.filter((c) => {
+      if (!q) return true;
+      return [c.code, c.name, c.system, c.serviceType].join(' ').toLowerCase().includes(q);
+    }).map((c) => {
+      const on = checked.has(String(c.id));
+      const already = (DB.plans || []).some((p) =>
+        Number(p.vehicleId) === Number(vehicleId)
+        && Number(p.catalogId) === Number(c.id)
+        && String(p.period) === String(period)
+        && !p.deferredTo
+      );
+      return `<tr class="border-t border-slate-100 ${already ? 'bg-slate-50 text-slate-400' : ''}">
+        <td class="px-3 py-2 text-center"><input type="checkbox" data-add-plan-cid="${esc(c.id)}" ${on ? 'checked' : ''} ${already ? 'disabled' : ''} /></td>
+        <td class="px-3 py-2"><div class="font-medium text-slate-900">${esc(c.name)}</div><div class="text-[11px] text-slate-500">${esc(c.code || '')} · ${esc(c.system || '—')}</div></td>
+        <td class="px-3 py-2 text-right tabular-nums">${money(c.refPrice || 0)}</td>
+        <td class="px-3 py-2 text-[11px]">${already ? 'Đã có kỳ này' : ''}</td>
+      </tr>`;
+    }).join('');
+    const box = $('#addPlanCatBody');
+    if (box) box.innerHTML = rows || `<tr><td colspan="4" class="px-3 py-8 text-center text-slate-500">Không có danh mục khớp</td></tr>`;
+    $$('[data-add-plan-cid]').forEach((el) => {
+      el.onchange = () => {
+        const id = String(el.getAttribute('data-add-plan-cid'));
+        if (el.checked) checked.add(id); else checked.delete(id);
+        const nEl = $('#addPlanSelCount');
+        if (nEl) nEl.textContent = String(checked.size);
+      };
+    });
+  };
+  openModal(`
+    <div class="border-b border-slate-200 px-5 py-4">
+      <h2 class="text-lg font-bold">Thêm kế hoạch · ${esc(v.plate || '')}</h2>
+      <p class="text-sm text-slate-600">${esc(v.type || '')} · ${esc(v.brand || '')} ${esc(v.model || '')} · kỳ <span class="font-medium text-slate-800">${esc(period)}</span></p>
+    </div>
+    <div class="px-5 py-4 space-y-3">
+      <div class="flex flex-wrap items-end gap-3">
+        <label class="block min-w-[140px] flex-1 text-sm font-medium text-slate-700">Kỳ (YYYY-MM)
+          <input id="addPlanPeriod" type="text" class="form-control" value="${esc(period)}" />
+        </label>
+        <label class="block min-w-[200px] flex-[2] text-sm font-medium text-slate-700">Tìm danh mục
+          <input id="addPlanCatSearch" type="search" class="form-control" placeholder="Tên, mã, hệ thống…" autocomplete="off" />
+        </label>
+      </div>
+      <div class="overflow-hidden rounded-md border border-slate-200">
+        <div class="max-h-72 overflow-y-auto">
+          <table class="min-w-full text-sm">
+            <thead class="sticky top-0 bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+              <tr>
+                <th class="px-3 py-2 w-10"></th>
+                <th class="px-3 py-2 text-left font-medium">Hạng mục</th>
+                <th class="px-3 py-2 text-right font-medium">Đơn giá</th>
+                <th class="px-3 py-2 text-left font-medium"></th>
+              </tr>
+            </thead>
+            <tbody id="addPlanCatBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <p class="text-xs text-slate-500 m-0">Đã chọn <span id="addPlanSelCount" class="font-semibold text-slate-800">0</span> hạng mục</p>
+    </div>
+    <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 px-5 py-3">
+      <button type="button" data-close class="btn btn-outline">Hủy</button>
+      <button type="button" id="btnConfirmAddPlanLines" class="btn btn-primary">Thêm vào kế hoạch</button>
+    </div>`, 'max-w-3xl');
+  $('[data-close]')?.addEventListener('click', closeModal);
+  $('#addPlanCatSearch')?.addEventListener('input', renderList);
+  $('#addPlanPeriod')?.addEventListener('change', () => {
+    period = String($('#addPlanPeriod').value || '').trim() || period;
+    renderList();
+  });
+  $('#btnConfirmAddPlanLines')?.addEventListener('click', () => {
+    period = String($('#addPlanPeriod')?.value || period).trim();
+    if (!/^\d{4}-\d{2}$/.test(period)) { toast('Kỳ không hợp lệ (YYYY-MM)'); return; }
+    if (!checked.size) { toast('Chọn ít nhất 1 hạng mục'); return; }
+    const n = addPlanLinesFromCatalog(vehicleId, period, [...checked]);
+    if (typeof save === 'function') save();
+    closeModal();
+    if (!n) { toast('Các hạng mục đã có trên kế hoạch kỳ này'); render(); return; }
+    toast('Đã thêm ' + n + ' hạng mục vào kế hoạch · ' + (v.plate || '') + ' · ' + period);
+    render();
+  });
+  renderList();
+}
+function deletePlanLinesByIds(ids, opts) {
+  const set = new Set((ids || []).map(String).filter(Boolean));
+  if (!set.size) { toast('Không có hạng mục để xóa'); return 0; }
+  const targets = (DB.plans || []).filter((p) => set.has(String(p.id)));
+  if (!targets.length) { toast('Không tìm thấy hạng mục'); return 0; }
+  const label = targets.length === 1
+    ? ('«' + (targets[0].service || targets[0].code || targets[0].id) + '»')
+    : (targets.length + ' hạng mục');
+  if (!opts?.silent && !confirm('Xóa ' + label + ' khỏi kế hoạch?')) return 0;
+  DB.plans = (DB.plans || []).filter((p) => !set.has(String(p.id)));
+  view.checkedPlanLineIds = (view.checkedPlanLineIds || []).filter((id) => !set.has(String(id)));
+  if (typeof save === 'function') save();
+  toast('Đã xóa ' + targets.length + ' hạng mục kế hoạch');
+  if (!opts?.noRender) render();
+  return targets.length;
 }
 function doPlanThisMonth(key) {
   const g = (window._planGridGroups || []).find(x => x.key === key);
@@ -66685,6 +66845,7 @@ function showPlanCtx(ev, item) {
   if (!el) return;
   el.classList.remove('hidden');
   const bits = item.__vehGroup ? [
+    slickMenuItem('add-plan', 'plus', 'Thêm kế hoạch cho xe này'),
     slickMenuItem('detail', 'file', 'Xem chi tiết xe · kỳ'),
     unlinked.length
       ? slickMenuItem('do-now', 'calCheck', 'Làm tháng này (tạo phiếu)')
@@ -66700,6 +66861,7 @@ function showPlanCtx(ev, item) {
     slickMenuItem('submit-base-veh', 'files', 'Trình BASE cả xe'),
     slickMenuItem('sync-base-veh', 'refresh', 'Đồng bộ BASE cả xe'),
     planCheckedLineIds().length > 1 ? slickMenuItem('bulk-order', 'files', 'Tạo phiếu ' + planCheckedLineIds().length + ' hạng mục đã chọn') : '',
+    (item.lineIds || []).length ? slickMenuItem('delete-veh', 'x', 'Xoá kế hoạch xe này (' + (item.lineIds || []).length + ')') : '',
   ] : [
     slickMenuItem('detail', 'file', 'Xem hạng mục'),
     unlinked.length
@@ -66718,6 +66880,9 @@ function showPlanCtx(ev, item) {
     item.lineId ? slickMenuItem('sync-base-veh', 'refresh', 'Đồng bộ BASE cả xe') : '',
     planCheckedLineIds().length ? slickMenuItem('keep', 'pin', 'Giữ trên kế hoạch') : '',
     planCheckedLineIds().length ? slickMenuItem('copy-next', 'cal', 'Sao chép sang tháng sau') : '',
+    `<div class="slick-menu-item slick-menu-item-divider"></div>`,
+    item.lineId ? slickMenuItem('delete-line', 'x', 'Xoá hạng mục này') : '',
+    planCheckedLineIds().length ? slickMenuItem('delete-sel', 'x', 'Xoá hạng mục đã chọn (' + planCheckedLineIds().length + ')') : '',
   ];
   el.innerHTML = bits.filter(Boolean).join('');
   const x = Math.min(ev.clientX, window.innerWidth - 280);
@@ -66734,6 +66899,27 @@ function showPlanCtx(ev, item) {
   });
 }
 function runPlanCtx(act, g, item) {
+  if (act === 'add-plan') {
+    const period = item?.period && /^\d{4}-\d{2}$/.test(String(item.period)) ? item.period : (g?.period || '');
+    openAddPlanLinesForVehicle(item?.vehicleId || g?.vehicleId, period);
+    return;
+  }
+  if (act === 'delete-line') {
+    const lid = planLineIdOfRow(item) || item?.lineId;
+    if (lid) deletePlanLinesByIds([lid]);
+    return;
+  }
+  if (act === 'delete-sel') {
+    deletePlanLinesByIds(planCheckedLineIds());
+    return;
+  }
+  if (act === 'delete-veh') {
+    const ids = item?.__vehGroup
+      ? (item.lineIds || [])
+      : (window._planGridData || []).filter(r => !r.__vehGroup && String(r.vehicleId) === String(item?.vehicleId || g?.vehicleId)).map(r => r.lineId);
+    deletePlanLinesByIds(ids);
+    return;
+  }
   if (act === 'detail') { openPlanPanel(g.key); return; }
   if (act === 'order' || act === 'do-now') { doPlanThisMonth(g.key); return; }
   if (act === 'defer') { deferPlanToNextMonth(g.key); return; }
@@ -67223,7 +67409,7 @@ function planTreeToggleBtnHtml(item) {
 function planGroupTitleCellHtml(item) {
   if (!item || !item.__vehGroup) return '';
   const title = item.groupTitle || item.content || '';
-  return `<span class="plan-group-title-cell" data-plan-group-toggle-row="1" data-vehicle-id="${esc(item.vehicleId)}">${planTreeToggleBtnHtml(item)}<span class="plan-group-title-text" title="${esc(title)}">${esc(title)}</span></span>`;
+  return `<span class="plan-group-title-cell" data-vehicle-id="${esc(item.vehicleId)}" title="Bấm để thêm kế hoạch · chevron để thu/mở nhóm">${planTreeToggleBtnHtml(item)}<span class="plan-group-title-text" title="${esc(title)} · bấm để thêm kế hoạch">${esc(title)}</span></span>`;
 }
 function mountPlanGridFallback(host, rows) {
   const head = `<th class="w-10"><input type="checkbox" id="planGridCheckAll" class="order-grid-select-all-checkbox" /></th><th>#</th><th>Năm</th><th>Tháng</th><th>Số xe</th><th>Số mooc</th><th>Áp dụng cho</th><th>PT ID</th><th>Nội dung thực hiện</th><th>Nhà cung cấp</th><th>Dịch vụ</th><th>Phân loại</th><th>Hệ thống</th><th>Nhóm</th><th class="text-right">Số lượng</th><th>ĐVT</th><th class="text-right">Đơn giá</th><th class="text-right">% VAT</th><th class="text-right">Thành tiền</th><th class="text-right">Tổng tiền</th><th>Ghi chú cho PMH</th><th>Kỹ thuật viên</th><th>Ngày thực hiện</th><th>BASE</th><th></th>`;
@@ -67263,6 +67449,16 @@ function mountPlanGridFallback(host, rows) {
         || rows.find(r => r.__vehGroup && String(r.vehicleId) === String(vid))
         || rows.find(r => r.key === tr.dataset.gkey);
       showPlanCtx(e, item);
+    };
+    tr.onclick = (e) => {
+      if (e.target && e.target.closest && (e.target.closest('input,button,a,[data-plan-tree-toggle]'))) return;
+      const vid = tr.getAttribute('data-vehicle-id');
+      const lid = tr.getAttribute('data-line-id');
+      if (lid) return; /* chỉ dòng group xe mới mở thêm kế hoạch */
+      const item = rows.find(r => r.__vehGroup && String(r.vehicleId) === String(vid));
+      if (!item) return;
+      const period = item.period && /^\d{4}-\d{2}$/.test(String(item.period)) ? item.period : '';
+      openAddPlanLinesForVehicle(item.vehicleId, period);
     };
   });
   host.querySelectorAll('[data-plan-schedule]').forEach(b => b.onclick = (e) => { e.stopPropagation(); schedulePlanGroupToDate(b.dataset.planSchedule); });
@@ -69204,7 +69400,7 @@ function mountPlanSlickGrid() {
   host._planTreeToggleAt = 0;
   host._planTreeToggleBound = (ev) => {
     const t = ev.target;
-    const toggleEl = t && t.closest && t.closest('[data-plan-tree-toggle], .slick-group-toggle, [data-plan-group-toggle-row]');
+    const toggleEl = t && t.closest && t.closest('[data-plan-tree-toggle], .slick-group-toggle');
     if (!toggleEl) return;
     /* không chặn khi bấm link biển số / checkbox trong cùng hàng */
     if (t.closest && (t.closest('[data-open-vehicle]') || t.closest('input.pg-row, input[type="checkbox"]'))) return;
@@ -69229,7 +69425,7 @@ function mountPlanSlickGrid() {
     if (!item) return;
     const native = (e && e.getNativeEvent && e.getNativeEvent()) || e;
     const t = native.target || e.target;
-    const toggleEl = t && t.closest && t.closest('[data-plan-tree-toggle], .slick-group-toggle, [data-plan-group-toggle-row]');
+    const toggleEl = t && t.closest && t.closest('[data-plan-tree-toggle], .slick-group-toggle');
     if (toggleEl) {
       if (native.stopImmediatePropagation) native.stopImmediatePropagation();
       if (native.stopPropagation) native.stopPropagation();
@@ -69272,9 +69468,10 @@ function mountPlanSlickGrid() {
       goVehicleDetail(veh.dataset.openVehicle, { from: menuPlansNav() });
       return;
     }
-    /* Click hàng group (ngoài checkbox/link): thu-mở — panel mở bằng double-click */
+    /* Click hàng group (ngoài chevron/checkbox): thêm kế hoạch cho xe — panel mở bằng double-click */
     if (item.__vehGroup) {
-      togglePlanVehicleGroupCollapse(item);
+      const period = item.period && /^\d{4}-\d{2}$/.test(String(item.period)) ? item.period : '';
+      openAddPlanLinesForVehicle(item.vehicleId, period);
       return;
     }
   });
@@ -69349,7 +69546,20 @@ function bindPlanSidePanel() {
       if (cb.dataset.groupKey === key && !cb.disabled) cb.checked = el.checked;
     });
   });
-  $$('[data-del-plan]', panel).forEach(b => b.onclick = () => { DB.plans = DB.plans.filter(p => p.id !== b.dataset.delPlan); toast('Đã xóa'); render(); });
+  $$('[data-del-plan]', panel).forEach(b => b.onclick = () => { deletePlanLinesByIds([b.dataset.delPlan]); });
+  $$('[data-add-plan-lines]', panel).forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    openAddPlanLinesForVehicle(b.dataset.addPlanLines, b.getAttribute('data-period') || '');
+  });
+  $$('[data-del-plan-veh]', panel).forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    const vid = b.dataset.delPlanVeh;
+    const period = b.getAttribute('data-period') || '';
+    const ids = (DB.plans || [])
+      .filter((p) => Number(p.vehicleId) === Number(vid) && (!period || !/^\d{4}-\d{2}$/.test(period) || String(p.period) === String(period)))
+      .map((p) => p.id);
+    deletePlanLinesByIds(ids);
+  });
   $$('[data-open-template]', panel).forEach(b => b.onclick = (e) => {
     e.stopPropagation();
     view = { ...view, name: 'planTemplate', templateId: b.dataset.openTemplate, plansTab: 'templates', batchBranch: null, batchSelectedIds: [], batchPeriodDraft: null, batchStartDraft: null, batchEndDraft: null };
@@ -83049,7 +83259,7 @@ function bind() {
     const periodEnd = $('#batchEnd')?.value || null;
     openBatchApplyConfirmModal(tpl, ids, period, periodStart, periodEnd);
   });
-  $$('[data-del-plan]').forEach(b => b.onclick = () => { DB.plans = DB.plans.filter(p => p.id !== b.dataset.delPlan); toast('Đã xóa'); render(); });
+  $$('[data-del-plan]').forEach(b => b.onclick = () => { deletePlanLinesByIds([b.dataset.delPlan]); });
   bindPlanSidePanel();
   bindPlanGridToolbar();
   if (!window._planCtxHideBound) {
