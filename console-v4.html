@@ -64964,6 +64964,81 @@ function materialsForPlanSystem(systemId, systemName) {
   });
   return (matched.length ? matched : all).slice(0, 80);
 }
+function normalizePlanMatchKey(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+/** Dòng nhân công / công BD — không gắn vật tư mẫu */
+function isPlanLaborOnlyContent(service) {
+  const s = normalizePlanMatchKey(service);
+  if (!s) return true;
+  if (/loc |nhot|dau nhot|mo bo|multifak|vo lop|lop |ac quy|acquy|phin|gioi|phu tung|delo|15w|filter/.test(s)) return false;
+  return /^(cong |bao duong xe|kiem tra danh gia|rua xe|ve sinh)/.test(s)
+    || /cong bao duong|bao duong xe tai|bao duong dinh ki|tien cong|nhan cong|cong viec/.test(s);
+}
+/**
+ * Gợi ý vật tư khớp nội dung hạng mục (tên / mã / nhóm từ khóa).
+ * Trả [] nếu là dòng công hoặc không tìm thấy khớp hợp lý — không fallback sang VT ngẫu nhiên.
+ */
+function suggestMaterialsForPlanLine(pOrService, systemId, systemName) {
+  enrichAllMaterials(false);
+  const service = typeof pOrService === 'string'
+    ? pOrService
+    : String(pOrService?.service || pOrService?.content || '').trim();
+  if (!service || isPlanLaborOnlyContent(service)) return [];
+  const svcKey = normalizePlanMatchKey(service);
+  const codes = String(service).match(/[0-9]{6,}/g) || [];
+  const pool = (DB.materials || []).filter((m) => !m.localOnly);
+  const scoreMat = (m) => {
+    const mk = normalizePlanMatchKey(m.name);
+    const ck = normalizePlanMatchKey(m.code);
+    let score = 0;
+    if (mk && (mk === svcKey || svcKey.includes(mk) || mk.includes(svcKey))) score += 100;
+    if (codes.some((c) => (m.code || '').includes(c) || (m.name || '').includes(c))) score += 80;
+    const st = svcKey.split(/\s+/).filter((t) => t.length > 2);
+    const mt = mk.split(/\s+/).filter((t) => t.length > 2);
+    const overlap = mt.filter((t) => st.includes(t));
+    score += overlap.length * 12;
+    if (overlap.some((t) => t.length >= 5)) score += 20;
+    if (ck && svcKey.includes(ck.replace(/\s+/g, ''))) score += 40;
+    return score;
+  };
+  let ranked = pool.map((m) => ({ m, score: scoreMat(m) })).filter((x) => x.score >= 24);
+  if (!ranked.length) {
+    const keywordRules = [
+      [/nhot|dau nhot|delo|15w40|15w 40|ci4|ultra/, /nhot|delo|15w40|dau nhot|ci4/],
+      [/loc nhot|loc dau|d6cc|d6ac|319458|263258|263208/, /loc nhot|loc dau|d6cc|d6ac|319458|263258|263208/],
+      [/loc nhien|loc diezel|loc diesel|319457/, /loc nhien|loc diezel|loc diesel|319457/],
+      [/mo bo|multifak|epl2|ep l2|ep3|ep 3/, /mo bo|multifak|epl2|ep3/],
+      [/vo lop|lop |tire|385\/|11r|295\//, /lop|tire|385|11r|295/],
+      [/ac quy|acquy|battery|n200|n150/, /ac quy|acquy|battery|n200|n150/],
+    ];
+    for (const [svcRe, matRe] of keywordRules) {
+      if (!svcRe.test(svcKey)) continue;
+      ranked = pool
+        .filter((m) => matRe.test(normalizePlanMatchKey(`${m.name} ${m.code}`)))
+        .map((m) => ({ m, score: 30 + scoreMat(m) }));
+      if (ranked.length) break;
+    }
+  }
+  ranked.sort((a, b) => b.score - a.score || String(a.m.name).localeCompare(String(b.m.name), 'vi'));
+  /* Chỉ lấy khớp tốt nhất; nếu điểm thấp và không trùng tên gần → bỏ */
+  if (!ranked.length) return [];
+  const best = ranked[0];
+  if (best.score < 30 && !svcKey.includes(normalizePlanMatchKey(best.m.name).slice(0, 12))) return [];
+  return [{
+    id: best.m.id,
+    code: best.m.code || '',
+    name: best.m.name || '',
+    uom: best.m.uom || 'Cái',
+    qty: 1,
+  }];
+}
 function contentOptionsForPlanSystem(systemId, systemName) {
   const sys = systemId ? vehicleSystemById(systemId) : null;
   const name = String(sys?.name || systemName || '').trim();
@@ -66110,16 +66185,15 @@ function planPmhNote(g) {
   return notes.join('; ');
 }
 function ensurePlanAssignSeed() {
-  /* 2 = đã seed KTV/ngày + vật tư mẫu trên dòng KH */
-  if (DB._planAssignSeeded === 2) return;
-  const alreadyTech = DB._planAssignSeeded === true || DB._planAssignSeeded === 1;
-  DB._planAssignSeeded = 2;
+  /* 3 = KTV/ngày + vật tư khớp theo nội dung (không gán VT ngẫu nhiên) */
+  if (DB._planAssignSeeded === 3) return;
+  const alreadyTech = DB._planAssignSeeded === true || DB._planAssignSeeded === 1 || DB._planAssignSeeded === 2;
+  DB._planAssignSeeded = 3;
   const techs = typeof technicianLookupOptions === 'function' ? technicianLookupOptions() : [];
   const names = techs.length
     ? techs.map(t => t.name).filter(Boolean)
     : ['Nguyễn Văn An', 'Trần Minh Tuấn', 'Lê Quốc Huy', 'Phạm Thu Hà'];
   enrichAllMaterials(false);
-  const matsPool = (DB.materials || []).filter((m) => !m.localOnly);
   (DB.plans || []).forEach((p, i) => {
     if (!alreadyTech) {
       if (!p.technicianName && i % 3 === 0) p.technicianName = names[i % names.length];
@@ -66129,15 +66203,14 @@ function ensurePlanAssignSeed() {
         p.scheduleDate = (per.length >= 7 ? per.slice(0, 7) : '2026-09') + '-' + day;
       }
     }
-    if ((!p.materials || !p.materials.length) && matsPool.length && i % 2 === 0) {
-      const bySys = materialsForPlanSystem(p.systemId, p.system);
-      const pick = (bySys.length ? bySys : matsPool).slice(0, 1 + (i % 2));
-      p.materials = pick.map((m) => ({
-        id: m.id, code: m.code || '', name: m.name || '', uom: m.uom || 'Cái', qty: 1,
-      }));
-      p.materialIds = p.materials.map((m) => m.id);
-    }
+    /* Luôn gắn lại VT mẫu theo nội dung — sửa seed cũ (Ác Bi Nhê gán lung tung) */
+    const sug = suggestMaterialsForPlanLine(p, p.systemId, p.system);
+    p.materials = sug;
+    p.materialIds = sug.map((m) => m.id).filter(Boolean);
   });
+  if (typeof save === 'function') {
+    try { save(); } catch (_) {}
+  }
 }
 function planAssignConsensus(lines, field) {
   const vals = [...new Set((lines || []).map(p => String(p?.[field] || '').trim()).filter(Boolean))];
