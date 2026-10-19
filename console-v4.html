@@ -66851,25 +66851,15 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
     const sysName = sysId ? systemNameById(sysId) : '';
     return materialsForPlanSystem(sysId || null, sysName);
   };
-  const renderSelectedMatChip = () => {
-    const box = $('#addPlanMatChip');
-    if (!box) return;
-    if (!selectedMat) {
-      box.innerHTML = '<span class="text-[11px] text-slate-400">Chưa chọn vật tư (tối đa 1 / dòng)</span>';
-      return;
-    }
-    box.innerHTML = `<span class="inline-flex items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2 py-1 text-xs text-sky-900">
-      <span class="font-medium">${esc(selectedMat.name)}</span>
-      <span class="text-sky-600/80">${esc(selectedMat.code || '')}</span>
-      <button type="button" id="btnClearAddPlanMat" class="ml-1 text-sky-700 hover:text-rose-600" title="Bỏ chọn">✕</button>
-    </span>`;
-    $('#btnClearAddPlanMat')?.addEventListener('click', () => {
-      selectedMat = null;
-      dirty.materials = true;
-      const inp = $('#addPlanMat');
-      if (inp) inp.value = '';
-      renderSelectedMatChip();
-    });
+  const matInputLabel = (m) => {
+    if (!m) return '';
+    const code = String(m.code || '').trim();
+    const name = String(m.name || '').trim();
+    return code ? (code + ' · ' + name) : name;
+  };
+  const syncMatInputValue = () => {
+    const matInp = $('#addPlanMat');
+    if (matInp) matInp.value = selectedMat ? matInputLabel(selectedMat) : '';
   };
   const fillFromMaterial = (raw, opts) => {
     const force = !!(opts && opts.force);
@@ -66917,9 +66907,7 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
         refreshServiceTypeOptions();
       }
     }
-    const matInp = $('#addPlanMat');
-    if (matInp) matInp.value = '';
-    renderSelectedMatChip();
+    syncMatInputValue();
     const hint = $('#addPlanFillHint');
     if (hint) hint.textContent = 'Đã điền từ vật tư «' + (selectedMat.name || '') + '» · NCC / ĐVT / đơn giá / phân loại có thể sửa';
   };
@@ -66952,9 +66940,9 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
     if (!dirty.materials && !selectedMat) {
       const sug = suggestMaterialsForPlanLine(c.name || c.service, c.systemId, c.system)[0];
       if (sug) fillFromMaterial(sug, { force: false });
-      else renderSelectedMatChip();
+      else syncMatInputValue();
     } else {
-      renderSelectedMatChip();
+      syncMatInputValue();
     }
     const hint = $('#addPlanFillHint');
     if (hint) hint.textContent = 'Đã điền từ danh mục «' + (c.name || c.code || '') + '» · nội dung / vật tư có thể sửa';
@@ -67106,13 +67094,12 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
             </div>
           </label>
           <div class="sm:col-span-2 space-y-1.5">
-            <label class="block text-sm font-medium text-slate-700">Vật tư (PWMS) <span class="font-normal text-slate-400">· chỉ 1 / dòng</span>
+            <label class="block text-sm font-medium text-slate-700">Vật tư (PWMS) <span class="font-normal text-slate-400">· chỉ 1 / dòng · chọn xong hiện trên ô nhập</span>
               <div class="ac-wrap mt-1">
                 <input id="addPlanMat" type="search" class="form-control" placeholder="Tìm mã / tên vật tư…" autocomplete="off" />
                 <div class="ac-dropdown hidden" id="addPlanMatDd"></div>
               </div>
             </label>
-            <div id="addPlanMatChip" class="min-h-[28px]"></div>
           </div>
         </div>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -67219,6 +67206,19 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
       return item;
     },
   });
+  $('#addPlanMat')?.addEventListener('input', () => {
+    const raw = String($('#addPlanMat')?.value || '').trim();
+    if (!raw) {
+      selectedMat = null;
+      dirty.materials = true;
+      return;
+    }
+    /* Đang gõ lại khác giá trị đã chọn → bỏ liên kết VT cũ */
+    if (selectedMat && raw !== matInputLabel(selectedMat) && raw !== selectedMat.name) {
+      selectedMat = null;
+      dirty.materials = true;
+    }
+  });
   const modalRoot = $('#modalRoot');
   if (modalRoot) {
     modalRoot.onclick = (e) => {
@@ -67229,6 +67229,16 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
   $('#btnConfirmAddPlanLines')?.addEventListener('click', () => {
     period = String($('#addPlanPeriod')?.value || period).trim();
     if (!/^\d{4}-\d{2}$/.test(period)) { toast('Kỳ không hợp lệ (YYYY-MM)'); return; }
+    /* Đồng bộ VT từ ô input nếu user chọn rồi */
+    const matRaw = String($('#addPlanMat')?.value || '').trim();
+    if (matRaw && !selectedMat) {
+      const hit = getMatAcOptions().find((m) =>
+        matInputLabel(m) === matRaw
+        || String(m.name || '').trim() === matRaw
+        || String(m.code || '').trim() === matRaw
+      );
+      if (hit) fillFromMaterial(hit, { force: false });
+    }
     const extras = readAddPlanFormExtras();
     if (!extras.content && mode === 'manual') { toast('Nhập / chọn nội dung thực hiện'); return; }
     let n = 0;
@@ -67247,7 +67257,7 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
     render();
   });
   refreshServiceTypeOptions();
-  renderSelectedMatChip();
+  syncMatInputValue();
   syncModeUi();
   renderList();
 }
