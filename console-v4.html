@@ -66918,10 +66918,12 @@ function openAddPlanLinesForVehicle(vehicleId, periodHint) {
       }
     }
     if (!dirty.materials && !selectedMats.size) {
-      const sug = materialsForPlanSystem(c.systemId, c.system).slice(0, 2);
-      sug.forEach((m) => selectedMats.set(String(m.id), {
-        id: m.id, code: m.code || '', name: m.name || '', uom: m.uom || 'Cái', qty: 1,
-      }));
+      selectedMats.clear();
+      suggestMaterialsForPlanLine(c.name || c.service, c.systemId, c.system).forEach((m) => {
+        selectedMats.set(String(m.id), {
+          id: m.id, code: m.code || '', name: m.name || '', uom: m.uom || 'Cái', qty: 1,
+        });
+      });
       renderMatList();
     } else {
       renderMatList();
