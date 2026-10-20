@@ -238,7 +238,7 @@
     .rel-list { margin: 0; padding-left: 18px; font-size: 13.5px; }
     .rel-list li { margin: 6px 0; }
 
-    /* ER diagrams — @dineug/erd-editor */
+    /* ER diagrams — HTML/SVG (self-hosted, no CDN editor) */
     .diagram-panel {
       margin: 12px 0 20px;
       border: 1px solid var(--line);
@@ -264,15 +264,86 @@
       margin: 0; padding: 10px 14px 0;
       font-size: 12.5px; color: var(--muted); line-height: 1.45;
     }
+    .erd-toolbar {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      padding: 8px 14px 0; font-size: 12px; color: var(--muted);
+    }
+    .erd-toolbar button {
+      font-family: inherit; font-size: 12px; font-weight: 600;
+      border: 1px solid var(--line); background: #fff;
+      border-radius: 8px; padding: 5px 10px; cursor: pointer; color: var(--ink);
+    }
+    .erd-toolbar button:hover { background: #ecfdf5; }
     .erd-host {
+      position: relative;
       height: min(72vh, 720px);
       min-height: 480px;
-      background: #f1f5f3;
+      margin: 10px 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background:
+        linear-gradient(90deg, rgba(11,110,79,.04) 1px, transparent 1px) 0 0 / 24px 24px,
+        linear-gradient(rgba(11,110,79,.04) 1px, transparent 1px) 0 0 / 24px 24px,
+        #f4f7f5;
+      overflow: hidden;
+      cursor: grab;
+      touch-action: none;
     }
-    .erd-host erd-editor {
-      display: block;
-      width: 100%;
-      height: 100%;
+    .erd-host.dragging { cursor: grabbing; }
+    .erd-stage {
+      position: absolute; left: 0; top: 0;
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+    .erd-stage svg.erd-links {
+      position: absolute; left: 0; top: 0;
+      overflow: visible; pointer-events: none;
+    }
+    .erd-tbl {
+      position: absolute;
+      width: 240px;
+      background: #fff;
+      border: 1px solid #c5d4cc;
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(12,26,20,.08);
+      font-size: 11.5px;
+      overflow: hidden;
+    }
+    .erd-tbl header {
+      padding: 8px 10px;
+      font-weight: 700;
+      font-family: ui-monospace, Consolas, monospace;
+      color: #fff;
+      background: var(--master);
+      display: flex; justify-content: space-between; gap: 8px; align-items: baseline;
+    }
+    .erd-tbl.kind-tx header { background: #1d4ed8; }
+    .erd-tbl.kind-j header { background: #6d28d9; }
+    .erd-tbl.kind-x header { background: #be123c; }
+    .erd-tbl header .note {
+      font-family: var(--font); font-weight: 500; font-size: 10.5px;
+      opacity: .88; max-width: 9rem; text-align: right; line-height: 1.2;
+    }
+    .erd-tbl ul { list-style: none; margin: 0; padding: 4px 0 6px; }
+    .erd-tbl li {
+      display: grid;
+      grid-template-columns: 18px 1fr auto;
+      gap: 6px; align-items: center;
+      padding: 3px 10px;
+      border-bottom: 1px solid #eef2ef;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+    .erd-tbl li:last-child { border-bottom: 0; }
+    .erd-tbl .badge {
+      font-size: 9px; font-weight: 700; letter-spacing: .02em;
+      color: #b45309;
+    }
+    .erd-tbl .badge.fk { color: #1d4ed8; }
+    .erd-tbl .cname { font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+    .erd-tbl .ctype { color: var(--muted); font-size: 10.5px; }
+    .erd-links path {
+      fill: none; stroke: #64748b; stroke-width: 1.6;
+      marker-end: url(#erdArrow);
     }
     .diagram-legend {
       display: flex; flex-wrap: wrap; gap: 8px 14px;
@@ -646,9 +717,8 @@
     <section id="erd">
       <h2>4. Sơ đồ liên kết bảng (ER diagram)</h2>
       <p class="sub">
-        Sơ đồ quan hệ đầy đủ cột (PK / FK / kiểu dữ liệu), vẽ bằng thư viện
-        <a href="https://github.com/dineug/erd-editor" target="_blank" rel="noopener">@dineug/erd-editor</a>.
-        Chọn tab để xem toàn cảnh hoặc phóng từng cụm. Kéo / zoom trên canvas; chế độ chỉ xem.
+        Sơ đồ quan hệ đầy đủ cột (PK / FK / kiểu dữ liệu). Chọn tab để xem toàn cảnh hoặc phóng từng cụm.
+        Kéo nền để pan · nút ± / bánh xe để zoom · <strong>Vừa khung</strong> để căn lại.
       </p>
       <div class="diagram-legend">
         <span>Master / danh mục</span>
@@ -666,8 +736,14 @@
           <button type="button" data-erd-tab="sync">Đồng bộ ngoài</button>
         </div>
         <p class="erd-cap" id="erdCap"></p>
-        <div class="erd-host">
-          <erd-editor id="erdCanvas"></erd-editor>
+        <div class="erd-toolbar">
+          <button type="button" data-erd-zoom="-">−</button>
+          <span id="erdZoomLabel">100%</span>
+          <button type="button" data-erd-zoom="+">+</button>
+          <button type="button" data-erd-fit>Vừa khung</button>
+        </div>
+        <div class="erd-host" id="erdHost" title="Kéo để di chuyển">
+          <div class="erd-stage" id="erdStage"></div>
         </div>
       </div>
 
@@ -984,545 +1060,425 @@
       · Cập nhật theo prototype v4 (đồng bộ MH bắt buộc · toi_thieu · luồng kế hoạch)
     </footer>
   </div>
-  <script type="module">
-import 'https://cdn.jsdelivr.net/npm/@dineug/erd-editor@4.1.0/+esm';
-
-await customElements.whenDefined('erd-editor');
-
-const editor = document.getElementById('erdCanvas');
+  <script>
+const host = document.getElementById('erdHost');
+const stage = document.getElementById('erdStage');
 const capEl = document.getElementById('erdCap');
+const zoomLabel = document.getElementById('erdZoomLabel');
 
-try {
-  editor.setPresetTheme({ appearance: 'light', grayColor: 'sage', accentColor: 'green' });
-} catch (_) {
-  editor.setPresetTheme({ appearance: 'light' });
-}
+const C = (name, type, flag = '') => ({ name, type, flag }); // flag: pk | fk | ''
 
-const VIEWS = {
-  overview: {
-    cap: 'Trục trung tâm: <strong>vehicle</strong> → kế hoạch / phiếu / đánh giá; <strong>material</strong> &amp; <strong>maint_catalog</strong> cấp dữ liệu nền. Zoom &amp; kéo để xem cột.',
-    dbml: `
-Project gls_bdsc {
-  database_type: 'PostgreSQL'
-  Note: 'GLS BD/SC — toàn cảnh'
-}
-
-Table vehicle_system [note: 'He thong xe'] {
-  id varchar(64) [pk, not null]
-  name varchar(128) [not null]
-}
-
-Table maint_catalog [note: 'Danh muc BD'] {
-  id bigint [pk, increment, not null]
-  code varchar(64) [unique, not null]
-  name varchar(256) [not null]
-  system_id varchar(64) [not null]
-  default_on_eval_bad varchar(16)
-}
-
-Table vehicle [note: 'Xe / ro-mooc'] {
-  id bigint [pk, increment, not null]
-  plate varchar(32) [unique, not null]
-  is_trailer boolean [not null]
-  brand varchar(64)
-  model varchar(64)
-  year int
-  odo_km numeric
-  engine_hours numeric
-  avg_km_per_month numeric
-  garage varchar(128)
-  area varchar(64)
-  gps_site varchar(128)
-  trailer_vehicle_id bigint
-}
-
-Table material [note: 'Master vat tu'] {
-  id bigint [pk, increment, not null]
-  code varchar(64) [unique, not null]
-  name varchar(256) [not null]
-  uom varchar(32) [not null]
-  ref_price numeric
-  vat numeric
-  min_qty numeric [not null, note: 'toi_thieu']
-  supplier varchar(128)
-  warehouse varchar(128)
-  stock_qty numeric
-  pwms_group varchar(64)
-  system varchar(64)
-  requires_serial boolean
-}
-
-Table vehicle_catalog [note: 'Gan DM vao xe'] {
-  vehicle_id bigint [pk, not null]
-  catalog_id bigint [pk, not null]
-  cycle_override jsonb
-}
-
-Table vehicle_catalog_state [note: 'Moc nhac BD'] {
-  vehicle_id bigint [pk, not null]
-  catalog_id bigint [pk, not null]
-  occurrence int [not null]
-  last_km numeric
-  last_date date
-  next_km numeric
-  next_date date
-  planned_date_override date
-}
-
-Table plan_line [note: 'Dong ke hoach'] {
-  id bigint [pk, increment, not null]
-  vehicle_id bigint [not null]
-  catalog_id bigint
-  period varchar(7) [not null]
-  content text
-  service varchar(128)
-  qty numeric
-  uom varchar(32)
-  unit_price numeric
-  vat numeric
-  schedule_date date
-  work_order_id bigint
-  base_sync_status varchar(32)
-  base_sync_code varchar(64)
-}
-
-Table work_order [note: 'Phieu BD / SC'] {
-  id bigint [pk, increment, not null]
-  code varchar(64) [unique, not null]
-  vehicle_id bigint [not null]
-  order_kind varchar(16) [not null]
-  source varchar(32) [not null]
-  approval_status varchar(32) [not null]
-  exec_status varchar(32) [not null]
-  odo_km numeric
-  garage varchar(128)
-  content text
-  catalog_id bigint
-  started_at timestamptz
-  completed_at timestamptz
-  material_requested_at timestamptz
-  material_ready_at timestamptz
-  cost numeric
-  revision int [not null]
-}
-
-Table evaluation [note: 'Danh gia xe'] {
-  id bigint [pk, increment, not null]
-  vehicle_id bigint [not null]
-  evaluated_at timestamptz [not null]
-  result varchar(32)
-  note text
-}
-
-Table work_order_sync [note: 'Sync MH / BASE'] {
-  work_order_id bigint [pk, not null]
-  purchase_status varchar(16) [not null]
-  purchase_synced_at timestamptz
-  issue_doc_code varchar(64)
-  base_status varchar(32)
-  base_code varchar(64)
-  base_synced_at timestamptz
-}
-
-Table pwms_vehicle_map [note: 'TMS - PWMS'] {
-  vehicle_id bigint [pk, not null]
-  pwms_object_id varchar(64) [unique, not null]
-  pwms_plate varchar(32)
-  status varchar(32)
-}
-
-Ref: maint_catalog.system_id > vehicle_system.id
-Ref: vehicle_catalog.vehicle_id > vehicle.id
-Ref: vehicle_catalog.catalog_id > maint_catalog.id
-Ref: vehicle_catalog_state.vehicle_id > vehicle.id
-Ref: vehicle_catalog_state.catalog_id > maint_catalog.id
-Ref: plan_line.vehicle_id > vehicle.id
-Ref: work_order.vehicle_id > vehicle.id
-Ref: evaluation.vehicle_id > vehicle.id
-Ref: plan_line.work_order_id - work_order.id
-Ref: work_order_sync.work_order_id - work_order.id
-Ref: pwms_vehicle_map.vehicle_id - vehicle.id
-`,
+const TABLE_DEFS = {
+  vehicle_system: {
+    kind: 'master', note: 'Hệ thống xe',
+    cols: [C('id', 'varchar(64)', 'pk'), C('name', 'varchar(128)')],
   },
-  maint: {
-    cap: 'Gắn danh mục BD vào xe → mốc <strong>vehicle_catalog_state</strong> (lưới Nhắc BD). Rule chu kỳ trên <strong>maint_catalog_rule</strong>.',
-    dbml: `
-Project gls_bdsc {
-  database_type: 'PostgreSQL'
-  Note: 'Master & nhac BD'
-}
-
-Table vehicle_system {
-  id varchar(64) [pk, not null]
-  name varchar(128) [not null]
-}
-
-Table maint_catalog {
-  id bigint [pk, increment, not null]
-  code varchar(64) [unique, not null]
-  name varchar(256) [not null]
-  system_id varchar(64) [not null]
-  default_on_eval_bad varchar(16)
-}
-
-Table maint_catalog_rule [note: 'Moc chu ky'] {
-  id bigint [pk, increment, not null]
-  catalog_id bigint [not null]
-  seq int [not null]
-  rule_type varchar(16) [not null]
-  value numeric [not null]
-  force_replace boolean
-  repeat boolean
-  max_occurrences int
-}
-
-Table vehicle {
-  id bigint [pk, increment, not null]
-  plate varchar(32) [unique, not null]
-  is_trailer boolean [not null]
-  brand varchar(64)
-  model varchar(64)
-  odo_km numeric
-  engine_hours numeric
-  avg_km_per_month numeric
-  garage varchar(128)
-  area varchar(64)
-  gps_site varchar(128)
-}
-
-Table vehicle_catalog {
-  vehicle_id bigint [pk, not null]
-  catalog_id bigint [pk, not null]
-  cycle_override jsonb
-}
-
-Table vehicle_catalog_state {
-  vehicle_id bigint [pk, not null]
-  catalog_id bigint [pk, not null]
-  occurrence int [not null]
-  last_km numeric
-  last_date date
-  next_km numeric
-  next_date date
-  planned_date_override date
-}
-
-Table repair_item {
-  id bigint [pk, increment, not null]
-  system_id varchar(64) [not null]
-  name varchar(256) [not null]
-  service varchar(128)
-}
-
-Table barem_hour {
-  id bigint [pk, increment, not null]
-  system_id varchar(64) [not null]
-  content varchar(256) [not null]
-  hours numeric [not null]
-}
-
-Ref: maint_catalog.system_id > vehicle_system.id
-Ref: maint_catalog_rule.catalog_id > maint_catalog.id
-Ref: vehicle_catalog.vehicle_id > vehicle.id
-Ref: vehicle_catalog.catalog_id > maint_catalog.id
-Ref: vehicle_catalog_state.vehicle_id > vehicle.id
-Ref: vehicle_catalog_state.catalog_id > maint_catalog.id
-Ref: repair_item.system_id > vehicle_system.id
-Ref: barem_hour.system_id > vehicle_system.id
-`,
+  maint_catalog: {
+    kind: 'master', note: 'Danh mục BD',
+    cols: [
+      C('id', 'bigint', 'pk'), C('code', 'varchar(64)'), C('name', 'varchar(256)'),
+      C('system_id', 'varchar(64)', 'fk'), C('default_on_eval_bad', 'varchar(16)'),
+    ],
   },
-  plan: {
-    cap: 'Dòng kế hoạch theo xe + kỳ; VT gợi ý qua junction. Có thể liên kết sang phiếu sau khi tạo.',
-    dbml: `
-Project gls_bdsc {
-  database_type: 'PostgreSQL'
-  Note: 'Ke hoach'
-}
-
-Table vehicle {
-  id bigint [pk, increment, not null]
-  plate varchar(32) [unique, not null]
-  brand varchar(64)
-  model varchar(64)
-}
-
-Table maint_catalog {
-  id bigint [pk, increment, not null]
-  code varchar(64) [unique, not null]
-  name varchar(256) [not null]
-}
-
-Table material {
-  id bigint [pk, increment, not null]
-  code varchar(64) [unique, not null]
-  name varchar(256) [not null]
-  uom varchar(32) [not null]
-  min_qty numeric [not null]
-  ref_price numeric
-}
-
-Table plan_line {
-  id bigint [pk, increment, not null]
-  vehicle_id bigint [not null]
-  catalog_id bigint
-  period varchar(7) [not null]
-  content text
-  service varchar(128)
-  qty numeric
-  uom varchar(32)
-  unit_price numeric
-  vat numeric
-  schedule_date date
-  work_order_id bigint
-  base_sync_status varchar(32)
-  base_sync_code varchar(64)
-}
-
-Table plan_line_material {
-  id bigint [pk, increment, not null]
-  plan_line_id bigint [not null]
-  material_id bigint
-  code varchar(64)
-  name varchar(256)
-  qty numeric [not null]
-  uom varchar(32)
-}
-
-Table plan_template {
-  id bigint [pk, increment, not null]
-  name varchar(128) [not null]
-  period varchar(7)
-  vehicle_type varchar(64)
-  brand varchar(64)
-  model varchar(64)
-  seed_vehicle_id bigint
-}
-
-Table plan_template_item {
-  id bigint [pk, increment, not null]
-  template_id bigint [not null]
-  catalog_id bigint
-  content text
-  qty numeric
-  unit_price numeric
-}
-
-Table work_order {
-  id bigint [pk, increment, not null]
-  code varchar(64) [unique, not null]
-  vehicle_id bigint [not null]
-  approval_status varchar(32) [not null]
-  exec_status varchar(32) [not null]
-}
-
-Ref: plan_line.vehicle_id > vehicle.id
-Ref: plan_line.catalog_id > maint_catalog.id
-Ref: plan_line_material.plan_line_id > plan_line.id
-Ref: plan_line_material.material_id > material.id
-Ref: plan_template_item.template_id > plan_template.id
-Ref: plan_line.work_order_id - work_order.id
-`,
+  maint_catalog_rule: {
+    kind: 'j', note: 'Mốc chu kỳ',
+    cols: [
+      C('id', 'bigint', 'pk'), C('catalog_id', 'bigint', 'fk'), C('seq', 'int'),
+      C('rule_type', 'varchar(16)'), C('value', 'numeric'), C('force_replace', 'boolean'),
+      C('repeat', 'boolean'), C('max_occurrences', 'int'),
+    ],
   },
-  order: {
-    cap: 'Phiếu BD/SC: hạng mục · VT dự kiến · VT mua hàng (sau sync) · sync · nhật ký duyệt. Hai cụm VT không ghi đè nhau.',
-    dbml: `
-Project gls_bdsc {
-  database_type: 'PostgreSQL'
-  Note: 'Phieu cong viec'
-}
-
-Table vehicle {
-  id bigint [pk, increment, not null]
-  plate varchar(32) [unique, not null]
-}
-
-Table material {
-  id bigint [pk, increment, not null]
-  code varchar(64) [unique, not null]
-  name varchar(256) [not null]
-  uom varchar(32) [not null]
-  min_qty numeric [not null]
-  ref_price numeric
-}
-
-Table work_order {
-  id bigint [pk, increment, not null]
-  code varchar(64) [unique, not null]
-  vehicle_id bigint [not null]
-  order_kind varchar(16) [not null]
-  source varchar(32) [not null]
-  approval_status varchar(32) [not null]
-  exec_status varchar(32) [not null]
-  odo_km numeric
-  garage varchar(128)
-  content text
-  catalog_id bigint
-  started_at timestamptz
-  completed_at timestamptz
-  material_requested_at timestamptz
-  material_ready_at timestamptz
-  cost numeric
-  revision int [not null]
-}
-
-Table work_order_item {
-  id bigint [pk, increment, not null]
-  work_order_id bigint [not null]
-  system varchar(64)
-  content text [not null]
-  service varchar(128)
-  performer varchar(128)
-  barem_hours numeric
-  actual_hours numeric
-  started_at timestamptz
-  completed_at timestamptz
-  status varchar(16) [not null]
-}
-
-Table work_order_material {
-  id bigint [pk, increment, not null]
-  work_order_id bigint [not null]
-  material_id bigint
-  source varchar(32) [not null]
-  qty numeric [not null]
-  uom varchar(32)
-  price numeric
-  vat numeric
-  local_only boolean
-}
-
-Table work_order_purchase_line {
-  id bigint [pk, increment, not null]
-  work_order_id bigint [not null]
-  planned_material_id bigint
-  price numeric
-  supplier varchar(128)
-  warehouse varchar(128)
-  purchase_doc_code varchar(64)
-  issued_at timestamptz
-}
-
-Table work_order_sync {
-  work_order_id bigint [pk, not null]
-  purchase_status varchar(16) [not null]
-  purchase_synced_at timestamptz
-  issue_doc_code varchar(64)
-  base_status varchar(32)
-  base_code varchar(64)
-  base_synced_at timestamptz
-}
-
-Table work_order_approval_log {
-  id bigint [pk, increment, not null]
-  work_order_id bigint [not null]
-  action varchar(32) [not null]
-  at timestamptz [not null]
-  acted_by varchar(128)
-  note text
-  changes_json jsonb
-}
-
-Ref: work_order.vehicle_id > vehicle.id
-Ref: work_order_item.work_order_id > work_order.id
-Ref: work_order_material.work_order_id > work_order.id
-Ref: work_order_purchase_line.work_order_id > work_order.id
-Ref: work_order_sync.work_order_id - work_order.id
-Ref: work_order_approval_log.work_order_id > work_order.id
-Ref: work_order_material.material_id > material.id
-Ref: work_order_purchase_line.planned_material_id - work_order_material.id
-`,
+  vehicle: {
+    kind: 'master', note: 'Xe / rơ-moóc',
+    cols: [
+      C('id', 'bigint', 'pk'), C('plate', 'varchar(32)'), C('is_trailer', 'boolean'),
+      C('brand', 'varchar(64)'), C('model', 'varchar(64)'), C('year', 'int'),
+      C('odo_km', 'numeric'), C('engine_hours', 'numeric'), C('avg_km_per_month', 'numeric'),
+      C('garage', 'varchar(128)'), C('area', 'varchar(64)'), C('gps_site', 'varchar(128)'),
+      C('trailer_vehicle_id', 'bigint', 'fk'),
+    ],
   },
-  sync: {
-    cap: 'Ánh xạ xe TMS ↔ PWMS; sync MH/BASE 1–1 với phiếu. GPS odo ghi vào <span class="mono">vehicle</span> (không bảng riêng). Ngoài: PWMS · BASE · GPS.',
-    dbml: `
-Project gls_bdsc {
-  database_type: 'PostgreSQL'
-  Note: 'Dong bo ngoai'
-}
-
-Table vehicle {
-  id bigint [pk, increment, not null]
-  plate varchar(32) [unique, not null]
-  odo_km numeric
-  gps_site varchar(128)
-}
-
-Table pwms_vehicle_map {
-  vehicle_id bigint [pk, not null]
-  pwms_object_id varchar(64) [unique, not null]
-  pwms_plate varchar(32)
-  status varchar(32)
-}
-
-Table work_order {
-  id bigint [pk, increment, not null]
-  code varchar(64) [unique, not null]
-  vehicle_id bigint [not null]
-  approval_status varchar(32) [not null]
-  exec_status varchar(32) [not null]
-}
-
-Table work_order_sync {
-  work_order_id bigint [pk, not null]
-  purchase_status varchar(16) [not null]
-  purchase_synced_at timestamptz
-  issue_doc_code varchar(64)
-  base_status varchar(32)
-  base_code varchar(64)
-  base_synced_at timestamptz
-}
-
-Table material {
-  id bigint [pk, increment, not null]
-  code varchar(64) [unique, not null]
-  name varchar(256) [not null]
-  ref_price numeric
-  supplier varchar(128)
-}
-
-Table material_price_history {
-  id bigint [pk, increment, not null]
-  material_id bigint [not null]
-  price numeric [not null]
-  supplier varchar(128)
-  synced_at timestamptz [not null]
-}
-
-Ref: pwms_vehicle_map.vehicle_id - vehicle.id
-Ref: work_order.vehicle_id > vehicle.id
-Ref: work_order_sync.work_order_id - work_order.id
-Ref: material_price_history.material_id > material.id
-`,
+  material: {
+    kind: 'master', note: 'Master vật tư',
+    cols: [
+      C('id', 'bigint', 'pk'), C('code', 'varchar(64)'), C('name', 'varchar(256)'),
+      C('uom', 'varchar(32)'), C('ref_price', 'numeric'), C('vat', 'numeric'),
+      C('min_qty', 'numeric'), C('supplier', 'varchar(128)'), C('warehouse', 'varchar(128)'),
+      C('stock_qty', 'numeric'), C('pwms_group', 'varchar(64)'), C('system', 'varchar(64)'),
+      C('requires_serial', 'boolean'),
+    ],
+  },
+  vehicle_catalog: {
+    kind: 'j', note: 'Gán DM vào xe',
+    cols: [
+      C('vehicle_id', 'bigint', 'pk'), C('catalog_id', 'bigint', 'pk'),
+      C('cycle_override', 'jsonb'),
+    ],
+  },
+  vehicle_catalog_state: {
+    kind: 'tx', note: 'Mốc nhắc BD',
+    cols: [
+      C('vehicle_id', 'bigint', 'pk'), C('catalog_id', 'bigint', 'pk'),
+      C('occurrence', 'int'), C('last_km', 'numeric'), C('last_date', 'date'),
+      C('next_km', 'numeric'), C('next_date', 'date'), C('planned_date_override', 'date'),
+    ],
+  },
+  plan_line: {
+    kind: 'tx', note: 'Dòng kế hoạch',
+    cols: [
+      C('id', 'bigint', 'pk'), C('vehicle_id', 'bigint', 'fk'), C('catalog_id', 'bigint', 'fk'),
+      C('period', 'varchar(7)'), C('content', 'text'), C('service', 'varchar(128)'),
+      C('qty', 'numeric'), C('uom', 'varchar(32)'), C('unit_price', 'numeric'), C('vat', 'numeric'),
+      C('schedule_date', 'date'), C('work_order_id', 'bigint', 'fk'),
+      C('base_sync_status', 'varchar(32)'), C('base_sync_code', 'varchar(64)'),
+    ],
+  },
+  plan_line_material: {
+    kind: 'j', note: 'VT gợi ý KH',
+    cols: [
+      C('id', 'bigint', 'pk'), C('plan_line_id', 'bigint', 'fk'), C('material_id', 'bigint', 'fk'),
+      C('code', 'varchar(64)'), C('name', 'varchar(256)'), C('qty', 'numeric'), C('uom', 'varchar(32)'),
+    ],
+  },
+  plan_template: {
+    kind: 'master', note: 'Mẫu kế hoạch',
+    cols: [
+      C('id', 'bigint', 'pk'), C('name', 'varchar(128)'), C('period', 'varchar(7)'),
+      C('vehicle_type', 'varchar(64)'), C('brand', 'varchar(64)'), C('model', 'varchar(64)'),
+      C('seed_vehicle_id', 'bigint', 'fk'),
+    ],
+  },
+  plan_template_item: {
+    kind: 'j', note: 'Hạng mục mẫu',
+    cols: [
+      C('id', 'bigint', 'pk'), C('template_id', 'bigint', 'fk'), C('catalog_id', 'bigint', 'fk'),
+      C('content', 'text'), C('qty', 'numeric'), C('unit_price', 'numeric'),
+    ],
+  },
+  work_order: {
+    kind: 'tx', note: 'Phiếu BD / SC',
+    cols: [
+      C('id', 'bigint', 'pk'), C('code', 'varchar(64)'), C('vehicle_id', 'bigint', 'fk'),
+      C('order_kind', 'varchar(16)'), C('source', 'varchar(32)'),
+      C('approval_status', 'varchar(32)'), C('exec_status', 'varchar(32)'),
+      C('odo_km', 'numeric'), C('garage', 'varchar(128)'), C('content', 'text'),
+      C('catalog_id', 'bigint', 'fk'), C('started_at', 'timestamptz'), C('completed_at', 'timestamptz'),
+      C('material_requested_at', 'timestamptz'), C('material_ready_at', 'timestamptz'),
+      C('cost', 'numeric'), C('revision', 'int'),
+    ],
+  },
+  work_order_item: {
+    kind: 'j', note: 'Hạng mục phiếu',
+    cols: [
+      C('id', 'bigint', 'pk'), C('work_order_id', 'bigint', 'fk'), C('system', 'varchar(64)'),
+      C('content', 'text'), C('service', 'varchar(128)'), C('performer', 'varchar(128)'),
+      C('barem_hours', 'numeric'), C('actual_hours', 'numeric'),
+      C('started_at', 'timestamptz'), C('completed_at', 'timestamptz'), C('status', 'varchar(16)'),
+    ],
+  },
+  work_order_material: {
+    kind: 'j', note: 'VT dự kiến',
+    cols: [
+      C('id', 'bigint', 'pk'), C('work_order_id', 'bigint', 'fk'), C('material_id', 'bigint', 'fk'),
+      C('source', 'varchar(32)'), C('qty', 'numeric'), C('uom', 'varchar(32)'),
+      C('price', 'numeric'), C('vat', 'numeric'), C('local_only', 'boolean'),
+    ],
+  },
+  work_order_purchase_line: {
+    kind: 'j', note: 'VT sau sync MH',
+    cols: [
+      C('id', 'bigint', 'pk'), C('work_order_id', 'bigint', 'fk'),
+      C('planned_material_id', 'bigint', 'fk'), C('price', 'numeric'),
+      C('supplier', 'varchar(128)'), C('warehouse', 'varchar(128)'),
+      C('purchase_doc_code', 'varchar(64)'), C('issued_at', 'timestamptz'),
+    ],
+  },
+  work_order_sync: {
+    kind: 'x', note: 'Sync MH / BASE',
+    cols: [
+      C('work_order_id', 'bigint', 'pk'), C('purchase_status', 'varchar(16)'),
+      C('purchase_synced_at', 'timestamptz'), C('issue_doc_code', 'varchar(64)'),
+      C('base_status', 'varchar(32)'), C('base_code', 'varchar(64)'), C('base_synced_at', 'timestamptz'),
+    ],
+  },
+  work_order_approval_log: {
+    kind: 'tx', note: 'Nhật ký duyệt',
+    cols: [
+      C('id', 'bigint', 'pk'), C('work_order_id', 'bigint', 'fk'), C('action', 'varchar(32)'),
+      C('at', 'timestamptz'), C('acted_by', 'varchar(128)'), C('note', 'text'), C('changes_json', 'jsonb'),
+    ],
+  },
+  evaluation: {
+    kind: 'tx', note: 'Đánh giá xe',
+    cols: [
+      C('id', 'bigint', 'pk'), C('vehicle_id', 'bigint', 'fk'), C('evaluated_at', 'timestamptz'),
+      C('result', 'varchar(32)'), C('note', 'text'),
+    ],
+  },
+  pwms_vehicle_map: {
+    kind: 'x', note: 'TMS ↔ PWMS',
+    cols: [
+      C('vehicle_id', 'bigint', 'pk'), C('pwms_object_id', 'varchar(64)'),
+      C('pwms_plate', 'varchar(32)'), C('status', 'varchar(32)'),
+    ],
+  },
+  material_price_history: {
+    kind: 'x', note: 'Lịch sử giá PWMS',
+    cols: [
+      C('id', 'bigint', 'pk'), C('material_id', 'bigint', 'fk'), C('price', 'numeric'),
+      C('supplier', 'varchar(128)'), C('synced_at', 'timestamptz'),
+    ],
+  },
+  repair_item: {
+    kind: 'master', note: 'Nội dung SC',
+    cols: [
+      C('id', 'bigint', 'pk'), C('system_id', 'varchar(64)', 'fk'),
+      C('name', 'varchar(256)'), C('service', 'varchar(128)'),
+    ],
+  },
+  barem_hour: {
+    kind: 'master', note: 'Giờ barem',
+    cols: [
+      C('id', 'bigint', 'pk'), C('system_id', 'varchar(64)', 'fk'),
+      C('content', 'varchar(256)'), C('hours', 'numeric'),
+    ],
   },
 };
 
-let loading = false;
+/** @type {Record<string, {cap:string, layout: Record<string,{x:number,y:number}>, links: Array<[string,string]>}>} */
+const VIEWS = {
+  overview: {
+    cap: 'Trục trung tâm: <strong>vehicle</strong> → kế hoạch / phiếu / đánh giá; <strong>material</strong> &amp; <strong>maint_catalog</strong> cấp dữ liệu nền.',
+    layout: {
+      vehicle_system: { x: 40, y: 40 },
+      maint_catalog: { x: 340, y: 40 },
+      material: { x: 640, y: 40 },
+      vehicle: { x: 40, y: 320 },
+      vehicle_catalog: { x: 340, y: 320 },
+      vehicle_catalog_state: { x: 640, y: 320 },
+      plan_line: { x: 40, y: 700 },
+      work_order: { x: 340, y: 700 },
+      evaluation: { x: 640, y: 700 },
+      work_order_sync: { x: 340, y: 1120 },
+      pwms_vehicle_map: { x: 40, y: 1120 },
+    },
+    links: [
+      ['vehicle_system', 'maint_catalog'],
+      ['vehicle', 'vehicle_catalog'],
+      ['maint_catalog', 'vehicle_catalog'],
+      ['vehicle', 'vehicle_catalog_state'],
+      ['maint_catalog', 'vehicle_catalog_state'],
+      ['vehicle', 'plan_line'],
+      ['vehicle', 'work_order'],
+      ['vehicle', 'evaluation'],
+      ['work_order', 'plan_line'],
+      ['work_order', 'work_order_sync'],
+      ['vehicle', 'pwms_vehicle_map'],
+    ],
+  },
+  maint: {
+    cap: 'Gắn danh mục BD vào xe → mốc <strong>vehicle_catalog_state</strong>. Rule chu kỳ trên <strong>maint_catalog_rule</strong>.',
+    layout: {
+      vehicle_system: { x: 40, y: 40 },
+      maint_catalog: { x: 340, y: 40 },
+      maint_catalog_rule: { x: 640, y: 40 },
+      vehicle: { x: 40, y: 360 },
+      vehicle_catalog: { x: 340, y: 360 },
+      vehicle_catalog_state: { x: 640, y: 360 },
+      repair_item: { x: 40, y: 760 },
+      barem_hour: { x: 340, y: 760 },
+    },
+    links: [
+      ['vehicle_system', 'maint_catalog'],
+      ['maint_catalog', 'maint_catalog_rule'],
+      ['vehicle', 'vehicle_catalog'],
+      ['maint_catalog', 'vehicle_catalog'],
+      ['vehicle', 'vehicle_catalog_state'],
+      ['maint_catalog', 'vehicle_catalog_state'],
+      ['vehicle_system', 'repair_item'],
+      ['vehicle_system', 'barem_hour'],
+    ],
+  },
+  plan: {
+    cap: 'Dòng kế hoạch theo xe + kỳ; VT gợi ý qua junction. Có thể liên kết sang phiếu sau khi tạo.',
+    layout: {
+      vehicle: { x: 40, y: 40 },
+      maint_catalog: { x: 340, y: 40 },
+      material: { x: 640, y: 40 },
+      plan_line: { x: 40, y: 420 },
+      plan_line_material: { x: 340, y: 420 },
+      work_order: { x: 640, y: 420 },
+      plan_template: { x: 40, y: 900 },
+      plan_template_item: { x: 340, y: 900 },
+    },
+    links: [
+      ['vehicle', 'plan_line'],
+      ['maint_catalog', 'plan_line'],
+      ['plan_line', 'plan_line_material'],
+      ['material', 'plan_line_material'],
+      ['plan_template', 'plan_template_item'],
+      ['work_order', 'plan_line'],
+    ],
+  },
+  order: {
+    cap: 'Phiếu BD/SC: hạng mục · VT dự kiến · VT mua hàng · sync · nhật ký duyệt. Hai cụm VT không ghi đè nhau.',
+    layout: {
+      vehicle: { x: 40, y: 40 },
+      material: { x: 340, y: 40 },
+      work_order: { x: 40, y: 360 },
+      work_order_item: { x: 340, y: 360 },
+      work_order_material: { x: 640, y: 360 },
+      work_order_purchase_line: { x: 640, y: 820 },
+      work_order_sync: { x: 40, y: 900 },
+      work_order_approval_log: { x: 340, y: 900 },
+    },
+    links: [
+      ['vehicle', 'work_order'],
+      ['work_order', 'work_order_item'],
+      ['work_order', 'work_order_material'],
+      ['work_order', 'work_order_purchase_line'],
+      ['work_order', 'work_order_sync'],
+      ['work_order', 'work_order_approval_log'],
+      ['material', 'work_order_material'],
+      ['work_order_material', 'work_order_purchase_line'],
+    ],
+  },
+  sync: {
+    cap: 'Ánh xạ xe TMS ↔ PWMS; sync MH/BASE 1–1 với phiếu. GPS odo ghi vào <span class="mono">vehicle</span>.',
+    layout: {
+      vehicle: { x: 40, y: 40 },
+      pwms_vehicle_map: { x: 360, y: 40 },
+      work_order: { x: 40, y: 420 },
+      work_order_sync: { x: 360, y: 420 },
+      material: { x: 40, y: 860 },
+      material_price_history: { x: 360, y: 860 },
+    },
+    links: [
+      ['vehicle', 'pwms_vehicle_map'],
+      ['vehicle', 'work_order'],
+      ['work_order', 'work_order_sync'],
+      ['material', 'material_price_history'],
+    ],
+  },
+};
 
-async function loadView(key) {
-  const view = VIEWS[key] || VIEWS.overview;
-  capEl.innerHTML = view.cap;
-  if (loading) return;
-  loading = true;
-  try {
-    editor.readonly = false;
-    const result = editor.setSchemaDBML(view.dbml.trim(), { placement: 'auto' });
-    if (result && typeof result.then === 'function') await result;
-    await new Promise((r) => setTimeout(r, 80));
-    editor.readonly = true;
-  } catch (err) {
-    console.error('ERD load failed', err);
-    try {
-      editor.setSchemaDBML(view.dbml.trim());
-      editor.readonly = true;
-    } catch (e2) {
-      console.error(e2);
-    }
-  } finally {
-    loading = false;
-  }
+const pan = { x: 24, y: 24, scale: 0.72 };
+let drag = null;
+
+function applyTransform() {
+  stage.style.transform = `translate(${pan.x}px, ${pan.y}px) scale(${pan.scale})`;
+  zoomLabel.textContent = `${Math.round(pan.scale * 100)}%`;
 }
 
-await loadView('overview');
+function tableHtml(name, def) {
+  const kindClass = def.kind === 'master' ? '' : ` kind-${def.kind}`;
+  const rows = def.cols.map((c) => {
+    const badge = c.flag === 'pk' ? '<span class="badge">PK</span>'
+      : c.flag === 'fk' ? '<span class="badge fk">FK</span>'
+      : '<span class="badge"></span>';
+    return `<li>${badge}<span class="cname">${c.name}</span><span class="ctype">${c.type}</span></li>`;
+  }).join('');
+  return `<div class="erd-tbl${kindClass}" data-tbl="${name}" style="left:${0}px;top:${0}px">
+    <header><span>${name}</span><span class="note">${def.note || ''}</span></header>
+    <ul>${rows}</ul>
+  </div>`;
+}
+
+function anchor(el, towardX, towardY) {
+  const x = el.offsetLeft;
+  const y = el.offsetTop;
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const dx = towardX - cx;
+  const dy = towardY - cy;
+  if (Math.abs(dx) > Math.abs(dy)) {
+    return dx > 0
+      ? { x: x + w, y: cy }
+      : { x: x, y: cy };
+  }
+  return dy > 0
+    ? { x: cx, y: y + h }
+    : { x: cx, y: y };
+}
+
+function drawLinks(links) {
+  const nodes = {};
+  stage.querySelectorAll('.erd-tbl').forEach((el) => {
+    nodes[el.dataset.tbl] = el;
+  });
+  let maxX = 0;
+  let maxY = 0;
+  Object.values(nodes).forEach((el) => {
+    maxX = Math.max(maxX, el.offsetLeft + el.offsetWidth);
+    maxY = Math.max(maxY, el.offsetTop + el.offsetHeight);
+  });
+  const paths = links.map(([a, b]) => {
+    const ea = nodes[a];
+    const eb = nodes[b];
+    if (!ea || !eb) return '';
+    const acx = ea.offsetLeft + ea.offsetWidth / 2;
+    const acy = ea.offsetTop + ea.offsetHeight / 2;
+    const bcx = eb.offsetLeft + eb.offsetWidth / 2;
+    const bcy = eb.offsetTop + eb.offsetHeight / 2;
+    const p1 = anchor(ea, bcx, bcy);
+    const p2 = anchor(eb, acx, acy);
+    const mx = (p1.x + p2.x) / 2;
+    const my = (p1.y + p2.y) / 2;
+    return `<path d="M${p1.x},${p1.y} Q${mx},${my} ${p2.x},${p2.y}" />`;
+  }).join('');
+  return `<svg class="erd-links" width="${maxX + 40}" height="${maxY + 40}">
+    <defs>
+      <marker id="erdArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="#64748b" />
+      </marker>
+    </defs>
+    ${paths}
+  </svg>`;
+}
+
+function fitView() {
+  const boxes = [...stage.querySelectorAll('.erd-tbl')];
+  if (!boxes.length) return;
+  let minX = Infinity, minY = Infinity, maxX = 0, maxY = 0;
+  boxes.forEach((el) => {
+    minX = Math.min(minX, el.offsetLeft);
+    minY = Math.min(minY, el.offsetTop);
+    maxX = Math.max(maxX, el.offsetLeft + el.offsetWidth);
+    maxY = Math.max(maxY, el.offsetTop + el.offsetHeight);
+  });
+  const pad = 40;
+  const contentW = maxX - minX + pad * 2;
+  const contentH = maxY - minY + pad * 2;
+  const vw = host.clientWidth;
+  const vh = host.clientHeight;
+  const scale = Math.min(1, vw / contentW, vh / contentH) * 0.96;
+  pan.scale = Math.max(0.35, scale);
+  pan.x = (vw - contentW * pan.scale) / 2 - minX * pan.scale + pad * pan.scale;
+  pan.y = (vh - contentH * pan.scale) / 2 - minY * pan.scale + pad * pan.scale;
+  applyTransform();
+}
+
+function loadView(key) {
+  const view = VIEWS[key] || VIEWS.overview;
+  capEl.innerHTML = view.cap;
+  const parts = Object.entries(view.layout).map(([name, pos]) => {
+    const def = TABLE_DEFS[name];
+    if (!def) return '';
+    const html = tableHtml(name, def);
+    return html.replace('left:0px;top:0px', `left:${pos.x}px;top:${pos.y}px`);
+  });
+  stage.innerHTML = parts.join('');
+  // measure then draw links
+  requestAnimationFrame(() => {
+    stage.insertAdjacentHTML('afterbegin', drawLinks(view.links));
+    fitView();
+  });
+}
+
+applyTransform();
+loadView('overview');
 
 document.querySelectorAll('[data-erd-tab]').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -1531,6 +1487,49 @@ document.querySelectorAll('[data-erd-tab]').forEach((btn) => {
     loadView(id);
   });
 });
+
+document.querySelector('[data-erd-zoom="+"]').addEventListener('click', () => {
+  pan.scale = Math.min(1.6, pan.scale + 0.1);
+  applyTransform();
+});
+document.querySelector('[data-erd-zoom="-"]').addEventListener('click', () => {
+  pan.scale = Math.max(0.3, pan.scale - 0.1);
+  applyTransform();
+});
+document.querySelector('[data-erd-fit]').addEventListener('click', fitView);
+
+host.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? -0.08 : 0.08;
+  const prev = pan.scale;
+  pan.scale = Math.min(1.6, Math.max(0.3, pan.scale + delta));
+  const rect = host.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  pan.x = mx - ((mx - pan.x) * pan.scale) / prev;
+  pan.y = my - ((my - pan.y) * pan.scale) / prev;
+  applyTransform();
+}, { passive: false });
+
+host.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  drag = { id: e.pointerId, x: e.clientX, y: e.clientY, ox: pan.x, oy: pan.y };
+  host.classList.add('dragging');
+  host.setPointerCapture(e.pointerId);
+});
+host.addEventListener('pointermove', (e) => {
+  if (!drag || drag.id !== e.pointerId) return;
+  pan.x = drag.ox + (e.clientX - drag.x);
+  pan.y = drag.oy + (e.clientY - drag.y);
+  applyTransform();
+});
+const endDrag = (e) => {
+  if (!drag || drag.id !== e.pointerId) return;
+  drag = null;
+  host.classList.remove('dragging');
+};
+host.addEventListener('pointerup', endDrag);
+host.addEventListener('pointercancel', endDrag);
 
   </script>
   <script>
