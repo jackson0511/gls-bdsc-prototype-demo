@@ -238,7 +238,7 @@
     .rel-list { margin: 0; padding-left: 18px; font-size: 13.5px; }
     .rel-list li { margin: 6px 0; }
 
-    /* ER diagrams */
+    /* ER diagrams — @dineug/erd-editor */
     .diagram-panel {
       margin: 12px 0 20px;
       border: 1px solid var(--line);
@@ -260,23 +260,23 @@
     .diagram-tabs button.on {
       background: #ecfdf5; border-color: #6ee7b7; color: var(--brand-deep);
     }
-    .diagram-pane {
-      display: none;
-      padding: 12px 8px 16px;
-      overflow-x: auto;
-      min-height: 280px;
+    .erd-cap {
+      margin: 0; padding: 10px 14px 0;
+      font-size: 12.5px; color: var(--muted); line-height: 1.45;
     }
-    .diagram-pane.on { display: block; }
-    .diagram-pane .mermaid {
-      display: flex; justify-content: center;
-      min-width: 640px;
+    .erd-host {
+      height: min(72vh, 720px);
+      min-height: 480px;
+      background: #f1f5f3;
     }
-    .diagram-pane .cap {
-      margin: 0 12px 8px; font-size: 12.5px; color: var(--muted); line-height: 1.45;
+    .erd-host erd-editor {
+      display: block;
+      width: 100%;
+      height: 100%;
     }
     .diagram-legend {
       display: flex; flex-wrap: wrap; gap: 8px 14px;
-      padding: 0 14px 12px; font-size: 11.5px; color: var(--muted);
+      padding: 0 0 12px; font-size: 11.5px; color: var(--muted);
     }
     .diagram-legend span::before {
       content: ""; display: inline-block; width: 8px; height: 8px;
@@ -646,11 +646,9 @@
     <section id="erd">
       <h2>4. Sơ đồ liên kết bảng (ER diagram)</h2>
       <p class="sub">
-        Quan hệ khóa ngoại giữa các bảng đề xuất. Chọn tab để xem toàn cảnh hoặc phóng từng cụm
-        (master &amp; nhắc · kế hoạch · phiếu · đồng bộ ngoài). Ký hiệu Mermaid:
-        <span class="mono">||--o{</span> = một–nhiều,
-        <span class="mono">}|--||</span> = nhiều–một bắt buộc,
-        <span class="mono">||--o|</span> = một–một tùy chọn.
+        Sơ đồ quan hệ đầy đủ cột (PK / FK / kiểu dữ liệu), vẽ bằng thư viện
+        <a href="https://github.com/dineug/erd-editor" target="_blank" rel="noopener">@dineug/erd-editor</a>.
+        Chọn tab để xem toàn cảnh hoặc phóng từng cụm. Kéo / zoom trên canvas; chế độ chỉ xem.
       </p>
       <div class="diagram-legend">
         <span>Master / danh mục</span>
@@ -667,206 +665,9 @@
           <button type="button" data-erd-tab="order">Phiếu công việc</button>
           <button type="button" data-erd-tab="sync">Đồng bộ ngoài</button>
         </div>
-
-        <div class="diagram-pane on" data-erd-pane="overview">
-          <p class="cap">Trục trung tâm: <strong>vehicle</strong> → kế hoạch / phiếu / đánh giá; <strong>material</strong> và <strong>maint_catalog</strong> cấp dữ liệu nền.</p>
-          <pre class="mermaid">
-erDiagram
-  VEHICLE ||--o{ VEHICLE_CATALOG : "gan DM"
-  MAINT_CATALOG ||--o{ VEHICLE_CATALOG : "duoc gan"
-  MAINT_CATALOG ||--o{ MAINT_CATALOG_RULE : "moc chu ky"
-  VEHICLE ||--o{ VEHICLE_CATALOG_STATE : "moc nhac"
-  MAINT_CATALOG ||--o{ VEHICLE_CATALOG_STATE : "theo DM"
-  VEHICLE ||--o{ PLAN_LINE : "co KH"
-  VEHICLE ||--o{ WORK_ORDER : "co phieu"
-  VEHICLE ||--o{ EVALUATION : "co DG"
-  PLAN_LINE ||--o{ PLAN_LINE_MATERIAL : "VT goi y"
-  MATERIAL ||--o{ PLAN_LINE_MATERIAL : "tu master"
-  WORK_ORDER ||--o{ WORK_ORDER_ITEM : "hang muc"
-  WORK_ORDER ||--o{ WORK_ORDER_MATERIAL : "VT du kien"
-  WORK_ORDER ||--o{ WORK_ORDER_PURCHASE_LINE : "cum MH"
-  WORK_ORDER ||--|| WORK_ORDER_SYNC : "trang thai sync"
-  WORK_ORDER ||--o{ WORK_ORDER_APPROVAL_LOG : "lich su duyet"
-  MATERIAL ||--o{ WORK_ORDER_MATERIAL : "tuy chon"
-  MATERIAL ||--o{ WORK_ORDER_PURCHASE_LINE : "tuy chon"
-  PLAN_LINE }o--o| WORK_ORDER : "tao phieu"
-  VEHICLE ||--o| PWMS_VEHICLE_MAP : "Object ID"
-  VEHICLE_SYSTEM ||--o{ MAINT_CATALOG : "he thong"
-  VEHICLE_SYSTEM ||--o{ REPAIR_ITEM : "ND SC"
-  VEHICLE_SYSTEM ||--o{ BAREM_HOUR : "gio barem"
-          </pre>
-        </div>
-
-        <div class="diagram-pane" data-erd-pane="maint">
-          <p class="cap">Gắn danh mục BD vào xe → lưu mốc <strong>vehicle_catalog_state</strong> (nguồn lưới Nhắc bảo dưỡng). Rule chu kỳ nằm trên <strong>maint_catalog_rule</strong>.</p>
-          <pre class="mermaid">
-erDiagram
-  VEHICLE {
-    bigint id PK
-    string plate
-    bool is_trailer
-    numeric odo_km
-  }
-  MAINT_CATALOG {
-    bigint id PK
-    string code
-    string name
-    bigint system_id FK
-  }
-  MAINT_CATALOG_RULE {
-    bigint id PK
-    bigint catalog_id FK
-    string rule_type
-    numeric value
-    bool repeat
-  }
-  VEHICLE_CATALOG {
-    bigint vehicle_id PK_FK
-    bigint catalog_id PK_FK
-    json cycle_override
-  }
-  VEHICLE_CATALOG_STATE {
-    bigint vehicle_id PK_FK
-    bigint catalog_id PK_FK
-    int occurrence
-    numeric next_km
-    date next_date
-  }
-  VEHICLE_SYSTEM {
-    string id PK
-    string name
-  }
-  VEHICLE ||--o{ VEHICLE_CATALOG : attaches
-  MAINT_CATALOG ||--o{ VEHICLE_CATALOG : attached_to
-  MAINT_CATALOG ||--o{ MAINT_CATALOG_RULE : has_rules
-  VEHICLE ||--o{ VEHICLE_CATALOG_STATE : reminder
-  MAINT_CATALOG ||--o{ VEHICLE_CATALOG_STATE : reminder
-  VEHICLE_SYSTEM ||--o{ MAINT_CATALOG : classifies
-          </pre>
-        </div>
-
-        <div class="diagram-pane" data-erd-pane="plan">
-          <p class="cap">Dòng kế hoạch theo xe + kỳ; vật tư gợi ý qua junction. Có thể liên kết sang phiếu sau khi tạo.</p>
-          <pre class="mermaid">
-erDiagram
-  VEHICLE ||--o{ PLAN_LINE : owns
-  MAINT_CATALOG ||--o{ PLAN_LINE : "tuy chon"
-  PLAN_TEMPLATE ||--o{ PLAN_TEMPLATE_ITEM : contains
-  PLAN_LINE ||--o{ PLAN_LINE_MATERIAL : lines
-  MATERIAL ||--o{ PLAN_LINE_MATERIAL : ref
-  PLAN_LINE }o--o| WORK_ORDER : "sinh phieu"
-  PLAN_LINE {
-    bigint id PK
-    bigint vehicle_id FK
-    bigint catalog_id FK
-    string period
-    string content
-    numeric qty
-    numeric unit_price
-    date schedule_date
-    bigint work_order_id FK
-  }
-  PLAN_LINE_MATERIAL {
-    bigint id PK
-    bigint plan_line_id FK
-    bigint material_id FK
-    numeric qty
-    string uom
-  }
-  PLAN_TEMPLATE {
-    bigint id PK
-    string name
-    string period
-    string brand
-    string model
-  }
-          </pre>
-        </div>
-
-        <div class="diagram-pane" data-erd-pane="order">
-          <p class="cap">Phiếu BD/SC: hạng mục · VT dự kiến · VT mua hàng (sau đồng bộ) · sync · nhật ký duyệt. Hai cụm VT không ghi đè nhau.</p>
-          <pre class="mermaid">
-erDiagram
-  VEHICLE ||--o{ WORK_ORDER : has
-  WORK_ORDER ||--o{ WORK_ORDER_ITEM : items
-  WORK_ORDER ||--o{ WORK_ORDER_MATERIAL : planned
-  WORK_ORDER ||--o{ WORK_ORDER_PURCHASE_LINE : purchased
-  WORK_ORDER ||--|| WORK_ORDER_SYNC : sync
-  WORK_ORDER ||--o{ WORK_ORDER_APPROVAL_LOG : audit
-  MATERIAL ||--o{ WORK_ORDER_MATERIAL : optional
-  MATERIAL ||--o{ WORK_ORDER_PURCHASE_LINE : optional
-  WORK_ORDER_MATERIAL ||--o| WORK_ORDER_PURCHASE_LINE : "doi chieu"
-  WORK_ORDER {
-    bigint id PK
-    string code UK
-    bigint vehicle_id FK
-    string approval_status
-    string exec_status
-    string source
-    numeric cost
-  }
-  WORK_ORDER_ITEM {
-    bigint id PK
-    bigint work_order_id FK
-    string content
-    numeric barem_hours
-    numeric actual_hours
-    string status
-  }
-  WORK_ORDER_MATERIAL {
-    bigint id PK
-    bigint work_order_id FK
-    bigint material_id FK
-    string source
-    numeric qty
-  }
-  WORK_ORDER_PURCHASE_LINE {
-    bigint id PK
-    bigint work_order_id FK
-    bigint planned_material_id FK
-    string purchase_doc_code
-    numeric price
-  }
-  WORK_ORDER_SYNC {
-    bigint work_order_id PK_FK
-    string purchase_status
-    string base_status
-    string base_code
-  }
-          </pre>
-        </div>
-
-        <div class="diagram-pane" data-erd-pane="sync">
-          <p class="cap">Ánh xạ xe TMS ↔ PWMS; trạng thái đồng bộ mua hàng / BASE gắn 1–1 với phiếu. GPS odo đọc vào vehicle (không bảng riêng trên prototype).</p>
-          <pre class="mermaid">
-erDiagram
-  VEHICLE ||--o| PWMS_VEHICLE_MAP : maps
-  WORK_ORDER ||--|| WORK_ORDER_SYNC : has
-  PWMS_VEHICLE_MAP {
-    bigint vehicle_id PK_FK
-    string pwms_object_id
-    string pwms_plate
-    string status
-  }
-  WORK_ORDER_SYNC {
-    bigint work_order_id PK_FK
-    string purchase_status
-    datetime purchase_synced_at
-    string issue_doc_code
-    string base_status
-    string base_code
-    datetime base_synced_at
-  }
-  MATERIAL ||--o{ MATERIAL_PRICE_HISTORY : history
-  MATERIAL_PRICE_HISTORY {
-    bigint id PK
-    bigint material_id FK
-    numeric price
-    string supplier
-    datetime synced_at
-  }
-          </pre>
-          <p class="cap" style="margin-top:10px">Hệ thống ngoài (không lưu bảng quan hệ trong TMS): <strong>PWMS</strong> kéo vào sync / giá vật tư · <strong>BASE</strong> đẩy trạng thái · <strong>GPS</strong> cập nhật odo trên <span class="mono">vehicle</span>.</p>
+        <p class="erd-cap" id="erdCap"></p>
+        <div class="erd-host">
+          <erd-editor id="erdCanvas" readonly></erd-editor>
         </div>
       </div>
 
@@ -1184,39 +985,524 @@ erDiagram
     </footer>
   </div>
   <script type="module">
-    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'base',
-      themeVariables: {
-        primaryColor: '#ecfdf5',
-        primaryTextColor: '#0c1a14',
-        primaryBorderColor: '#0b6e4f',
-        lineColor: '#5a6b63',
-        secondaryColor: '#eff6ff',
-        tertiaryColor: '#f8fafc',
-        fontFamily: 'Be Vietnam Pro, IBM Plex Sans, sans-serif',
-      },
-      er: { useMaxWidth: true },
-    });
+    import 'https://esm.run/@dineug/erd-editor';
 
-    const runMermaid = async (root) => {
-      const nodes = [...(root || document).querySelectorAll('.mermaid:not([data-processed])')];
-      if (!nodes.length) return;
-      await mermaid.run({ nodes });
+    const OPT = { AI: 1, PK: 2, UQ: 4, NN: 8 };
+    const REL = { ZeroOne: 2, ZeroN: 4, OneOnly: 8, OneN: 16 };
+    const SHOW = 1 | 2 | 4 | 32 | 64 | 128 | 256; // comment, type, PK, UQ, NN, relationships
+    const COLOR = { master: '#0b6e4f', tx: '#1d4ed8', junction: '#7c3aed', ext: '#be123c' };
+
+    const tid = (n) => `t_${n}`;
+    const cid = (t, c) => `c_${t}__${c}`;
+    const rid = (a, b, i = 0) => `r_${a}__${b}__${i}`;
+
+    function col(table, name, dataType, comment, options = OPT.NN) {
+      return { id: cid(table, name), tableId: tid(table), name, comment: comment || '', dataType, default: '', options };
+    }
+
+    function buildSchema({ tables, relationships, zoom = 0.7, originX = 0, originY = 0, dbName = 'gls_bdsc' }) {
+      const tableEntities = {};
+      const tableColumnEntities = {};
+      const relationshipEntities = {};
+      const tableIds = [];
+      const relationshipIds = [];
+
+      tables.forEach((t) => {
+        const id = tid(t.name);
+        tableIds.push(id);
+        const columnIds = t.columns.map((c) => c.id);
+        t.columns.forEach((c) => { tableColumnEntities[c.id] = c; });
+        tableEntities[id] = {
+          id,
+          name: t.name,
+          comment: t.comment || '',
+          columnIds,
+          ui: { x: t.x, y: t.y, color: t.color || COLOR.master },
+        };
+      });
+
+      relationships.forEach((r, i) => {
+        const id = r.id || rid(r.start, r.end, i);
+        relationshipIds.push(id);
+        relationshipEntities[id] = {
+          id,
+          relationshipType: r.type || REL.OneN,
+          onDelete: 1,
+          onUpdate: 1,
+          start: { tableId: tid(r.start), columnIds: r.startCols.map((c) => cid(r.start, c)) },
+          end: { tableId: tid(r.end), columnIds: r.endCols.map((c) => cid(r.end, c)) },
+        };
+      });
+
+      return {
+        $schema: 'https://raw.githubusercontent.com/dineug/erd-editor/main/json-schema/schema.json',
+        version: '3.0.0',
+        settings: {
+          originX,
+          originY,
+          zoomLevel: zoom,
+          show: SHOW,
+          database: 16,
+          databaseName: dbName,
+          canvasType: 'ERD',
+          language: 16,
+          tableNameCase: 1,
+          columnNameCase: 1,
+          bracketType: 1,
+          relationshipDataTypeSync: true,
+          columnOrder: [1, 2, 4, 8, 16, 32, 64],
+          maxWidthComment: 160,
+          lockSettings: 0,
+        },
+        doc: { tableIds, relationshipIds, indexIds: [], memoIds: [] },
+        collections: {
+          tableEntities,
+          tableColumnEntities,
+          relationshipEntities,
+          indexEntities: {},
+          indexColumnEntities: {},
+          memoEntities: {},
+        },
+      };
+    }
+
+    /* —— Column catalogs (shared) —— */
+    const T = {
+      vehicle: (x, y, color = COLOR.master) => ({
+        name: 'vehicle', comment: 'Xe / rơ-moóc', color, x, y,
+        columns: [
+          col('vehicle', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('vehicle', 'plate', 'varchar(32)', 'Biển số', OPT.NN | OPT.UQ),
+          col('vehicle', 'is_trailer', 'boolean', 'Rơ-moóc?', OPT.NN),
+          col('vehicle', 'brand', 'varchar(64)', 'Hãng'),
+          col('vehicle', 'model', 'varchar(64)', 'Dòng'),
+          col('vehicle', 'year', 'int', 'Năm SX'),
+          col('vehicle', 'odo_km', 'numeric', 'ODO đồng hồ'),
+          col('vehicle', 'engine_hours', 'numeric', 'Giờ máy'),
+          col('vehicle', 'avg_km_per_month', 'numeric', 'TB km/tháng'),
+          col('vehicle', 'garage', 'varchar(128)', 'Garage'),
+          col('vehicle', 'area', 'varchar(64)', 'Khu vực'),
+          col('vehicle', 'gps_site', 'varchar(128)', 'Điểm GPS'),
+          col('vehicle', 'trailer_vehicle_id', 'bigint', 'FK → vehicle'),
+        ],
+      }),
+      material: (x, y, color = COLOR.master) => ({
+        name: 'material', comment: 'Master vật tư', color, x, y,
+        columns: [
+          col('material', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('material', 'code', 'varchar(64)', 'Mã VT', OPT.NN | OPT.UQ),
+          col('material', 'name', 'varchar(256)', 'Tên', OPT.NN),
+          col('material', 'uom', 'varchar(32)', 'ĐVT', OPT.NN),
+          col('material', 'ref_price', 'numeric', 'Giá tham chiếu'),
+          col('material', 'vat', 'numeric', '% VAT'),
+          col('material', 'min_qty', 'numeric', 'toi_thieu ≥ 1', OPT.NN),
+          col('material', 'supplier', 'varchar(128)', 'NCC'),
+          col('material', 'warehouse', 'varchar(128)', 'Kho'),
+          col('material', 'stock_qty', 'numeric', 'Tồn cache PWMS'),
+          col('material', 'pwms_group', 'varchar(64)', 'nhom'),
+          col('material', 'system', 'varchar(64)', 'he_thong'),
+          col('material', 'requires_serial', 'boolean', 'Lốp / ắc'),
+        ],
+      }),
+      vehicle_system: (x, y) => ({
+        name: 'vehicle_system', comment: 'Hệ thống xe', color: COLOR.master, x, y,
+        columns: [
+          col('vehicle_system', 'id', 'varchar(64)', 'PK', OPT.PK | OPT.NN),
+          col('vehicle_system', 'name', 'varchar(128)', 'Tên', OPT.NN),
+        ],
+      }),
+      maint_catalog: (x, y) => ({
+        name: 'maint_catalog', comment: 'Danh mục BD', color: COLOR.master, x, y,
+        columns: [
+          col('maint_catalog', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('maint_catalog', 'code', 'varchar(64)', 'Mã', OPT.NN | OPT.UQ),
+          col('maint_catalog', 'name', 'varchar(256)', 'Tên', OPT.NN),
+          col('maint_catalog', 'system_id', 'varchar(64)', 'FK → vehicle_system', OPT.NN),
+          col('maint_catalog', 'default_on_eval_bad', 'varchar(16)', 'REPAIR|REPLACE'),
+        ],
+      }),
+      maint_catalog_rule: (x, y) => ({
+        name: 'maint_catalog_rule', comment: 'Mốc chu kỳ', color: COLOR.junction, x, y,
+        columns: [
+          col('maint_catalog_rule', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('maint_catalog_rule', 'catalog_id', 'bigint', 'FK', OPT.NN),
+          col('maint_catalog_rule', 'seq', 'int', 'Thứ tự', OPT.NN),
+          col('maint_catalog_rule', 'rule_type', 'varchar(16)', 'KM | MONTH', OPT.NN),
+          col('maint_catalog_rule', 'value', 'numeric', 'Giá trị mốc', OPT.NN),
+          col('maint_catalog_rule', 'force_replace', 'boolean', 'Bắt buộc thay'),
+          col('maint_catalog_rule', 'repeat', 'boolean', 'Lặp lại'),
+          col('maint_catalog_rule', 'max_occurrences', 'int', 'null = ∞'),
+        ],
+      }),
+      vehicle_catalog: (x, y) => ({
+        name: 'vehicle_catalog', comment: 'Gán DM vào xe', color: COLOR.junction, x, y,
+        columns: [
+          col('vehicle_catalog', 'vehicle_id', 'bigint', 'PK/FK', OPT.PK | OPT.NN),
+          col('vehicle_catalog', 'catalog_id', 'bigint', 'PK/FK', OPT.PK | OPT.NN),
+          col('vehicle_catalog', 'cycle_override', 'jsonb', 'Override chu kỳ'),
+        ],
+      }),
+      vehicle_catalog_state: (x, y) => ({
+        name: 'vehicle_catalog_state', comment: 'Mốc nhắc BD', color: COLOR.tx, x, y,
+        columns: [
+          col('vehicle_catalog_state', 'vehicle_id', 'bigint', 'PK/FK', OPT.PK | OPT.NN),
+          col('vehicle_catalog_state', 'catalog_id', 'bigint', 'PK/FK', OPT.PK | OPT.NN),
+          col('vehicle_catalog_state', 'occurrence', 'int', 'Lần thực hiện', OPT.NN),
+          col('vehicle_catalog_state', 'last_km', 'numeric', 'Km lần trước'),
+          col('vehicle_catalog_state', 'last_date', 'date', 'Ngày lần trước'),
+          col('vehicle_catalog_state', 'next_km', 'numeric', 'Mốc km kế'),
+          col('vehicle_catalog_state', 'next_date', 'date', 'Mốc ngày kế'),
+          col('vehicle_catalog_state', 'planned_date_override', 'date', 'Override KH'),
+        ],
+      }),
+      plan_line: (x, y) => ({
+        name: 'plan_line', comment: 'Dòng kế hoạch', color: COLOR.tx, x, y,
+        columns: [
+          col('plan_line', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('plan_line', 'vehicle_id', 'bigint', 'FK → vehicle', OPT.NN),
+          col('plan_line', 'catalog_id', 'bigint', 'FK · nullable'),
+          col('plan_line', 'period', 'varchar(7)', 'YYYY-MM', OPT.NN),
+          col('plan_line', 'content', 'text', 'Nội dung'),
+          col('plan_line', 'service', 'varchar(128)', 'Loại DV'),
+          col('plan_line', 'qty', 'numeric', 'SL'),
+          col('plan_line', 'uom', 'varchar(32)', 'ĐVT'),
+          col('plan_line', 'unit_price', 'numeric', 'Đơn giá'),
+          col('plan_line', 'vat', 'numeric', '% VAT'),
+          col('plan_line', 'schedule_date', 'date', 'Ngày KH'),
+          col('plan_line', 'work_order_id', 'bigint', 'FK · đã tạo phiếu'),
+          col('plan_line', 'base_sync_status', 'varchar(32)', 'Trạng thái BASE'),
+          col('plan_line', 'base_sync_code', 'varchar(64)', 'Mã BASE'),
+        ],
+      }),
+      plan_line_material: (x, y) => ({
+        name: 'plan_line_material', comment: 'VT gợi ý trên KH', color: COLOR.junction, x, y,
+        columns: [
+          col('plan_line_material', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('plan_line_material', 'plan_line_id', 'bigint', 'FK', OPT.NN),
+          col('plan_line_material', 'material_id', 'bigint', 'FK · nullable'),
+          col('plan_line_material', 'code', 'varchar(64)', 'Mã VT'),
+          col('plan_line_material', 'name', 'varchar(256)', 'Tên VT'),
+          col('plan_line_material', 'qty', 'numeric', '≥ min_qty', OPT.NN),
+          col('plan_line_material', 'uom', 'varchar(32)', 'ĐVT'),
+        ],
+      }),
+      plan_template: (x, y) => ({
+        name: 'plan_template', comment: 'Mẫu kế hoạch', color: COLOR.master, x, y,
+        columns: [
+          col('plan_template', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('plan_template', 'name', 'varchar(128)', 'Tên mẫu', OPT.NN),
+          col('plan_template', 'period', 'varchar(7)', 'Kỳ mặc định'),
+          col('plan_template', 'vehicle_type', 'varchar(64)', 'Loại xe'),
+          col('plan_template', 'brand', 'varchar(64)', 'Hãng'),
+          col('plan_template', 'model', 'varchar(64)', 'Dòng'),
+          col('plan_template', 'seed_vehicle_id', 'bigint', 'FK seed'),
+        ],
+      }),
+      plan_template_item: (x, y) => ({
+        name: 'plan_template_item', comment: 'Hạng mục mẫu', color: COLOR.junction, x, y,
+        columns: [
+          col('plan_template_item', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('plan_template_item', 'template_id', 'bigint', 'FK', OPT.NN),
+          col('plan_template_item', 'catalog_id', 'bigint', 'FK · nullable'),
+          col('plan_template_item', 'content', 'text', 'Nội dung'),
+          col('plan_template_item', 'qty', 'numeric', 'SL'),
+          col('plan_template_item', 'unit_price', 'numeric', 'Đơn giá'),
+        ],
+      }),
+      work_order: (x, y) => ({
+        name: 'work_order', comment: 'Phiếu BD / SC', color: COLOR.tx, x, y,
+        columns: [
+          col('work_order', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('work_order', 'code', 'varchar(64)', 'RO-… / PBD-…', OPT.NN | OPT.UQ),
+          col('work_order', 'vehicle_id', 'bigint', 'FK → vehicle', OPT.NN),
+          col('work_order', 'order_kind', 'varchar(16)', 'MAINT | REPAIR', OPT.NN),
+          col('work_order', 'source', 'varchar(32)', 'INCIDENT|PLAN|EVAL|…', OPT.NN),
+          col('work_order', 'approval_status', 'varchar(32)', 'Enum duyệt', OPT.NN),
+          col('work_order', 'exec_status', 'varchar(32)', 'Enum thực hiện', OPT.NN),
+          col('work_order', 'odo_km', 'numeric', 'ODO lúc tạo'),
+          col('work_order', 'garage', 'varchar(128)', 'Garage'),
+          col('work_order', 'content', 'text', 'Mô tả'),
+          col('work_order', 'catalog_id', 'bigint', 'FK · nullable'),
+          col('work_order', 'started_at', 'timestamptz', 'Bắt đầu'),
+          col('work_order', 'completed_at', 'timestamptz', 'Hoàn thành'),
+          col('work_order', 'material_requested_at', 'timestamptz', 'Mốc VT'),
+          col('work_order', 'material_ready_at', 'timestamptz', 'VT sẵn'),
+          col('work_order', 'cost', 'numeric', 'Chi phí derived'),
+          col('work_order', 'revision', 'int', 'Phiên bản', OPT.NN),
+        ],
+      }),
+      work_order_item: (x, y) => ({
+        name: 'work_order_item', comment: 'Hạng mục phiếu', color: COLOR.junction, x, y,
+        columns: [
+          col('work_order_item', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('work_order_item', 'work_order_id', 'bigint', 'FK', OPT.NN),
+          col('work_order_item', 'system', 'varchar(64)', 'Hệ thống'),
+          col('work_order_item', 'content', 'text', 'Nội dung', OPT.NN),
+          col('work_order_item', 'service', 'varchar(128)', 'Loại DV'),
+          col('work_order_item', 'performer', 'varchar(128)', 'KTV'),
+          col('work_order_item', 'barem_hours', 'numeric', 'Giờ barem'),
+          col('work_order_item', 'actual_hours', 'numeric', 'Giờ thực tế'),
+          col('work_order_item', 'started_at', 'timestamptz', ''),
+          col('work_order_item', 'completed_at', 'timestamptz', ''),
+          col('work_order_item', 'status', 'varchar(16)', 'TODO|DOING|DONE', OPT.NN),
+        ],
+      }),
+      work_order_material: (x, y) => ({
+        name: 'work_order_material', comment: 'VT dự kiến', color: COLOR.junction, x, y,
+        columns: [
+          col('work_order_material', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('work_order_material', 'work_order_id', 'bigint', 'FK', OPT.NN),
+          col('work_order_material', 'material_id', 'bigint', 'FK · nullable'),
+          col('work_order_material', 'source', 'varchar(32)', 'PWMS|EXTERNAL|TECHNICIAN', OPT.NN),
+          col('work_order_material', 'qty', 'numeric', '≥ min_qty', OPT.NN),
+          col('work_order_material', 'uom', 'varchar(32)', 'ĐVT'),
+          col('work_order_material', 'price', 'numeric', 'Đơn giá'),
+          col('work_order_material', 'vat', 'numeric', '% VAT'),
+          col('work_order_material', 'local_only', 'boolean', 'Chỉ nội bộ'),
+        ],
+      }),
+      work_order_purchase_line: (x, y) => ({
+        name: 'work_order_purchase_line', comment: 'VT sau đồng bộ MH', color: COLOR.junction, x, y,
+        columns: [
+          col('work_order_purchase_line', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('work_order_purchase_line', 'work_order_id', 'bigint', 'FK', OPT.NN),
+          col('work_order_purchase_line', 'planned_material_id', 'bigint', 'FK → work_order_material'),
+          col('work_order_purchase_line', 'price', 'numeric', 'Giá từ MH'),
+          col('work_order_purchase_line', 'supplier', 'varchar(128)', 'NCC'),
+          col('work_order_purchase_line', 'warehouse', 'varchar(128)', 'Kho'),
+          col('work_order_purchase_line', 'purchase_doc_code', 'varchar(64)', 'XK-… / MH-…'),
+          col('work_order_purchase_line', 'issued_at', 'timestamptz', 'Xuất kho'),
+        ],
+      }),
+      work_order_sync: (x, y) => ({
+        name: 'work_order_sync', comment: 'Sync MH / BASE 1–1', color: COLOR.ext, x, y,
+        columns: [
+          col('work_order_sync', 'work_order_id', 'bigint', 'PK/FK', OPT.PK | OPT.NN),
+          col('work_order_sync', 'purchase_status', 'varchar(16)', 'NONE|SYNCING|SYNCED|FAILED', OPT.NN),
+          col('work_order_sync', 'purchase_synced_at', 'timestamptz', ''),
+          col('work_order_sync', 'issue_doc_code', 'varchar(64)', 'Chứng từ XK'),
+          col('work_order_sync', 'base_status', 'varchar(32)', 'Trạng thái BASE'),
+          col('work_order_sync', 'base_code', 'varchar(64)', 'Mã BASE'),
+          col('work_order_sync', 'base_synced_at', 'timestamptz', ''),
+        ],
+      }),
+      work_order_approval_log: (x, y) => ({
+        name: 'work_order_approval_log', comment: 'Nhật ký duyệt', color: COLOR.tx, x, y,
+        columns: [
+          col('work_order_approval_log', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('work_order_approval_log', 'work_order_id', 'bigint', 'FK', OPT.NN),
+          col('work_order_approval_log', 'action', 'varchar(32)', 'CREATE|SUBMIT|APPROVE|…', OPT.NN),
+          col('work_order_approval_log', 'at', 'timestamptz', '', OPT.NN),
+          col('work_order_approval_log', 'by', 'varchar(128)', 'Người thao tác'),
+          col('work_order_approval_log', 'note', 'text', 'Ghi chú'),
+          col('work_order_approval_log', 'changes_json', 'jsonb', 'Diff cũ→mới'),
+        ],
+      }),
+      evaluation: (x, y) => ({
+        name: 'evaluation', comment: 'Đánh giá xe', color: COLOR.tx, x, y,
+        columns: [
+          col('evaluation', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('evaluation', 'vehicle_id', 'bigint', 'FK', OPT.NN),
+          col('evaluation', 'evaluated_at', 'timestamptz', '', OPT.NN),
+          col('evaluation', 'result', 'varchar(32)', 'PASS|FAIL|…'),
+          col('evaluation', 'note', 'text', ''),
+        ],
+      }),
+      pwms_vehicle_map: (x, y) => ({
+        name: 'pwms_vehicle_map', comment: 'TMS ↔ PWMS Object ID', color: COLOR.ext, x, y,
+        columns: [
+          col('pwms_vehicle_map', 'vehicle_id', 'bigint', 'PK/FK', OPT.PK | OPT.NN),
+          col('pwms_vehicle_map', 'pwms_object_id', 'varchar(64)', 'Object ID', OPT.NN | OPT.UQ),
+          col('pwms_vehicle_map', 'pwms_plate', 'varchar(32)', 'Biển trên PWMS'),
+          col('pwms_vehicle_map', 'status', 'varchar(32)', 'ACTIVE|…'),
+        ],
+      }),
+      material_price_history: (x, y) => ({
+        name: 'material_price_history', comment: 'Lịch sử giá PWMS', color: COLOR.ext, x, y,
+        columns: [
+          col('material_price_history', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('material_price_history', 'material_id', 'bigint', 'FK', OPT.NN),
+          col('material_price_history', 'price', 'numeric', '', OPT.NN),
+          col('material_price_history', 'supplier', 'varchar(128)', ''),
+          col('material_price_history', 'synced_at', 'timestamptz', '', OPT.NN),
+        ],
+      }),
+      repair_item: (x, y) => ({
+        name: 'repair_item', comment: 'Nội dung SC', color: COLOR.master, x, y,
+        columns: [
+          col('repair_item', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('repair_item', 'system_id', 'varchar(64)', 'FK', OPT.NN),
+          col('repair_item', 'name', 'varchar(256)', '', OPT.NN),
+          col('repair_item', 'service', 'varchar(128)', 'Loại DV'),
+        ],
+      }),
+      barem_hour: (x, y) => ({
+        name: 'barem_hour', comment: 'Giờ barem', color: COLOR.master, x, y,
+        columns: [
+          col('barem_hour', 'id', 'bigint', 'PK', OPT.PK | OPT.NN | OPT.AI),
+          col('barem_hour', 'system_id', 'varchar(64)', 'FK', OPT.NN),
+          col('barem_hour', 'content', 'varchar(256)', '', OPT.NN),
+          col('barem_hour', 'hours', 'numeric', '', OPT.NN),
+        ],
+      }),
     };
 
-    await runMermaid(document.querySelector('.diagram-pane.on'));
+    const VIEWS = {
+      overview: {
+        cap: 'Trục trung tâm: <strong>vehicle</strong> → kế hoạch / phiếu / đánh giá; <strong>material</strong> &amp; <strong>maint_catalog</strong> cấp dữ liệu nền. Zoom &amp; kéo để xem cột.',
+        schema: () => buildSchema({
+          zoom: 0.45,
+          originX: 80,
+          originY: 40,
+          tables: [
+            T.vehicle_system(40, 40),
+            T.maint_catalog(320, 40),
+            T.vehicle(40, 360),
+            T.material(960, 40),
+            T.vehicle_catalog(320, 320),
+            T.vehicle_catalog_state(560, 320),
+            T.plan_line(40, 720),
+            T.work_order(480, 720),
+            T.evaluation(880, 720),
+            T.work_order_sync(480, 1180),
+            T.pwms_vehicle_map(40, 1180),
+          ],
+          relationships: [
+            { start: 'vehicle_system', startCols: ['id'], end: 'maint_catalog', endCols: ['system_id'], type: REL.OneN },
+            { start: 'vehicle', startCols: ['id'], end: 'vehicle_catalog', endCols: ['vehicle_id'], type: REL.OneN },
+            { start: 'maint_catalog', startCols: ['id'], end: 'vehicle_catalog', endCols: ['catalog_id'], type: REL.OneN },
+            { start: 'vehicle', startCols: ['id'], end: 'vehicle_catalog_state', endCols: ['vehicle_id'], type: REL.OneN },
+            { start: 'maint_catalog', startCols: ['id'], end: 'vehicle_catalog_state', endCols: ['catalog_id'], type: REL.OneN },
+            { start: 'vehicle', startCols: ['id'], end: 'plan_line', endCols: ['vehicle_id'], type: REL.OneN },
+            { start: 'vehicle', startCols: ['id'], end: 'work_order', endCols: ['vehicle_id'], type: REL.OneN },
+            { start: 'vehicle', startCols: ['id'], end: 'evaluation', endCols: ['vehicle_id'], type: REL.OneN },
+            { start: 'work_order', startCols: ['id'], end: 'plan_line', endCols: ['work_order_id'], type: REL.ZeroOne },
+            { start: 'work_order', startCols: ['id'], end: 'work_order_sync', endCols: ['work_order_id'], type: REL.OneOnly },
+            { start: 'vehicle', startCols: ['id'], end: 'pwms_vehicle_map', endCols: ['vehicle_id'], type: REL.ZeroOne },
+          ],
+        }),
+      },
+      maint: {
+        cap: 'Gắn danh mục BD vào xe → mốc <strong>vehicle_catalog_state</strong> (lưới Nhắc BD). Rule chu kỳ trên <strong>maint_catalog_rule</strong>.',
+        schema: () => buildSchema({
+          zoom: 0.72,
+          originX: 40,
+          originY: 20,
+          tables: [
+            T.vehicle_system(40, 40),
+            T.maint_catalog(320, 40),
+            T.maint_catalog_rule(700, 40),
+            T.vehicle(40, 380),
+            T.vehicle_catalog(360, 380),
+            T.vehicle_catalog_state(700, 380),
+            T.repair_item(40, 820),
+            T.barem_hour(360, 820),
+          ],
+          relationships: [
+            { start: 'vehicle_system', startCols: ['id'], end: 'maint_catalog', endCols: ['system_id'], type: REL.OneN },
+            { start: 'maint_catalog', startCols: ['id'], end: 'maint_catalog_rule', endCols: ['catalog_id'], type: REL.OneN },
+            { start: 'vehicle', startCols: ['id'], end: 'vehicle_catalog', endCols: ['vehicle_id'], type: REL.OneN },
+            { start: 'maint_catalog', startCols: ['id'], end: 'vehicle_catalog', endCols: ['catalog_id'], type: REL.OneN },
+            { start: 'vehicle', startCols: ['id'], end: 'vehicle_catalog_state', endCols: ['vehicle_id'], type: REL.OneN },
+            { start: 'maint_catalog', startCols: ['id'], end: 'vehicle_catalog_state', endCols: ['catalog_id'], type: REL.OneN },
+            { start: 'vehicle_system', startCols: ['id'], end: 'repair_item', endCols: ['system_id'], type: REL.OneN },
+            { start: 'vehicle_system', startCols: ['id'], end: 'barem_hour', endCols: ['system_id'], type: REL.OneN },
+          ],
+        }),
+      },
+      plan: {
+        cap: 'Dòng kế hoạch theo xe + kỳ; VT gợi ý qua junction. Có thể liên kết sang phiếu sau khi tạo.',
+        schema: () => buildSchema({
+          zoom: 0.68,
+          originX: 40,
+          originY: 20,
+          tables: [
+            T.vehicle(40, 40),
+            T.maint_catalog(420, 40),
+            T.material(800, 40),
+            T.plan_line(40, 480),
+            T.plan_line_material(480, 480),
+            T.plan_template(40, 980),
+            T.plan_template_item(420, 980),
+            T.work_order(800, 480),
+          ],
+          relationships: [
+            { start: 'vehicle', startCols: ['id'], end: 'plan_line', endCols: ['vehicle_id'], type: REL.OneN },
+            { start: 'maint_catalog', startCols: ['id'], end: 'plan_line', endCols: ['catalog_id'], type: REL.ZeroN },
+            { start: 'plan_line', startCols: ['id'], end: 'plan_line_material', endCols: ['plan_line_id'], type: REL.OneN },
+            { start: 'material', startCols: ['id'], end: 'plan_line_material', endCols: ['material_id'], type: REL.ZeroN },
+            { start: 'plan_template', startCols: ['id'], end: 'plan_template_item', endCols: ['template_id'], type: REL.OneN },
+            { start: 'work_order', startCols: ['id'], end: 'plan_line', endCols: ['work_order_id'], type: REL.ZeroOne },
+          ],
+        }),
+      },
+      order: {
+        cap: 'Phiếu BD/SC: hạng mục · VT dự kiến · VT mua hàng (sau sync) · sync · nhật ký duyệt. Hai cụm VT không ghi đè nhau.',
+        schema: () => buildSchema({
+          zoom: 0.62,
+          originX: 20,
+          originY: 10,
+          tables: [
+            T.vehicle(40, 40),
+            T.material(420, 40),
+            T.work_order(40, 480),
+            T.work_order_item(480, 480),
+            T.work_order_material(820, 480),
+            T.work_order_purchase_line(820, 980),
+            T.work_order_sync(40, 1100),
+            T.work_order_approval_log(420, 1100),
+          ],
+          relationships: [
+            { start: 'vehicle', startCols: ['id'], end: 'work_order', endCols: ['vehicle_id'], type: REL.OneN },
+            { start: 'work_order', startCols: ['id'], end: 'work_order_item', endCols: ['work_order_id'], type: REL.OneN },
+            { start: 'work_order', startCols: ['id'], end: 'work_order_material', endCols: ['work_order_id'], type: REL.OneN },
+            { start: 'work_order', startCols: ['id'], end: 'work_order_purchase_line', endCols: ['work_order_id'], type: REL.OneN },
+            { start: 'work_order', startCols: ['id'], end: 'work_order_sync', endCols: ['work_order_id'], type: REL.OneOnly },
+            { start: 'work_order', startCols: ['id'], end: 'work_order_approval_log', endCols: ['work_order_id'], type: REL.OneN },
+            { start: 'material', startCols: ['id'], end: 'work_order_material', endCols: ['material_id'], type: REL.ZeroN },
+            { start: 'work_order_material', startCols: ['id'], end: 'work_order_purchase_line', endCols: ['planned_material_id'], type: REL.ZeroOne },
+          ],
+        }),
+      },
+      sync: {
+        cap: 'Ánh xạ xe TMS ↔ PWMS; sync MH/BASE 1–1 với phiếu. GPS odo ghi vào <span class="mono">vehicle</span> (không bảng riêng). Ngoài: PWMS · BASE · GPS.',
+        schema: () => buildSchema({
+          zoom: 0.75,
+          originX: 60,
+          originY: 30,
+          tables: [
+            T.vehicle(40, 40),
+            T.pwms_vehicle_map(420, 40),
+            T.work_order(40, 480),
+            T.work_order_sync(420, 480),
+            T.material(40, 980),
+            T.material_price_history(420, 980),
+          ],
+          relationships: [
+            { start: 'vehicle', startCols: ['id'], end: 'pwms_vehicle_map', endCols: ['vehicle_id'], type: REL.ZeroOne },
+            { start: 'work_order', startCols: ['id'], end: 'work_order_sync', endCols: ['work_order_id'], type: REL.OneOnly },
+            { start: 'material', startCols: ['id'], end: 'material_price_history', endCols: ['material_id'], type: REL.OneN },
+          ],
+        }),
+      },
+    };
+
+    const editor = document.getElementById('erdCanvas');
+    const capEl = document.getElementById('erdCap');
+
+    function loadView(key) {
+      const view = VIEWS[key] || VIEWS.overview;
+      capEl.innerHTML = view.cap;
+      editor.setInitialValue(JSON.stringify(view.schema()));
+    }
+
+    loadView('overview');
 
     document.querySelectorAll('[data-erd-tab]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-erd-tab');
         document.querySelectorAll('[data-erd-tab]').forEach((b) => b.classList.toggle('on', b === btn));
-        document.querySelectorAll('[data-erd-pane]').forEach((p) => {
-          p.classList.toggle('on', p.getAttribute('data-erd-pane') === id);
-        });
-        const pane = document.querySelector(`[data-erd-pane="${id}"]`);
-        await runMermaid(pane);
+        loadView(id);
       });
     });
   </script>
