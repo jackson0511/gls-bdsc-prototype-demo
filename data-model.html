@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GLS · Mô hình dữ liệu &amp; luồng · console v4</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #0c1a14;
+      --muted: #5a6b63;
+      --line: #d5e0da;
+      --brand: #0b6e4f;
+      --brand-deep: #084c37;
+      --accent: #c45c26;
+      --surface: #ffffff;
+      --bg: #eef4f0;
+      --master: #0b6e4f;
+      --tx: #1d4ed8;
+      --ext: #be123c;
+      --pad: clamp(14px, 3vw, 28px);
+      --max: 1120px;
+      --radius: 14px;
+      --shadow: 0 1px 0 rgba(12,26,20,.04), 0 12px 32px rgba(12,26,20,.06);
+      --font: "Be Vietnam Pro", "IBM Plex Sans", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      color: var(--ink);
+      background:
+        radial-gradient(1100px 520px at -5% -10%, #b8e0cf 0%, transparent 55%),
+        radial-gradient(900px 480px at 110% 0%, #e8ddd0 0%, transparent 50%),
+        linear-gradient(180deg, #f5f9f6 0%, var(--bg) 40%, #e8efe9 100%);
+      line-height: 1.55;
+      min-height: 100vh;
+    }
+    a { color: var(--brand); }
+    .wrap { max-width: var(--max); margin: 0 auto; padding: var(--pad) var(--pad) 72px; }
+
+    /* Hero */
+    .hero {
+      position: relative;
+      padding: clamp(28px, 5vw, 48px) 0 8px;
+      margin-bottom: 8px;
+    }
+    .hero-brand {
+      font-size: 12px; font-weight: 700; letter-spacing: .12em;
+      text-transform: uppercase; color: var(--brand); margin: 0 0 10px;
+    }
+    .hero h1 {
+      margin: 0 0 12px;
+      font-size: clamp(1.75rem, 4.2vw, 2.45rem);
+      font-weight: 700; line-height: 1.15; letter-spacing: -0.02em;
+      max-width: 18ch;
+    }
+    .hero-lead {
+      margin: 0 0 18px; color: var(--muted); font-size: 1.02rem;
+      max-width: 58ch;
+    }
+    .hero-meta {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      font-size: 12px; color: var(--muted);
+    }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 12px; border-radius: 999px;
+      background: rgba(255,255,255,.72); border: 1px solid var(--line);
+      backdrop-filter: blur(6px);
+    }
+    .pill a { text-decoration: none; font-weight: 600; }
+
+    /* Sticky nav */
+    .toc {
+      position: sticky; top: 0; z-index: 20;
+      margin: 20px 0 28px;
+      padding: 10px;
+      background: rgba(255,255,255,.88);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      backdrop-filter: blur(10px);
+      box-shadow: var(--shadow);
+      display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
+    }
+    .toc a {
+      text-decoration: none; color: var(--ink);
+      font-size: 13px; font-weight: 600;
+      padding: 8px 14px; border-radius: 999px;
+    }
+    .toc a:hover, .toc a.on { background: #ecfdf5; color: var(--brand-deep); }
+
+    section {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: clamp(20px, 3vw, 28px);
+      margin-bottom: 18px;
+      box-shadow: var(--shadow);
+    }
+    section h2 {
+      margin: 0 0 6px;
+      font-size: 1.28rem; font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    section .sub {
+      margin: 0 0 20px; color: var(--muted); font-size: 14px; max-width: 70ch;
+    }
+    h3 {
+      margin: 22px 0 10px;
+      font-size: 1.02rem; font-weight: 700; color: var(--brand-deep);
+    }
+    h3:first-of-type { margin-top: 4px; }
+
+    /* Entity cards */
+    .grid-3 {
+      display: grid; gap: 12px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 720px) {
+      .grid-3 { grid-template-columns: repeat(3, 1fr); }
+      .grid-2 { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+    }
+    .grid-2 { display: grid; gap: 12px; }
+    .ent {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 14px 12px;
+      background: linear-gradient(165deg, #fbfdfb 0%, #f4f8f5 100%);
+    }
+    .ent.tx { background: linear-gradient(165deg, #f8fbff 0%, #eef4ff 100%); border-color: #c7d7fe; }
+    .ent.ext { background: linear-gradient(165deg, #fff8f8 0%, #ffeef0 100%); border-color: #fecdd3; }
+    .ent .tag {
+      font-size: 10px; font-weight: 700; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--master); margin-bottom: 4px;
+    }
+    .ent.tx .tag { color: var(--tx); }
+    .ent.ext .tag { color: var(--ext); }
+    .ent strong { display: block; font-size: 14px; margin-bottom: 6px; }
+    .ent ul { margin: 0; padding-left: 16px; font-size: 12.5px; color: #334155; }
+    .ent li { margin: 2px 0; }
+
+    /* Tables */
+    .table-wrap { overflow-x: auto; margin: 10px 0 4px; border: 1px solid var(--line); border-radius: 10px; }
+    table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+      min-width: 560px;
+    }
+    th, td {
+      text-align: left; padding: 10px 12px;
+      border-bottom: 1px solid var(--line); vertical-align: top;
+    }
+    th {
+      background: #f3f7f4; font-weight: 600; font-size: 12px;
+      color: #334155; white-space: nowrap;
+    }
+    tr:last-child td { border-bottom: 0; }
+    code, .mono {
+      font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+      font-size: 12px; background: #f1f5f9; padding: 1px 5px; border-radius: 4px;
+    }
+    .pk { color: #b45309; font-weight: 600; }
+    .fk { color: #1d4ed8; font-weight: 600; }
+
+    /* Flow */
+    .flow {
+      display: flex; flex-direction: column; align-items: stretch; gap: 0;
+      max-width: 640px; margin: 8px 0 16px;
+    }
+    .fnode {
+      border: 1.5px solid var(--line); border-radius: 12px;
+      padding: 12px 14px; background: #f8fafc;
+    }
+    .fnode.m { background: #ecfdf5; border-color: #86efac; }
+    .fnode.p { background: #eff6ff; border-color: #93c5fd; }
+    .fnode.x { background: #fff1f2; border-color: #fda4af; }
+    .fnode.d { background: #fffbeb; border-color: #fcd34d; }
+    .fnode .k { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+    .fnode .t { font-size: 14px; font-weight: 700; margin-top: 2px; }
+    .fnode .s { font-size: 12.5px; color: var(--muted); margin-top: 4px; line-height: 1.45; }
+    .farrow {
+      align-self: center; color: var(--muted); font-size: 18px;
+      line-height: 1; padding: 2px 0; user-select: none;
+    }
+    .legend {
+      display: flex; flex-wrap: wrap; gap: 10px 16px;
+      font-size: 12px; color: var(--muted); margin-bottom: 14px;
+    }
+    .legend i {
+      display: inline-block; width: 10px; height: 10px; border-radius: 3px;
+      margin-right: 5px; vertical-align: -1px; border: 1px solid #94a3b8;
+    }
+    .legend .lm i { background: #ecfdf5; border-color: #86efac; }
+    .legend .lp i { background: #eff6ff; border-color: #93c5fd; }
+    .legend .lx i { background: #fff1f2; border-color: #fda4af; }
+    .legend .ld i { background: #fffbeb; border-color: #fcd34d; }
+
+    /* ER ascii-ish */
+    .er {
+      display: grid; gap: 10px;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 800px) {
+      .er { grid-template-columns: repeat(2, 1fr); }
+    }
+    .er-box {
+      border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+      font-size: 12.5px;
+    }
+    .er-box header {
+      background: var(--brand); color: #fff;
+      padding: 8px 12px; font-weight: 700; font-size: 13px;
+    }
+    .er-box header.tx { background: #1d4ed8; }
+    .er-box header.j { background: #6d28d9; }
+    .er-box ul { list-style: none; margin: 0; padding: 8px 12px 10px; }
+    .er-box li {
+      padding: 3px 0; border-bottom: 1px dashed #e2e8f0;
+      display: flex; gap: 8px; flex-wrap: wrap;
+    }
+    .er-box li:last-child { border-bottom: 0; }
+    .er-box .col { font-family: ui-monospace, Consolas, monospace; font-weight: 600; min-width: 9.5rem; }
+    .er-box .typ { color: var(--muted); }
+
+    .callout {
+      margin: 14px 0 0;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #fff7ed;
+      border: 1px solid #fed7aa;
+      font-size: 13px; color: #9a3412;
+    }
+    .callout strong { color: #7c2d12; }
+
+    .rel-list { margin: 0; padding-left: 18px; font-size: 13.5px; }
+    .rel-list li { margin: 6px 0; }
+
+    footer.doc {
+      margin-top: 28px; text-align: center;
+      font-size: 12px; color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <p class="hero-brand">GLS · Quản lý xe · Prototype console v4</p>
+      <h1>Mô hình dữ liệu &amp; luồng hệ thống</h1>
+      <p class="hero-lead">
+        Tài liệu mô tả thực thể dữ liệu, luồng nghiệp vụ bảo dưỡng / sửa chữa, và đề xuất thiết kế cơ sở dữ liệu
+        bám theo bản xem thử
+        <a href="https://jackson0511.github.io/gls-bdsc-prototype-demo/console-v4.html">console-v4</a>.
+        Prototype lưu seed trên trình duyệt (<span class="mono">localStorage</span>) — đây là bản đồ để chuyển sang hệ thống thật.
+      </p>
+      <div class="hero-meta">
+        <span class="pill">Nguồn: seed console v4 · Seed v4.02</span>
+        <span class="pill"><a href="console-v4.html">Mở console</a></span>
+        <span class="pill"><a href="flow-guide.html">Sơ đồ luồng tương tác</a></span>
+      </div>
+    </header>
+
+    <nav class="toc" aria-label="Mục lục">
+      <a href="#overview">Tổng quan</a>
+      <a href="#entities">Thực thể</a>
+      <a href="#flows">Luồng dữ liệu</a>
+      <a href="#db">Thiết kế CSDL</a>
+      <a href="#sync">Đồng bộ ngoài</a>
+    </nav>
+
+    <!-- ========== OVERVIEW ========== -->
+    <section id="overview">
+      <h2>1. Tổng quan kiến trúc dữ liệu</h2>
+      <p class="sub">
+        Hệ thống tách rõ <strong>dữ liệu nền (master)</strong>, <strong>giao dịch vận hành</strong> (nhắc · kế hoạch · phiếu · đánh giá),
+        và <strong>cầu nối hệ thống ngoài</strong> (PWMS kho / mua hàng, BASE duyệt, GPS odo).
+      </p>
+      <div class="legend">
+        <span class="lm"><i></i>Master / danh mục</span>
+        <span class="lp"><i></i>Giao dịch TMS</span>
+        <span class="lx"><i></i>Hệ thống ngoài</span>
+        <span class="ld"><i></i>Quyết định / trạng thái</span>
+      </div>
+      <div class="flow" style="max-width:100%">
+        <div class="fnode m">
+          <div class="k">Lớp 1 · Master</div>
+          <div class="t">Xe · Hệ thống · Vật tư · Nội dung SC · Loại DV · Tiêu chí ĐG · Danh mục BD · Barem giờ</div>
+          <div class="s">Khai báo một lần; gắn xe ↔ danh mục; ánh xạ Object ID PWMS.</div>
+        </div>
+        <div class="farrow">↓</div>
+        <div class="fnode p">
+          <div class="k">Lớp 2 · Vận hành</div>
+          <div class="t">Nhắc BD · Kế hoạch / mẫu · Phiếu BD·SC · Đánh giá định kỳ · SERI lốp/ắc</div>
+          <div class="s">Tạo từ master + mốc chu kỳ / sự cố / đánh giá; lưu trạng thái duyệt &amp; thực hiện.</div>
+        </div>
+        <div class="farrow">↓</div>
+        <div class="fnode x">
+          <div class="k">Lớp 3 · Đồng bộ</div>
+          <div class="t">BASE (duyệt) · PWMS / mua hàng (giá · chứng từ · tồn) · GPS (odo)</div>
+          <div class="s">TMS kéo dữ liệu mua hàng theo mã phiếu; đẩy trạng thái / mã sang BASE (mô phỏng trên demo).</div>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>Nguyên tắc prototype:</strong> cụm vật tư <em>dự kiến</em> (kỹ thuật nhập) và cụm <em>mua hàng</em> (sau đồng bộ) không ghi đè nhau.
+        Mọi phiếu đều phải đồng bộ mua hàng — kể cả chỉ vật tư kỹ thuật viên ghi tay.
+      </div>
+    </section>
+
+    <!-- ========== ENTITIES ========== -->
+    <section id="entities">
+      <h2>2. Catalogue thực thể dữ liệu</h2>
+      <p class="sub">Ánh xạ trực tiếp các khóa trong object <span class="mono">DB</span> của console-v4 (seed + localStorage).</p>
+
+      <h3>2.1 Master (danh mục nền)</h3>
+      <div class="grid-3">
+        <div class="ent">
+          <div class="tag">Master</div>
+          <strong>vehicles</strong>
+          <ul>
+            <li>Đầu kéo / rơ-mooc · biển số · hãng · model</li>
+            <li>km / giờ · khu vực · garage · GPS site</li>
+            <li>pwmsCode · trailerPlate · mốc đánh giá</li>
+          </ul>
+        </div>
+        <div class="ent">
+          <div class="tag">Master</div>
+          <strong>vehicleSystems</strong>
+          <ul>
+            <li>Hệ thống trên xe (PWMS)</li>
+            <li>Gắn tiêu chí ĐG · nội dung SC · danh mục BD</li>
+          </ul>
+        </div>
+        <div class="ent">
+          <div class="tag">Master</div>
+          <strong>materials</strong>
+          <ul>
+            <li>Mã · tên · đơn vị tính · VAT · giá tham chiếu</li>
+            <li><span class="mono">toi_thieu</span> (SL tối thiểu) · tồn · NCC · kho</li>
+            <li>nhóm / hệ thống PWMS · cờ SERI (lốp/ắc)</li>
+          </ul>
+        </div>
+        <div class="ent">
+          <div class="tag">Master</div>
+          <strong>repairItems</strong>
+          <ul>
+            <li>Nội dung sửa chữa / hạng mục công việc</li>
+            <li>Thuộc hệ thống · gợi ý trên phiếu &amp; đánh giá</li>
+          </ul>
+        </div>
+        <div class="ent">
+          <div class="tag">Master</div>
+          <strong>serviceTypes</strong>
+          <ul>
+            <li>Loại dịch vụ (bảo dưỡng / sửa chữa…)</li>
+            <li>Gợi ý phân loại hạng mục trên kế hoạch</li>
+          </ul>
+        </div>
+        <div class="ent">
+          <div class="tag">Master</div>
+          <strong>evalCriteria</strong>
+          <ul>
+            <li>Tiêu chí / nhóm tiêu chí đánh giá</li>
+            <li>Liên kết hệ thống · gợi ý SC / VT</li>
+          </ul>
+        </div>
+        <div class="ent">
+          <div class="tag">Master</div>
+          <strong>catalog (+ rules)</strong>
+          <ul>
+            <li>Danh mục bảo dưỡng: mã · tên · hệ thống</li>
+            <li>Mốc chu kỳ KM/tháng · forceReplace · repeat</li>
+            <li>evalItemIds · repairItemIds · defaultOnEvalBad</li>
+          </ul>
+        </div>
+        <div class="ent">
+          <div class="tag">Master</div>
+          <strong>baremHours</strong>
+          <ul>
+            <li>Giờ barem theo hệ thống + nội dung</li>
+            <li>effectiveFrom / effectiveTo (kỳ áp dụng)</li>
+          </ul>
+        </div>
+        <div class="ent">
+          <div class="tag">Master · liên kết</div>
+          <strong>vehicleCatalogIds / Overrides</strong>
+          <ul>
+            <li>Gắn danh mục BD vào từng xe</li>
+            <li>Ghi đè chu kỳ định mức theo xe</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>2.2 Giao dịch vận hành</h3>
+      <div class="grid-3">
+        <div class="ent tx">
+          <div class="tag">Giao dịch</div>
+          <strong>catState</strong>
+          <ul>
+            <li>Khóa <span class="mono">vehicleId:catalogId</span></li>
+            <li>occurrence · lastKm/Date · nextKm/Date</li>
+            <li>Nguồn cho lưới <em>Nhắc bảo dưỡng</em></li>
+          </ul>
+        </div>
+        <div class="ent tx">
+          <div class="tag">Giao dịch</div>
+          <strong>plans / planTemplates</strong>
+          <ul>
+            <li>Dòng kế hoạch theo xe · kỳ · nội dung · VT</li>
+            <li>Đơn giá · SL · lịch · liên kết BASE</li>
+            <li>Mẫu nhiều hạng mục (xe gốc · loại/hãng/model)</li>
+          </ul>
+        </div>
+        <div class="ent tx">
+          <div class="tag">Giao dịch</div>
+          <strong>orders</strong>
+          <ul>
+            <li>Phiếu BD / SC · approvalStatus · status</li>
+            <li>workItems · materials (dự kiến) · purchaseMaterials</li>
+            <li>purchaseSync · baseSync · approvalLog · ảnh</li>
+          </ul>
+        </div>
+        <div class="ent tx">
+          <div class="tag">Giao dịch</div>
+          <strong>evaluations</strong>
+          <ul>
+            <li>Đánh giá định kỳ theo xe / ngày</li>
+            <li>items (Tốt / SC / Thay) · notes · draft/submit</li>
+            <li>Có thể sinh phiếu SC liên kết</li>
+          </ul>
+        </div>
+        <div class="ent tx">
+          <div class="tag">Giao dịch</div>
+          <strong>localLookups</strong>
+          <ul>
+            <li>Nội dung / garage / VT tạo mới nội bộ</li>
+            <li>Không sync PWMS cho đến khi map master</li>
+          </ul>
+        </div>
+        <div class="ent tx">
+          <div class="tag">Giao dịch</div>
+          <strong>Lốp / ắc (SERI)</strong>
+          <ul>
+            <li>Đơn vị lắp trên xe · serial · ngày lắp</li>
+            <li>Định mức tháng (không theo km trên nhắc)</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>2.3 Trường trạng thái quan trọng trên phiếu</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nhóm</th>
+              <th>Trường</th>
+              <th>Giá trị / ý nghĩa</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Duyệt nội bộ</td>
+              <td><span class="mono">approvalStatus</span></td>
+              <td>DRAFT → PENDING_APPROVAL → APPROVED | REJECTED (+ nộp lại)</td>
+            </tr>
+            <tr>
+              <td>Thực hiện</td>
+              <td><span class="mono">status</span></td>
+              <td>NOT_STARTED → IN_PROGRESS → COMPLETED</td>
+            </tr>
+            <tr>
+              <td>Vật tư dự kiến</td>
+              <td><span class="mono">materials[].source</span></td>
+              <td>PWMS (xuất kho) · EXTERNAL (sửa ngoài) · TECHNICIAN (KTV ghi)</td>
+            </tr>
+            <tr>
+              <td>Đồng bộ MH</td>
+              <td><span class="mono">purchaseSync.status</span></td>
+              <td>NONE → SYNCING → SYNCED | FAILED — <strong>bắt buộc mọi phiếu</strong></td>
+            </tr>
+            <tr>
+              <td>Cụm MH</td>
+              <td><span class="mono">purchaseMaterials[]</span></td>
+              <td>Giá / NCC / chứng từ / ngày cấp sau đồng bộ; không ghi đè cụm dự kiến</td>
+            </tr>
+            <tr>
+              <td>BASE</td>
+              <td><span class="mono">baseSync</span></td>
+              <td>NONE → SYNCING → SYNCED · mã yêu cầu trên BASE</td>
+            </tr>
+            <tr>
+              <td>Vật tư</td>
+              <td><span class="mono">toiThieu / minQty</span></td>
+              <td>Số lượng tối thiểu khi chọn từ danh mục (không mặc định luôn 1)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ========== FLOWS ========== -->
+    <section id="flows">
+      <h2>3. Luồng dữ liệu nghiệp vụ</h2>
+      <p class="sub">Tóm tắt hướng đi của dữ liệu — chi tiết thao tác UI xem thêm <a href="flow-guide.html">sơ đồ luồng tương tác</a>.</p>
+
+      <h3>3.1 Bảo dưỡng định kỳ</h3>
+      <div class="flow">
+        <div class="fnode m">
+          <div class="k">Vào</div>
+          <div class="t">catalog + vehicleCatalogIds + catState + vehicles.km</div>
+          <div class="s">Mốc nextKm / nextDate so với odo / ngày hiện tại.</div>
+        </div>
+        <div class="farrow">↓</div>
+        <div class="fnode p">
+          <div class="k">Nhắc bảo dưỡng</div>
+          <div class="t">Sắp hạn · quá hạn · lốp/ắc theo tháng</div>
+          <div class="s">Đưa vào kế hoạch (tháng này / tháng sau / ngày cụ thể).</div>
+        </div>
+        <div class="farrow">↓</div>
+        <div class="fnode p">
+          <div class="k">plans / planTemplates</div>
+          <div class="t">Dòng KH: nội dung · VT gợi ý · SL (toi_thieu) · đơn giá</div>
+          <div class="s">DM gắn xe: chỉ bỏ chọn. Dòng trống: luôn chọn + có xóa.</div>
+        </div>
+        <div class="farrow">↓</div>
+        <div class="fnode d">
+          <div class="k">Quyết định</div>
+          <div class="t">Đồng bộ BASE kế hoạch → tạo phiếu BD (gom/tách)</div>
+        </div>
+        <div class="farrow">↓</div>
+        <div class="fnode p">
+          <div class="k">orders (PERIODIC)</div>
+          <div class="t">Duyệt → bắt đầu → hạng mục → odo → hoàn thành</div>
+          <div class="s">Cập nhật catState (occurrence, next mốc). Đồng bộ MH + BASE phiếu.</div>
+        </div>
+      </div>
+
+      <h3>3.2 Sửa chữa</h3>
+      <div class="flow">
+        <div class="fnode m">
+          <div class="k">Nguồn vào</div>
+          <div class="t">Sự cố TX · Đánh giá định kỳ · KTV chủ động · Từ nhắc / KH</div>
+        </div>
+        <div class="farrow">↓</div>
+        <div class="fnode p">
+          <div class="k">orders (INCIDENTAL) nháp</div>
+          <div class="t">workItems + materials (nhập tự do / autocomplete)</div>
+          <div class="s">Hình thức XK / SN hệ thống gợi ý theo tồn khi khớp danh mục.</div>
+        </div>
+        <div class="farrow">↓</div>
+        <div class="fnode d">
+          <div class="k">Chu kỳ duyệt</div>
+          <div class="t">Nộp → Duyệt / Từ chối → (sửa + nộp lại)</div>
+        </div>
+        <div class="farrow">↓</div>
+        <div class="fnode p">
+          <div class="k">Thực hiện</div>
+          <div class="t">START → đồng bộ MH → hoàn thành WI → COMPLETE</div>
+        </div>
+        <div class="farrow">↓</div>
+        <div class="fnode x">
+          <div class="k">Ra ngoài</div>
+          <div class="t">purchaseMaterials ← PWMS/MH · baseSync → BASE</div>
+        </div>
+      </div>
+
+      <h3>3.3 Luồng vật tư trên phiếu</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Bước</th><th>Dữ liệu đọc</th><th>Dữ liệu ghi</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>KTV nhập / chọn autocomplete</td>
+              <td>materials · localLookups.materials</td>
+              <td>orders.materials[] (qty ≥ toi_thieu nếu từ master)</td>
+            </tr>
+            <tr>
+              <td>Đồng bộ mua hàng</td>
+              <td>materials (giá / NCC) · mã phiếu</td>
+              <td>purchaseMaterials[] · purchaseSync=SYNCED</td>
+            </tr>
+            <tr>
+              <td>Báo cáo chi phí</td>
+              <td>Ưu tiên sum(purchaseMaterials); fallback materials dự kiến</td>
+              <td>orders.cost</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ========== DB DESIGN ========== -->
+    <section id="db">
+      <h2>4. Đề xuất thiết kế cơ sở dữ liệu</h2>
+      <p class="sub">
+        Schema quan hệ đề xuất khi chuyển prototype → backend. Tên bảng tiếng Anh kỹ thuật; mô tả tiếng Việt.
+        Khóa chính <span class="pk">PK</span> · khóa ngoại <span class="fk">FK</span>.
+      </p>
+
+      <h3>4.1 Sơ đồ quan hệ cốt lõi</h3>
+      <ul class="rel-list">
+        <li><strong>vehicle</strong> 1—N <strong>vehicle_catalog</strong> N—1 <strong>maint_catalog</strong> (gắn DM BD)</li>
+        <li><strong>maint_catalog</strong> 1—N <strong>maint_catalog_rule</strong> (mốc chu kỳ)</li>
+        <li><strong>vehicle</strong> + <strong>maint_catalog</strong> → <strong>vehicle_catalog_state</strong> (mốc hiện tại / nhắc)</li>
+        <li><strong>vehicle</strong> 1—N <strong>plan_line</strong> · 1—N <strong>work_order</strong> · 1—N <strong>evaluation</strong></li>
+        <li><strong>work_order</strong> 1—N <strong>work_order_item</strong> · 1—N <strong>work_order_material</strong> (dự kiến) · 1—N <strong>work_order_purchase_line</strong> (sau MH)</li>
+        <li><strong>material</strong> 1—N dòng VT trên kế hoạch / phiếu / lịch sử giá</li>
+        <li><strong>vehicle</strong> 0—1 <strong>pwms_vehicle_map</strong> (Object ID PWMS)</li>
+      </ul>
+
+      <h3>4.2 Bảng master</h3>
+      <div class="er">
+        <div class="er-box">
+          <header>vehicle</header>
+          <ul>
+            <li><span class="col pk">id</span><span class="typ">bigint PK</span></li>
+            <li><span class="col">plate</span><span class="typ">varchar · unique</span></li>
+            <li><span class="col">is_trailer</span><span class="typ">bool</span></li>
+            <li><span class="col">brand / model / year</span><span class="typ"></span></li>
+            <li><span class="col">odo_km / engine_hours</span><span class="typ">numeric</span></li>
+            <li><span class="col">avg_km_per_month</span><span class="typ">numeric · nullable</span></li>
+            <li><span class="col">garage / area / gps_site</span><span class="typ"></span></li>
+            <li><span class="col">trailer_vehicle_id</span><span class="typ fk">FK → vehicle</span></li>
+          </ul>
+        </div>
+        <div class="er-box">
+          <header>material</header>
+          <ul>
+            <li><span class="col pk">id</span><span class="typ">bigint / uuid PK</span></li>
+            <li><span class="col">code</span><span class="typ">varchar · unique</span></li>
+            <li><span class="col">name / uom</span><span class="typ"></span></li>
+            <li><span class="col">ref_price / vat</span><span class="typ">numeric</span></li>
+            <li><span class="col pk">min_qty</span><span class="typ">numeric · toi_thieu ≥ 1</span></li>
+            <li><span class="col">supplier / warehouse</span><span class="typ"></span></li>
+            <li><span class="col">stock_qty</span><span class="typ">cache từ PWMS</span></li>
+            <li><span class="col">pwms_group / system</span><span class="typ">nhom · he_thong</span></li>
+            <li><span class="col">requires_serial</span><span class="typ">bool · lốp/ắc</span></li>
+          </ul>
+        </div>
+        <div class="er-box">
+          <header>maint_catalog</header>
+          <ul>
+            <li><span class="col pk">id</span><span class="typ">PK</span></li>
+            <li><span class="col">code / name</span><span class="typ"></span></li>
+            <li><span class="col">system_id</span><span class="typ fk">FK → vehicle_system</span></li>
+            <li><span class="col">default_on_eval_bad</span><span class="typ">REPAIR|REPLACE</span></li>
+          </ul>
+        </div>
+        <div class="er-box">
+          <header>maint_catalog_rule</header>
+          <ul>
+            <li><span class="col pk">id</span><span class="typ">PK</span></li>
+            <li><span class="col">catalog_id</span><span class="typ fk">FK</span></li>
+            <li><span class="col">seq</span><span class="typ">int</span></li>
+            <li><span class="col">rule_type</span><span class="typ">KM | MONTH</span></li>
+            <li><span class="col">value</span><span class="typ">numeric</span></li>
+            <li><span class="col">force_replace / repeat</span><span class="typ">bool</span></li>
+            <li><span class="col">max_occurrences</span><span class="typ">int · null = ∞</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>4.3 Bảng trạng thái &amp; kế hoạch</h3>
+      <div class="er">
+        <div class="er-box">
+          <header class="tx">vehicle_catalog_state</header>
+          <ul>
+            <li><span class="col pk">vehicle_id + catalog_id</span><span class="typ">PK kép</span></li>
+            <li><span class="col">occurrence</span><span class="typ">int</span></li>
+            <li><span class="col">last_km / last_date</span><span class="typ"></span></li>
+            <li><span class="col">next_km / next_date</span><span class="typ">mốc nhắc</span></li>
+            <li><span class="col">planned_date_override</span><span class="typ">nullable</span></li>
+          </ul>
+        </div>
+        <div class="er-box">
+          <header class="tx">plan_line</header>
+          <ul>
+            <li><span class="col pk">id</span><span class="typ">PK</span></li>
+            <li><span class="col">vehicle_id</span><span class="typ fk">FK</span></li>
+            <li><span class="col">catalog_id</span><span class="typ fk">nullable</span></li>
+            <li><span class="col">period</span><span class="typ">YYYY-MM</span></li>
+            <li><span class="col">content / service</span><span class="typ"></span></li>
+            <li><span class="col">qty / uom / unit_price / vat</span><span class="typ"></span></li>
+            <li><span class="col">schedule_date</span><span class="typ">date</span></li>
+            <li><span class="col">work_order_id</span><span class="typ fk">nullable · đã tạo phiếu</span></li>
+            <li><span class="col">base_sync_status / code</span><span class="typ"></span></li>
+          </ul>
+        </div>
+        <div class="er-box">
+          <header class="j">plan_line_material</header>
+          <ul>
+            <li><span class="col pk">id</span><span class="typ">PK</span></li>
+            <li><span class="col">plan_line_id</span><span class="typ fk">FK</span></li>
+            <li><span class="col">material_id</span><span class="typ fk">nullable</span></li>
+            <li><span class="col">code / name / qty / uom</span><span class="typ">qty ≥ min_qty khi có material_id</span></li>
+          </ul>
+        </div>
+        <div class="er-box">
+          <header class="tx">plan_template</header>
+          <ul>
+            <li><span class="col pk">id</span><span class="typ">PK</span></li>
+            <li><span class="col">name / period</span><span class="typ"></span></li>
+            <li><span class="col">vehicle_type / brand / model</span><span class="typ">áp dụng hàng loạt</span></li>
+            <li><span class="col">seed_vehicle_id</span><span class="typ fk"></span></li>
+            <li><span class="col">items JSON / bảng con</span><span class="typ">hạng mục mẫu</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>4.4 Bảng phiếu công việc</h3>
+      <div class="er">
+        <div class="er-box">
+          <header class="tx">work_order</header>
+          <ul>
+            <li><span class="col pk">id</span><span class="typ">PK</span></li>
+            <li><span class="col">code</span><span class="typ">unique · RO-… / PBD-…</span></li>
+            <li><span class="col">vehicle_id</span><span class="typ fk">FK</span></li>
+            <li><span class="col">order_kind</span><span class="typ">MAINT | REPAIR</span></li>
+            <li><span class="col">source</span><span class="typ">INCIDENT|PLAN|EVAL|…</span></li>
+            <li><span class="col">approval_status</span><span class="typ">enum</span></li>
+            <li><span class="col">exec_status</span><span class="typ">enum</span></li>
+            <li><span class="col">odo_km / garage / content</span><span class="typ"></span></li>
+            <li><span class="col">catalog_id</span><span class="typ fk">nullable</span></li>
+            <li><span class="col">started_at / completed_at</span><span class="typ"></span></li>
+            <li><span class="col">material_requested_at / ready_at</span><span class="typ">4 mốc</span></li>
+            <li><span class="col">cost</span><span class="typ">numeric · derived</span></li>
+            <li><span class="col">revision</span><span class="typ">int</span></li>
+          </ul>
+        </div>
+        <div class="er-box">
+          <header class="j">work_order_item</header>
+          <ul>
+            <li><span class="col pk">id</span><span class="typ">PK</span></li>
+            <li><span class="col">work_order_id</span><span class="typ fk">FK</span></li>
+            <li><span class="col">system / content / service</span><span class="typ"></span></li>
+            <li><span class="col">performer</span><span class="typ">KTV</span></li>
+            <li><span class="col">barem_hours / actual_hours</span><span class="typ"></span></li>
+            <li><span class="col">started_at / completed_at</span><span class="typ"></span></li>
+            <li><span class="col">status</span><span class="typ">TODO|DOING|DONE</span></li>
+          </ul>
+        </div>
+        <div class="er-box">
+          <header class="j">work_order_material</header>
+          <ul>
+            <li><span class="col pk">id</span><span class="typ">PK · cụm dự kiến</span></li>
+            <li><span class="col">work_order_id</span><span class="typ fk">FK</span></li>
+            <li><span class="col">material_id</span><span class="typ fk">nullable</span></li>
+            <li><span class="col">source</span><span class="typ">PWMS|EXTERNAL|TECHNICIAN</span></li>
+            <li><span class="col">qty / uom / price / vat</span><span class="typ">qty ≥ min_qty</span></li>
+            <li><span class="col">local_only</span><span class="typ">bool</span></li>
+          </ul>
+        </div>
+        <div class="er-box">
+          <header class="j">work_order_purchase_line</header>
+          <ul>
+            <li><span class="col pk">id</span><span class="typ">PK · cụm MH</span></li>
+            <li><span class="col">work_order_id</span><span class="typ fk">FK</span></li>
+            <li><span class="col">planned_material_id</span><span class="typ fk">nullable</span></li>
+            <li><span class="col">price / supplier / warehouse</span><span class="typ">từ MH</span></li>
+            <li><span class="col">purchase_doc_code</span><span class="typ">XK-… / MH-…</span></li>
+            <li><span class="col">issued_at</span><span class="typ">timestamp</span></li>
+          </ul>
+        </div>
+        <div class="er-box">
+          <header class="tx">work_order_sync</header>
+          <ul>
+            <li><span class="col pk">work_order_id</span><span class="typ">PK/FK</span></li>
+            <li><span class="col">purchase_status</span><span class="typ">NONE|SYNCING|SYNCED|FAILED</span></li>
+            <li><span class="col">purchase_synced_at / issue_doc</span><span class="typ"></span></li>
+            <li><span class="col">base_status / base_code</span><span class="typ"></span></li>
+            <li><span class="col">base_synced_at</span><span class="typ"></span></li>
+          </ul>
+        </div>
+        <div class="er-box">
+          <header class="tx">work_order_approval_log</header>
+          <ul>
+            <li><span class="col pk">id</span><span class="typ">PK</span></li>
+            <li><span class="col">work_order_id</span><span class="typ fk">FK</span></li>
+            <li><span class="col">action</span><span class="typ">CREATE|SUBMIT|APPROVE|…</span></li>
+            <li><span class="col">at / by / note</span><span class="typ"></span></li>
+            <li><span class="col">changes_json</span><span class="typ">diff cũ→mới</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>4.5 Chỉ mục &amp; ràng buộc gợi ý</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Đối tượng</th><th>Ràng buộc / index</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>vehicle</td>
+              <td>UNIQUE(plate); INDEX(is_trailer, area)</td>
+            </tr>
+            <tr>
+              <td>material</td>
+              <td>UNIQUE(code); CHECK(min_qty &gt; 0)</td>
+            </tr>
+            <tr>
+              <td>work_order_material</td>
+              <td>CHECK: nếu material_id NOT NULL thì qty ≥ material.min_qty</td>
+            </tr>
+            <tr>
+              <td>vehicle_catalog_state</td>
+              <td>PK(vehicle_id, catalog_id); INDEX(next_km), INDEX(next_date)</td>
+            </tr>
+            <tr>
+              <td>plan_line</td>
+              <td>INDEX(vehicle_id, period); INDEX(schedule_date)</td>
+            </tr>
+            <tr>
+              <td>work_order</td>
+              <td>UNIQUE(code); INDEX(vehicle_id, approval_status, exec_status)</td>
+            </tr>
+            <tr>
+              <td>work_order_sync</td>
+              <td>CHECK purchase_status ≠ 'NA' (mọi phiếu đều phải đồng bộ MH)</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout">
+        <strong>Ghi chú triển khai:</strong> Prototype chưa có master người dùng / vai trò — production cần thêm
+        <span class="mono">app_user</span>, <span class="mono">role</span>, và bảng phân quyền trước khi gắn
+        <span class="mono">approval_log.by</span> / performer KTV vào tài khoản thật.
+      </div>
+    </section>
+
+    <!-- ========== SYNC ========== -->
+    <section id="sync">
+      <h2>5. Biên hệ thống ngoài (đồng bộ)</h2>
+      <p class="sub">Trên demo chỉ mô phỏng. Hướng tích hợp thật (xem thêm <a href="diagram-it.html">IT · API PWMS</a>).</p>
+      <div class="grid-2">
+        <div class="ent ext">
+          <div class="tag">PWMS / Mua hàng</div>
+          <strong>TMS ← kéo</strong>
+          <ul>
+            <li>Master vật tư · tồn · giá · NCC</li>
+            <li>Chứng từ xuất kho / mua ngoài theo mã phiếu</li>
+            <li>Ánh xạ xe: TMS id ↔ Object ID PWMS</li>
+          </ul>
+        </div>
+        <div class="ent ext">
+          <div class="tag">BASE</div>
+          <strong>TMS → đẩy / cập nhật</strong>
+          <ul>
+            <li>Yêu cầu kế hoạch / phiếu · trạng thái duyệt</li>
+            <li>Nhận mã BASE về <span class="mono">base_sync.code</span></li>
+          </ul>
+        </div>
+        <div class="ent ext">
+          <div class="tag">GPS</div>
+          <strong>TMS ← odo</strong>
+          <ul>
+            <li>Km ODO GPS trên nhắc BD (đối chiếu đồng hồ)</li>
+            <li>Hỗ trợ tính mốc / cảnh báo vượt km</li>
+          </ul>
+        </div>
+        <div class="ent">
+          <div class="tag">Nội bộ TMS</div>
+          <strong>Không đẩy vòng đời phiếu sang PWMS</strong>
+          <ul>
+            <li>Trạng thái duyệt / giờ KTV giữ trong TMS</li>
+            <li>localLookups: tạo nhanh ND/VT/garage chỉ nội bộ</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>Ánh xạ object seed → bảng đề xuất</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Trong console-v4 <span class="mono">DB.*</span></th><th>Bảng đề xuất</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>vehicles</td><td>vehicle</td></tr>
+            <tr><td>materials</td><td>material</td></tr>
+            <tr><td>catalog + rules[]</td><td>maint_catalog + maint_catalog_rule</td></tr>
+            <tr><td>vehicleCatalogIds</td><td>vehicle_catalog (junction)</td></tr>
+            <tr><td>catState</td><td>vehicle_catalog_state</td></tr>
+            <tr><td>plans</td><td>plan_line (+ plan_line_material)</td></tr>
+            <tr><td>planTemplates</td><td>plan_template (+ items)</td></tr>
+            <tr><td>orders</td><td>work_order</td></tr>
+            <tr><td>orders.workItems</td><td>work_order_item</td></tr>
+            <tr><td>orders.materials</td><td>work_order_material</td></tr>
+            <tr><td>orders.purchaseMaterials</td><td>work_order_purchase_line</td></tr>
+            <tr><td>orders.purchaseSync / baseSync</td><td>work_order_sync</td></tr>
+            <tr><td>orders.approvalLog</td><td>work_order_approval_log</td></tr>
+            <tr><td>evaluations</td><td>evaluation + evaluation_item</td></tr>
+            <tr><td>pwmsVehicleMap / ánh xạ</td><td>pwms_vehicle_map</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <footer class="doc">
+      GLS · BD/SC · Tài liệu mô hình dữ liệu bám
+      <a href="https://jackson0511.github.io/gls-bdsc-prototype-demo/console-v4.html">console-v4</a>
+      · Cập nhật theo prototype v4 (đồng bộ MH bắt buộc · toi_thieu · luồng kế hoạch)
+    </footer>
+  </div>
+  <script>
+    (function () {
+      const links = [...document.querySelectorAll('.toc a')];
+      const sections = links.map((a) => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+      const onScroll = () => {
+        let cur = sections[0];
+        const y = window.scrollY + 120;
+        sections.forEach((s) => { if (s.offsetTop <= y) cur = s; });
+        links.forEach((a) => a.classList.toggle('on', a.getAttribute('href') === '#' + cur.id));
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+    })();
+  </script>
+</body>
+</html>
