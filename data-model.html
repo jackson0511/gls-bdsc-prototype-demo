@@ -21,7 +21,7 @@
       --tx: #1d4ed8;
       --ext: #be123c;
       --pad: clamp(14px, 3vw, 28px);
-      --max: 1120px;
+      --max: 1180px;
       --radius: 14px;
       --shadow: 0 1px 0 rgba(12,26,20,.04), 0 12px 32px rgba(12,26,20,.06);
       --font: "Be Vietnam Pro", "IBM Plex Sans", system-ui, sans-serif;
@@ -238,6 +238,55 @@
     .rel-list { margin: 0; padding-left: 18px; font-size: 13.5px; }
     .rel-list li { margin: 6px 0; }
 
+    /* ER diagrams */
+    .diagram-panel {
+      margin: 12px 0 20px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #f8fbf9;
+    }
+    .diagram-tabs {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 10px 12px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+    }
+    .diagram-tabs button {
+      font-family: inherit; font-size: 12.5px; font-weight: 600;
+      border: 1px solid var(--line); background: #fff;
+      border-radius: 999px; padding: 7px 12px; cursor: pointer; color: var(--ink);
+    }
+    .diagram-tabs button.on {
+      background: #ecfdf5; border-color: #6ee7b7; color: var(--brand-deep);
+    }
+    .diagram-pane {
+      display: none;
+      padding: 12px 8px 16px;
+      overflow-x: auto;
+      min-height: 280px;
+    }
+    .diagram-pane.on { display: block; }
+    .diagram-pane .mermaid {
+      display: flex; justify-content: center;
+      min-width: 640px;
+    }
+    .diagram-pane .cap {
+      margin: 0 12px 8px; font-size: 12.5px; color: var(--muted); line-height: 1.45;
+    }
+    .diagram-legend {
+      display: flex; flex-wrap: wrap; gap: 8px 14px;
+      padding: 0 14px 12px; font-size: 11.5px; color: var(--muted);
+    }
+    .diagram-legend span::before {
+      content: ""; display: inline-block; width: 8px; height: 8px;
+      border-radius: 2px; margin-right: 5px; vertical-align: 0;
+      background: var(--brand);
+    }
+    .diagram-legend .tx::before { background: #1d4ed8; }
+    .diagram-legend .j::before { background: #7c3aed; }
+    .diagram-legend .x::before { background: #be123c; }
+
     footer.doc {
       margin-top: 28px; text-align: center;
       font-size: 12px; color: var(--muted);
@@ -266,6 +315,7 @@
       <a href="#overview">Tổng quan</a>
       <a href="#entities">Thực thể</a>
       <a href="#flows">Luồng dữ liệu</a>
+      <a href="#erd">Sơ đồ liên kết</a>
       <a href="#db">Thiết kế CSDL</a>
       <a href="#sync">Đồng bộ ngoài</a>
     </nav>
@@ -592,26 +642,255 @@
       </div>
     </section>
 
-    <!-- ========== DB DESIGN ========== -->
-    <section id="db">
-      <h2>4. Đề xuất thiết kế cơ sở dữ liệu</h2>
+    <!-- ========== ER DIAGRAM ========== -->
+    <section id="erd">
+      <h2>4. Sơ đồ liên kết bảng (ER diagram)</h2>
       <p class="sub">
-        Schema quan hệ đề xuất khi chuyển prototype → backend. Tên bảng tiếng Anh kỹ thuật; mô tả tiếng Việt.
-        Khóa chính <span class="pk">PK</span> · khóa ngoại <span class="fk">FK</span>.
+        Quan hệ khóa ngoại giữa các bảng đề xuất. Chọn tab để xem toàn cảnh hoặc phóng từng cụm
+        (master &amp; nhắc · kế hoạch · phiếu · đồng bộ ngoài). Ký hiệu Mermaid:
+        <span class="mono">||--o{</span> = một–nhiều,
+        <span class="mono">}|--||</span> = nhiều–một bắt buộc,
+        <span class="mono">||--o|</span> = một–một tùy chọn.
       </p>
+      <div class="diagram-legend">
+        <span>Master / danh mục</span>
+        <span class="tx">Giao dịch vận hành</span>
+        <span class="j">Bảng dòng / junction</span>
+        <span class="x">Ánh xạ hệ thống ngoài</span>
+      </div>
 
-      <h3>4.1 Sơ đồ quan hệ cốt lõi</h3>
+      <div class="diagram-panel">
+        <div class="diagram-tabs" role="tablist">
+          <button type="button" class="on" data-erd-tab="overview">Toàn cảnh</button>
+          <button type="button" data-erd-tab="maint">Master &amp; nhắc BD</button>
+          <button type="button" data-erd-tab="plan">Kế hoạch</button>
+          <button type="button" data-erd-tab="order">Phiếu công việc</button>
+          <button type="button" data-erd-tab="sync">Đồng bộ ngoài</button>
+        </div>
+
+        <div class="diagram-pane on" data-erd-pane="overview">
+          <p class="cap">Trục trung tâm: <strong>vehicle</strong> → kế hoạch / phiếu / đánh giá; <strong>material</strong> và <strong>maint_catalog</strong> cấp dữ liệu nền.</p>
+          <pre class="mermaid">
+erDiagram
+  VEHICLE ||--o{ VEHICLE_CATALOG : "gan DM"
+  MAINT_CATALOG ||--o{ VEHICLE_CATALOG : "duoc gan"
+  MAINT_CATALOG ||--o{ MAINT_CATALOG_RULE : "moc chu ky"
+  VEHICLE ||--o{ VEHICLE_CATALOG_STATE : "moc nhac"
+  MAINT_CATALOG ||--o{ VEHICLE_CATALOG_STATE : "theo DM"
+  VEHICLE ||--o{ PLAN_LINE : "co KH"
+  VEHICLE ||--o{ WORK_ORDER : "co phieu"
+  VEHICLE ||--o{ EVALUATION : "co DG"
+  PLAN_LINE ||--o{ PLAN_LINE_MATERIAL : "VT goi y"
+  MATERIAL ||--o{ PLAN_LINE_MATERIAL : "tu master"
+  WORK_ORDER ||--o{ WORK_ORDER_ITEM : "hang muc"
+  WORK_ORDER ||--o{ WORK_ORDER_MATERIAL : "VT du kien"
+  WORK_ORDER ||--o{ WORK_ORDER_PURCHASE_LINE : "cum MH"
+  WORK_ORDER ||--|| WORK_ORDER_SYNC : "trang thai sync"
+  WORK_ORDER ||--o{ WORK_ORDER_APPROVAL_LOG : "lich su duyet"
+  MATERIAL ||--o{ WORK_ORDER_MATERIAL : "tuy chon"
+  MATERIAL ||--o{ WORK_ORDER_PURCHASE_LINE : "tuy chon"
+  PLAN_LINE }o--o| WORK_ORDER : "tao phieu"
+  VEHICLE ||--o| PWMS_VEHICLE_MAP : "Object ID"
+  VEHICLE_SYSTEM ||--o{ MAINT_CATALOG : "he thong"
+  VEHICLE_SYSTEM ||--o{ REPAIR_ITEM : "ND SC"
+  VEHICLE_SYSTEM ||--o{ BAREM_HOUR : "gio barem"
+          </pre>
+        </div>
+
+        <div class="diagram-pane" data-erd-pane="maint">
+          <p class="cap">Gắn danh mục BD vào xe → lưu mốc <strong>vehicle_catalog_state</strong> (nguồn lưới Nhắc bảo dưỡng). Rule chu kỳ nằm trên <strong>maint_catalog_rule</strong>.</p>
+          <pre class="mermaid">
+erDiagram
+  VEHICLE {
+    bigint id PK
+    string plate
+    bool is_trailer
+    numeric odo_km
+  }
+  MAINT_CATALOG {
+    bigint id PK
+    string code
+    string name
+    bigint system_id FK
+  }
+  MAINT_CATALOG_RULE {
+    bigint id PK
+    bigint catalog_id FK
+    string rule_type
+    numeric value
+    bool repeat
+  }
+  VEHICLE_CATALOG {
+    bigint vehicle_id PK_FK
+    bigint catalog_id PK_FK
+    json cycle_override
+  }
+  VEHICLE_CATALOG_STATE {
+    bigint vehicle_id PK_FK
+    bigint catalog_id PK_FK
+    int occurrence
+    numeric next_km
+    date next_date
+  }
+  VEHICLE_SYSTEM {
+    string id PK
+    string name
+  }
+  VEHICLE ||--o{ VEHICLE_CATALOG : attaches
+  MAINT_CATALOG ||--o{ VEHICLE_CATALOG : attached_to
+  MAINT_CATALOG ||--o{ MAINT_CATALOG_RULE : has_rules
+  VEHICLE ||--o{ VEHICLE_CATALOG_STATE : reminder
+  MAINT_CATALOG ||--o{ VEHICLE_CATALOG_STATE : reminder
+  VEHICLE_SYSTEM ||--o{ MAINT_CATALOG : classifies
+          </pre>
+        </div>
+
+        <div class="diagram-pane" data-erd-pane="plan">
+          <p class="cap">Dòng kế hoạch theo xe + kỳ; vật tư gợi ý qua junction. Có thể liên kết sang phiếu sau khi tạo.</p>
+          <pre class="mermaid">
+erDiagram
+  VEHICLE ||--o{ PLAN_LINE : owns
+  MAINT_CATALOG ||--o{ PLAN_LINE : "tuy chon"
+  PLAN_TEMPLATE ||--o{ PLAN_TEMPLATE_ITEM : contains
+  PLAN_LINE ||--o{ PLAN_LINE_MATERIAL : lines
+  MATERIAL ||--o{ PLAN_LINE_MATERIAL : ref
+  PLAN_LINE }o--o| WORK_ORDER : "sinh phieu"
+  PLAN_LINE {
+    bigint id PK
+    bigint vehicle_id FK
+    bigint catalog_id FK
+    string period
+    string content
+    numeric qty
+    numeric unit_price
+    date schedule_date
+    bigint work_order_id FK
+  }
+  PLAN_LINE_MATERIAL {
+    bigint id PK
+    bigint plan_line_id FK
+    bigint material_id FK
+    numeric qty
+    string uom
+  }
+  PLAN_TEMPLATE {
+    bigint id PK
+    string name
+    string period
+    string brand
+    string model
+  }
+          </pre>
+        </div>
+
+        <div class="diagram-pane" data-erd-pane="order">
+          <p class="cap">Phiếu BD/SC: hạng mục · VT dự kiến · VT mua hàng (sau đồng bộ) · sync · nhật ký duyệt. Hai cụm VT không ghi đè nhau.</p>
+          <pre class="mermaid">
+erDiagram
+  VEHICLE ||--o{ WORK_ORDER : has
+  WORK_ORDER ||--o{ WORK_ORDER_ITEM : items
+  WORK_ORDER ||--o{ WORK_ORDER_MATERIAL : planned
+  WORK_ORDER ||--o{ WORK_ORDER_PURCHASE_LINE : purchased
+  WORK_ORDER ||--|| WORK_ORDER_SYNC : sync
+  WORK_ORDER ||--o{ WORK_ORDER_APPROVAL_LOG : audit
+  MATERIAL ||--o{ WORK_ORDER_MATERIAL : optional
+  MATERIAL ||--o{ WORK_ORDER_PURCHASE_LINE : optional
+  WORK_ORDER_MATERIAL ||--o| WORK_ORDER_PURCHASE_LINE : "doi chieu"
+  WORK_ORDER {
+    bigint id PK
+    string code UK
+    bigint vehicle_id FK
+    string approval_status
+    string exec_status
+    string source
+    numeric cost
+  }
+  WORK_ORDER_ITEM {
+    bigint id PK
+    bigint work_order_id FK
+    string content
+    numeric barem_hours
+    numeric actual_hours
+    string status
+  }
+  WORK_ORDER_MATERIAL {
+    bigint id PK
+    bigint work_order_id FK
+    bigint material_id FK
+    string source
+    numeric qty
+  }
+  WORK_ORDER_PURCHASE_LINE {
+    bigint id PK
+    bigint work_order_id FK
+    bigint planned_material_id FK
+    string purchase_doc_code
+    numeric price
+  }
+  WORK_ORDER_SYNC {
+    bigint work_order_id PK_FK
+    string purchase_status
+    string base_status
+    string base_code
+  }
+          </pre>
+        </div>
+
+        <div class="diagram-pane" data-erd-pane="sync">
+          <p class="cap">Ánh xạ xe TMS ↔ PWMS; trạng thái đồng bộ mua hàng / BASE gắn 1–1 với phiếu. GPS odo đọc vào vehicle (không bảng riêng trên prototype).</p>
+          <pre class="mermaid">
+erDiagram
+  VEHICLE ||--o| PWMS_VEHICLE_MAP : maps
+  WORK_ORDER ||--|| WORK_ORDER_SYNC : has
+  PWMS_VEHICLE_MAP {
+    bigint vehicle_id PK_FK
+    string pwms_object_id
+    string pwms_plate
+    string status
+  }
+  WORK_ORDER_SYNC {
+    bigint work_order_id PK_FK
+    string purchase_status
+    datetime purchase_synced_at
+    string issue_doc_code
+    string base_status
+    string base_code
+    datetime base_synced_at
+  }
+  MATERIAL ||--o{ MATERIAL_PRICE_HISTORY : history
+  MATERIAL_PRICE_HISTORY {
+    bigint id PK
+    bigint material_id FK
+    numeric price
+    string supplier
+    datetime synced_at
+  }
+          </pre>
+          <p class="cap" style="margin-top:10px">Hệ thống ngoài (không lưu bảng quan hệ trong TMS): <strong>PWMS</strong> kéo vào sync / giá vật tư · <strong>BASE</strong> đẩy trạng thái · <strong>GPS</strong> cập nhật odo trên <span class="mono">vehicle</span>.</p>
+        </div>
+      </div>
+
+      <h3>Chú giải quan hệ (văn bản)</h3>
       <ul class="rel-list">
-        <li><strong>vehicle</strong> 1—N <strong>vehicle_catalog</strong> N—1 <strong>maint_catalog</strong> (gắn DM BD)</li>
+        <li><strong>vehicle</strong> 1—N <strong>vehicle_catalog</strong> N—1 <strong>maint_catalog</strong> (gắn danh mục BD)</li>
         <li><strong>maint_catalog</strong> 1—N <strong>maint_catalog_rule</strong> (mốc chu kỳ)</li>
-        <li><strong>vehicle</strong> + <strong>maint_catalog</strong> → <strong>vehicle_catalog_state</strong> (mốc hiện tại / nhắc)</li>
+        <li><strong>vehicle</strong> + <strong>maint_catalog</strong> → <strong>vehicle_catalog_state</strong> (mốc nhắc hiện tại)</li>
         <li><strong>vehicle</strong> 1—N <strong>plan_line</strong> · 1—N <strong>work_order</strong> · 1—N <strong>evaluation</strong></li>
-        <li><strong>work_order</strong> 1—N <strong>work_order_item</strong> · 1—N <strong>work_order_material</strong> (dự kiến) · 1—N <strong>work_order_purchase_line</strong> (sau MH)</li>
-        <li><strong>material</strong> 1—N dòng VT trên kế hoạch / phiếu / lịch sử giá</li>
+        <li><strong>work_order</strong> 1—N hạng mục / VT dự kiến / dòng MH · 1—1 <strong>work_order_sync</strong></li>
+        <li><strong>material</strong> 1—N dòng VT trên kế hoạch &amp; phiếu</li>
         <li><strong>vehicle</strong> 0—1 <strong>pwms_vehicle_map</strong> (Object ID PWMS)</li>
       </ul>
+    </section>
 
-      <h3>4.2 Bảng master</h3>
+    <!-- ========== DB DESIGN ========== -->
+    <section id="db">
+      <h2>5. Chi tiết cột bảng (đề xuất)</h2>
+      <p class="sub">
+        Schema quan hệ đề xuất khi chuyển prototype → backend. Tên bảng tiếng Anh kỹ thuật; mô tả tiếng Việt.
+        Khóa chính <span class="pk">PK</span> · khóa ngoại <span class="fk">FK</span>. Xem liên kết tổng thể ở mục <a href="#erd">Sơ đồ liên kết</a>.
+      </p>
+
+      <h3>5.1 Bảng master</h3>
       <div class="er">
         <div class="er-box">
           <header>vehicle</header>
@@ -663,7 +942,7 @@
         </div>
       </div>
 
-      <h3>4.3 Bảng trạng thái &amp; kế hoạch</h3>
+      <h3>5.2 Bảng trạng thái &amp; kế hoạch</h3>
       <div class="er">
         <div class="er-box">
           <header class="tx">vehicle_catalog_state</header>
@@ -710,7 +989,7 @@
         </div>
       </div>
 
-      <h3>4.4 Bảng phiếu công việc</h3>
+      <h3>5.3 Bảng phiếu công việc</h3>
       <div class="er">
         <div class="er-box">
           <header class="tx">work_order</header>
@@ -786,7 +1065,7 @@
         </div>
       </div>
 
-      <h3>4.5 Chỉ mục &amp; ràng buộc gợi ý</h3>
+      <h3>5.4 Chỉ mục &amp; ràng buộc gợi ý</h3>
       <div class="table-wrap">
         <table>
           <thead>
@@ -833,7 +1112,7 @@
 
     <!-- ========== SYNC ========== -->
     <section id="sync">
-      <h2>5. Biên hệ thống ngoài (đồng bộ)</h2>
+      <h2>6. Biên hệ thống ngoài (đồng bộ)</h2>
       <p class="sub">Trên demo chỉ mô phỏng. Hướng tích hợp thật (xem thêm <a href="diagram-it.html">IT · API PWMS</a>).</p>
       <div class="grid-2">
         <div class="ent ext">
@@ -904,6 +1183,43 @@
       · Cập nhật theo prototype v4 (đồng bộ MH bắt buộc · toi_thieu · luồng kế hoạch)
     </footer>
   </div>
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#ecfdf5',
+        primaryTextColor: '#0c1a14',
+        primaryBorderColor: '#0b6e4f',
+        lineColor: '#5a6b63',
+        secondaryColor: '#eff6ff',
+        tertiaryColor: '#f8fafc',
+        fontFamily: 'Be Vietnam Pro, IBM Plex Sans, sans-serif',
+      },
+      er: { useMaxWidth: true },
+    });
+
+    const runMermaid = async (root) => {
+      const nodes = [...(root || document).querySelectorAll('.mermaid:not([data-processed])')];
+      if (!nodes.length) return;
+      await mermaid.run({ nodes });
+    };
+
+    await runMermaid(document.querySelector('.diagram-pane.on'));
+
+    document.querySelectorAll('[data-erd-tab]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-erd-tab');
+        document.querySelectorAll('[data-erd-tab]').forEach((b) => b.classList.toggle('on', b === btn));
+        document.querySelectorAll('[data-erd-pane]').forEach((p) => {
+          p.classList.toggle('on', p.getAttribute('data-erd-pane') === id);
+        });
+        const pane = document.querySelector(`[data-erd-pane="${id}"]`);
+        await runMermaid(pane);
+      });
+    });
+  </script>
   <script>
     (function () {
       const links = [...document.querySelectorAll('.toc a')];
